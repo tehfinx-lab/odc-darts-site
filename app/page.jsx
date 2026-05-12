@@ -199,9 +199,18 @@ function LeaderboardsPage({ data }) {
 
 
 
-function EventsPage({ data }) {
-  return <section className="mx-auto max-w-7xl px-4 py-10"><SectionTitle kicker="Events" title="Nightly Tournament Winners" text="This can be connected to an Events sheet later. For now it uses latest match winner." /><div className="grid gap-4 md:grid-cols-3">{data.events.map((event) => <Card key={event.title}><div className="mb-5 flex items-center justify-between"><CalendarDays className="text-odcGreen" /><span className="rounded-full bg-odcGreen/20 px-3 py-1 text-xs font-black">{event.date}</span></div><h3 className="text-2xl font-black">{event.title}</h3><div className="mt-5 rounded-2xl bg-odcNavy p-4"><p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">Winner</p><p className="mt-2 flex items-center gap-2 text-xl font-black"><Medal className="text-odcRed" /> {event.winner}</p></div><p className="mt-4 text-sm text-odcCream/60">Runner-up: {event.runnerUp}</p></Card>)}</div></section>;
+function EventsPage() {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-10">
+      <SectionTitle kicker="Events" title="Nightly Tournament Winners" text="This section is ready. Add an Events sheet later and we can connect it properly." />
+      <Card className="max-w-2xl">
+        <h3 className="text-2xl font-black">Events sheet not connected yet</h3>
+        <p className="mt-3 text-odcCream/65">The old fake/latest-match winner has been removed so this page does not show incorrect tournament data.</p>
+      </Card>
+    </section>
+  );
 }
+
 
 export default function App() {
   const [active, setActive] = useState("home");
