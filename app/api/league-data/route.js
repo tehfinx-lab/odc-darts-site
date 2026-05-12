@@ -2,11 +2,25 @@ const SHEET_ID = "12g5hf6mPmQDBiDb-kN8zozOJfddmU5utOaq7YCzGRLk";
 const MATCHES_GID = "257719632"; // Matches tab
 
 const COL = {
-  date: 0, division: 1, p1: 2, p1LegsFor: 3, p1LegsAgainst: 4,
-  p1Avg: 5, p1NineAvg: 6, p1HighCheckout: 7, p1Tons: 8,
-  p2: 9, p2LegsFor: 10, p2LegsAgainst: 11,
-  p2Avg: 12, p2NineAvg: 13, p2HighCheckout: 14, p2Tons: 15,
-  p1BestLeg: 16, p2BestLeg: 17, week: 19,
+  date: 0,
+  division: 1,
+  p1: 2,
+  p1LegsFor: 3,
+  p1LegsAgainst: 4,
+  p1Avg: 5,
+  p1NineAvg: 6,
+  p1HighCheckout: 7,
+  p1Tons: 8,
+  p2: 9,
+  p2LegsFor: 10,
+  p2LegsAgainst: 11,
+  p2Avg: 12,
+  p2NineAvg: 13,
+  p2HighCheckout: 14,
+  p2Tons: 15,
+  p1BestLeg: 16,
+  p2BestLeg: 17,
+  week: 19,
 };
 
 function parseCsv(csvText) {
@@ -91,6 +105,9 @@ function addPlayerMatch(players, division, name, stats) {
   p.legsAgainst += stats.legsAgainst;
   p.tons += stats.tons;
   p.highCheckout = Math.max(p.highCheckout, stats.highCheckout);
+
+  // Best leg = lowest positive number of darts.
+  // P1 pulls from column Q, P2 pulls from column R.
   if (stats.bestLeg > 0) {
     p.bestLeg = p.bestLeg === 0 ? stats.bestLeg : Math.min(p.bestLeg, stats.bestLeg);
   }
@@ -107,14 +124,14 @@ function addPlayerMatch(players, division, name, stats) {
 
   if (stats.legsFor > stats.legsAgainst) {
     p.wins += 1;
-    p.points += 2;
+    p.points += 2; // 2 points per win
     p.form.push("W");
   } else if (stats.legsFor < stats.legsAgainst) {
     p.losses += 1;
     p.form.push("L");
   } else {
     p.draws += 1;
-    p.points += 1;
+    p.points += 1; // 1 point per draw
     p.form.push("D");
   }
 }
@@ -146,7 +163,7 @@ function buildLeagueData(rows) {
       nineAvg: num(row[COL.p1NineAvg]),
       highCheckout: num(row[COL.p1HighCheckout]),
       tons: num(row[COL.p1Tons]),
-      bestLeg: num(row[COL.p1BestLeg]),
+      bestLeg: num(row[COL.p1BestLeg]), // Q = Best Leg P1, player in C
     };
 
     const p2Stats = {
@@ -156,7 +173,7 @@ function buildLeagueData(rows) {
       nineAvg: num(row[COL.p2NineAvg]),
       highCheckout: num(row[COL.p2HighCheckout]),
       tons: num(row[COL.p2Tons]),
-      bestLeg: num(row[COL.p2BestLeg]),
+      bestLeg: num(row[COL.p2BestLeg]), // R = Best Leg P2, player in J
     };
 
     addPlayerMatch(playerMap, division, p1, p1Stats);
@@ -166,7 +183,7 @@ function buildLeagueData(rows) {
       home: p1,
       away: p2,
       score: `${p1Stats.legsFor} - ${p2Stats.legsFor}`,
-      avg: Math.max(p1Stats.avg, p2Stats.avg) || "-",
+      avg: `${p1Stats.avg || "-"} / ${p2Stats.avg || "-"}`,
       checkout: `${Math.max(p1Stats.highCheckout, p2Stats.highCheckout) || 0} C/O`,
       division,
       week: text(row[COL.week]),
@@ -188,6 +205,7 @@ function buildLeagueData(rows) {
   const divisionNames = sortDivisionNames([...new Set(players.map((p) => p.division))]);
 
   const tables = {};
+
   for (const division of divisionNames) {
     tables[division] = players
       .filter((p) => p.division === division)
@@ -213,23 +231,13 @@ function buildLeagueData(rows) {
       }));
   }
 
-  const latest = latestResults.reverse().slice(0, 6);
-
-  const events = latest[0]
-    ? [{
-        title: "Latest Match Winner",
-        winner: Number(latest[0].score.split(" - ")[0]) >= Number(latest[0].score.split(" - ")[1]) ? latest[0].home : latest[0].away,
-        runnerUp: Number(latest[0].score.split(" - ")[0]) >= Number(latest[0].score.split(" - ")[1]) ? latest[0].away : latest[0].home,
-        date: latest[0].date || "Latest",
-        prize: "ODC Winner",
-      }]
-    : [];
+  const latest = latestResults.reverse().slice(0, 12);
 
   return {
     tables,
     players: players.sort((a, b) => b.avg - a.avg),
     results: latest,
-    events,
+    events: [],
   };
 }
 
@@ -239,7 +247,10 @@ export async function GET() {
     const res = await fetch(csvUrl, { cache: "no-store" });
 
     if (!res.ok) {
-      return Response.json({ error: `Google Sheets fetch failed: ${res.status}` }, { status: 500 });
+      return Response.json(
+        { error: `Google Sheets fetch failed: ${res.status}` },
+        { status: 500 }
+      );
     }
 
     const csv = await res.text();
@@ -247,9 +258,14 @@ export async function GET() {
     const data = buildLeagueData(rows);
 
     return Response.json(data, {
-      headers: { "Cache-Control": "no-store" },
+      headers: {
+        "Cache-Control": "no-store",
+      },
     });
   } catch (error) {
-    return Response.json({ error: error.message || "Failed to build league data" }, { status: 500 });
+    return Response.json(
+      { error: error.message || "Failed to build league data" },
+      { status: 500 }
+    );
   }
 }
