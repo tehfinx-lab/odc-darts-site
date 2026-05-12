@@ -91,7 +91,9 @@ function addPlayerMatch(players, division, name, stats) {
   p.legsAgainst += stats.legsAgainst;
   p.tons += stats.tons;
   p.highCheckout = Math.max(p.highCheckout, stats.highCheckout);
-  p.bestLeg = Math.max(p.bestLeg, stats.bestLeg);
+  if (stats.bestLeg > 0) {
+    p.bestLeg = p.bestLeg === 0 ? stats.bestLeg : Math.min(p.bestLeg, stats.bestLeg);
+  }
 
   if (stats.avg > 0) {
     p.avgTotal += stats.avg;
@@ -169,6 +171,8 @@ function buildLeagueData(rows) {
       division,
       week: text(row[COL.week]),
       date: text(row[COL.date]),
+      p1Stats,
+      p2Stats,
     });
   }
 
