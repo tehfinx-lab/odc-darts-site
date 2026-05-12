@@ -19,6 +19,9 @@ import {
   Flame,
   Shield,
   Zap,
+MessageCircle,
+Share2,
+ExternalLink,
 } from "lucide-react";
 import { fallbackData, getLiveLeagueData } from "../lib/sheetData";
 
@@ -29,7 +32,23 @@ const pages = [
   { id: "leaderboards", label: "Leaders", icon: BarChart3 },
   { id: "events", label: "Events", icon: CalendarDays },
 ];
-
+const socials = [
+  {
+    label: "Discord",
+    href: "https://discord.gg/s4GdKykCe9",
+    icon: MessageCircle,
+  },
+  {
+    label: "Facebook",
+    href: "https://www.facebook.com/profile.php?id=61581159360834",
+    icon: Share2,
+  },
+  {
+    label: "TikTok",
+    href: "https://www.tiktok.com/@odccircuit",
+    icon: ExternalLink,
+  },
+];
 function Card({ children, className = "" }) {
   return <div className={`rounded-3xl border border-odcCream/10 bg-white/[0.055] p-5 shadow-cream backdrop-blur ${className}`}>{children}</div>;
 }
@@ -57,7 +76,28 @@ function SmallStat({ label, value, icon: Icon }) {
     </Card>
   );
 }
+function SocialButtons() {
+  return (
+    <div className="flex flex-wrap gap-3">
+      {socials.map((social) => {
+        const Icon = social.icon;
 
+        return (
+          <a
+            key={social.label}
+            href={social.href}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-2xl border border-odcCream/15 bg-white/5 px-4 py-3 text-sm font-black text-odcCream transition hover:bg-white/10"
+          >
+            <Icon size={17} />
+            {social.label}
+          </a>
+        );
+      })}
+    </div>
+  );
+}
 function Header({ active, setActive }) {
   const [open, setOpen] = useState(false);
   const go = (id) => {
@@ -140,6 +180,9 @@ function HomePage({ setActive, data, status }) {
             <h1 className="text-4xl font-black tracking-tight md:text-7xl">Online Darts, <span className="text-odcRed">Done Properly.</span></h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-odcCream/70 md:text-lg">Welcome to ODC — fixtures, tables, player stats, rankings and nightly tournament winners in one clean league hub.</p>
             <div className="mt-7 flex flex-wrap gap-3"><button onClick={() => setActive("tables")} className="rounded-2xl bg-odcRed px-5 py-3 font-black text-white shadow-glow">View Tables</button><button onClick={() => setActive("players")} className="rounded-2xl border border-odcCream/20 px-5 py-3 font-black">Player Stats</button></div>
+            <div className="mt-5">
+  <SocialButtons />
+</div>
           </motion.div>
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto w-full max-w-sm">
             <Card className="relative overflow-hidden p-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(229,29,42,.22),transparent_58%)]" /><img src="/odc-logo.jpg" alt="ODC logo" className="relative mx-auto aspect-square w-52 rounded-full object-cover shadow-glow ring-4 ring-odcCream/15 md:w-72" /></Card>
