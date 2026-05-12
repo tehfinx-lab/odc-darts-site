@@ -167,9 +167,36 @@ function PlayersPage({ data }) {
 }
 
 function LeaderboardsPage({ data }) {
-  const boards = useMemo(() => [["Highest Average", [...data.players].sort((a, b) => b.avg - a.avg), "avg", Trophy], ["Most 180s", [...data.players].sort((a, b) => b.tons - a.tons), "tons", Flame], ["Most Wins", [...data.players].sort((a, b) => b.wins - a.wins), "wins", Medal]], [data.players]);
-  return <section className="mx-auto max-w-7xl px-4 py-10"><SectionTitle kicker="Rankings" title="Leaderboards" text="Automatically calculated from your Matches sheet." /><div className="grid gap-4 md:grid-cols-3">{boards.map(([title, list, key, Icon]) => <Card key={title}><div className="mb-4 flex items-center gap-2"><Icon className="text-odcRed" /><h3 className="text-xl font-black">{title}</h3></div>{list.slice(0, 10).map((p, i) => <div key={`${title}-${p.name}-${p.division}`} className="flex items-center justify-between border-t border-odcCream/10 py-3"><span className="font-bold">{i + 1}. {p.name}</span><span className="rounded-lg bg-odcCream/10 px-3 py-1 font-black">{p[key]}</span></div>)}</Card>)}</div></section>;
+  const boards = useMemo(() => [
+    ["Highest Average", [...data.players].sort((a, b) => b.avg - a.avg), "avg", Trophy],
+    ["Most 180s", [...data.players].sort((a, b) => b.tons - a.tons), "tons", Flame],
+    ["Highest Checkout", [...data.players].sort((a, b) => b.highCheckout - a.highCheckout), "highCheckout", Medal],
+    ["Best Leg", [...data.players].sort((a, b) => b.bestLeg - a.bestLeg), "bestLeg", Zap],
+  ], [data.players]);
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-10">
+      <SectionTitle kicker="Rankings" title="Leaderboards" text="Automatically calculated from every match in your Matches sheet." />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {boards.map(([title, list, key, Icon]) => (
+          <Card key={title}>
+            <div className="mb-4 flex items-center gap-2">
+              <Icon className="text-odcRed" />
+              <h3 className="text-xl font-black">{title}</h3>
+            </div>
+            {list.filter((p) => Number(p[key]) > 0).slice(0, 10).map((p, i) => (
+              <div key={`${title}-${p.name}-${p.division}`} className="flex items-center justify-between border-t border-odcCream/10 py-3">
+                <span className="font-bold">{i + 1}. {p.name}</span>
+                <span className="rounded-lg bg-odcCream/10 px-3 py-1 font-black">{p[key]}</span>
+              </div>
+            ))}
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
 }
+
 
 function EventsPage({ data }) {
   return <section className="mx-auto max-w-7xl px-4 py-10"><SectionTitle kicker="Events" title="Nightly Tournament Winners" text="This can be connected to an Events sheet later. For now it uses latest match winner." /><div className="grid gap-4 md:grid-cols-3">{data.events.map((event) => <Card key={event.title}><div className="mb-5 flex items-center justify-between"><CalendarDays className="text-odcGreen" /><span className="rounded-full bg-odcGreen/20 px-3 py-1 text-xs font-black">{event.date}</span></div><h3 className="text-2xl font-black">{event.title}</h3><div className="mt-5 rounded-2xl bg-odcNavy p-4"><p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">Winner</p><p className="mt-2 flex items-center gap-2 text-xl font-black"><Medal className="text-odcRed" /> {event.winner}</p></div><p className="mt-4 text-sm text-odcCream/60">Runner-up: {event.runnerUp}</p></Card>)}</div></section>;
