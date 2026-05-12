@@ -1,20 +1,4 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  background: #050505;
-  color: #F8EBC6;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#050505;color:#F8EBC6}button,a,input,select{-webkit-tap-highlight-color:transparent}.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
