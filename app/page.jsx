@@ -171,7 +171,7 @@ function LeaderboardsPage({ data }) {
     ["Highest Average", [...data.players].sort((a, b) => b.avg - a.avg), "avg", Trophy],
     ["Most 180s", [...data.players].sort((a, b) => b.tons - a.tons), "tons", Flame],
     ["Highest Checkout", [...data.players].sort((a, b) => b.highCheckout - a.highCheckout), "highCheckout", Medal],
-    ["Best Leg", [...data.players].sort((a, b) => b.bestLeg - a.bestLeg), "bestLeg", Zap],
+    ["Best Leg", [...data.players].filter((p) => Number(p.bestLeg) > 0).sort((a, b) => a.bestLeg - b.bestLeg), "bestLeg", Zap],
   ], [data.players]);
 
   return (
@@ -196,6 +196,7 @@ function LeaderboardsPage({ data }) {
     </section>
   );
 }
+
 
 
 function EventsPage({ data }) {
