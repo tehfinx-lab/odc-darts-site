@@ -107,7 +107,7 @@ function addPlayerMatch(players, division, name, stats) {
 
   if (stats.legsFor > stats.legsAgainst) {
     p.wins += 1;
-    p.points += 3;
+    p.points += 2;
     p.form.push("W");
   } else if (stats.legsFor < stats.legsAgainst) {
     p.losses += 1;
