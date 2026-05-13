@@ -1,8 +1,8 @@
 const SHEET_ID = "12g5hf6mPmQDBiDb-kN8zozOJfddmU5utOaq7YCzGRLk";
 const MATCHES_GID = "257719632";
 const FIXTURES_GID = "573028301";
+const MASTER_STATS_GID = "1607751142";
 const CURRENT_WEEK = 7;
-const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
   date: 0, division: 1, p1: 2, p1LegsFor: 3, p1LegsAgainst: 4,
@@ -221,7 +221,7 @@ function buildMatchesData(rows) {
       p2Stats,
     });
 
-    if (week === MVP_WEEK) {
+    if (week === CURRENT_WEEK) {
       for (const candidate of [
         { name: p1, stats: p1Stats },
         { name: p2, stats: p2Stats },
@@ -299,10 +299,13 @@ function buildMatchesData(rows) {
     return clean;
   });
 
+  const allResults = [...latestResults].reverse();
+
   return {
     tables,
     players: players.sort((a, b) => b.avg - a.avg),
-    results: latestResults.reverse().slice(0, 12),
+    results: allResults.slice(0, 12),
+    allResults,
     weeklyMvps,
   };
 }
@@ -339,22 +342,53 @@ function buildFixturesData(rows) {
   return grouped;
 }
 
+
+function buildMasterStats(rows) {
+  const stats = {};
+
+  for (const row of rows.slice(1)) {
+    const player = text(row[MASTER_COL.player]);
+    if (!player) continue;
+
+    stats[player.toLowerCase()] = {
+      player,
+      gamesPlayed: num(row[MASTER_COL.gamesPlayed]),
+      gamesWon: num(row[MASTER_COL.gamesWon]),
+      gamesDrawn: num(row[MASTER_COL.gamesDrawn]),
+      gamesLost: num(row[MASTER_COL.gamesLost]),
+      legsFor: num(row[MASTER_COL.legsFor]),
+      legsAgainst: num(row[MASTER_COL.legsAgainst]),
+      legsDiff: text(row[MASTER_COL.legsDiff]) || String(num(row[MASTER_COL.legsFor]) - num(row[MASTER_COL.legsAgainst])),
+      bestCheckout: num(row[MASTER_COL.bestCheckout]),
+      tons: num(row[MASTER_COL.tons]),
+      best3DA: num(row[MASTER_COL.best3DA]),
+      best9DA: num(row[MASTER_COL.best9DA]),
+      totalPoints: num(row[MASTER_COL.totalPoints]),
+      division: text(row[MASTER_COL.division]),
+    };
+  }
+
+  return stats;
+}
+
 export async function GET() {
   try {
-    const [matchRows, fixtureRows] = await Promise.all([
+    const [matchRows, fixtureRows, masterRows] = await Promise.all([
       fetchSheetRows(MATCHES_GID),
       fetchSheetRows(FIXTURES_GID),
+      fetchSheetRows(MASTER_STATS_GID),
     ]);
 
     const matchData = buildMatchesData(matchRows);
     const fixtures = buildFixturesData(fixtureRows);
+    const masterStats = buildMasterStats(masterRows);
 
     return Response.json(
       {
         ...matchData,
         fixtures,
+        masterStats,
         currentWeek: CURRENT_WEEK,
-        mvpWeek: MVP_WEEK,
         events: [],
       },
       {
@@ -365,12 +399,8 @@ export async function GET() {
     );
   } catch (error) {
     return Response.json(
-      {
-        error: error.message || "Failed to build league data",
-      },
-      {
-        status: 500,
-      }
+      { error: error.message || "Failed to build league data" },
+      { status: 500 }
     );
   }
 }
