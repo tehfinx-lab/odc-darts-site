@@ -316,7 +316,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             <img
               src="/odc-logo.jpg"
               alt="ODC logo"
-              className="relative z-10 w-full max-w-[460px] object-contain mix-blend-screen drop-shadow-[0_0_45px_rgba(229,29,42,0.25)]"
+              className="relative z-10 w-full max-w-[440px] object-contain mix-blend-lighten brightness-110 contrast-125 drop-shadow-[0_0_45px_rgba(229,29,42,0.35)]"
             />
           </motion.div>
         </div>
