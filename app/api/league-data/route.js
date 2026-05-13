@@ -2,18 +2,57 @@ const SHEET_ID = "12g5hf6mPmQDBiDb-kN8zozOJfddmU5utOaq7YCzGRLk";
 const MATCHES_GID = "257719632";
 const FIXTURES_GID = "573028301";
 const MASTER_STATS_GID = "1607751142";
+
 const CURRENT_WEEK = 7;
+const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
-  date: 0, division: 1, p1: 2, p1LegsFor: 3, p1LegsAgainst: 4,
-  p1Avg: 5, p1NineAvg: 6, p1HighCheckout: 7, p1Tons: 8,
-  p2: 9, p2LegsFor: 10, p2LegsAgainst: 11,
-  p2Avg: 12, p2NineAvg: 13, p2HighCheckout: 14, p2Tons: 15,
-  p1BestLeg: 16, p2BestLeg: 17, week: 19,
+  date: 0,
+  division: 1,
+  p1: 2,
+  p1LegsFor: 3,
+  p1LegsAgainst: 4,
+  p1Avg: 5,
+  p1NineAvg: 6,
+  p1HighCheckout: 7,
+  p1Tons: 8,
+  p2: 9,
+  p2LegsFor: 10,
+  p2LegsAgainst: 11,
+  p2Avg: 12,
+  p2NineAvg: 13,
+  p2HighCheckout: 14,
+  p2Tons: 15,
+  p1BestLeg: 16,
+  p2BestLeg: 17,
+  week: 19,
 };
 
 const FIXTURE_COL = {
-  week: 0, division: 1, home: 2, away: 3, status: 4, notes: 5, date: 6,
+  week: 0,
+  division: 1,
+  home: 2,
+  away: 3,
+  status: 4,
+  notes: 5,
+  date: 6,
+};
+
+const MASTER_COL = {
+  player: 0,
+  gamesPlayed: 1,
+  gamesWon: 2,
+  gamesDrawn: 3,
+  gamesLost: 4,
+  legsFor: 5,
+  legsAgainst: 6,
+  legsDiff: 7,
+  bestCheckout: 8,
+  tons: 9,
+  best3DA: 10,
+  best9DA: 11,
+  totalPoints: 12,
+  division: 13,
 };
 
 function parseCsv(csvText) {
@@ -68,15 +107,20 @@ function bestLegRank(value) {
   return match ? Number(match[1]) : 9999;
 }
 
-async function fetchSheetRows(gid) {
+async function fetchSheetRows(gid, label = "Sheet") {
   const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
   const res = await fetch(csvUrl, { cache: "no-store" });
 
   if (!res.ok) {
-    throw new Error(`Google Sheets fetch failed: ${res.status}`);
+    throw new Error(`${label} fetch failed: ${res.status}`);
   }
 
   const csv = await res.text();
+
+  if (csv.toLowerCase().includes("<html") || csv.toLowerCase().includes("sign in")) {
+    throw new Error(`${label} is not publicly readable as CSV`);
+  }
+
   return parseCsv(csv);
 }
 
@@ -164,7 +208,12 @@ function sortDivisionNames(names) {
 }
 
 function hasRealResult(p1Stats, p2Stats) {
-  return p1Stats.legsFor > 0 || p1Stats.legsAgainst > 0 || p2Stats.legsFor > 0 || p2Stats.legsAgainst > 0;
+  return (
+    p1Stats.legsFor > 0 ||
+    p1Stats.legsAgainst > 0 ||
+    p2Stats.legsFor > 0 ||
+    p2Stats.legsAgainst > 0
+  );
 }
 
 function buildMatchesData(rows) {
@@ -221,7 +270,7 @@ function buildMatchesData(rows) {
       p2Stats,
     });
 
-    if (week === CURRENT_WEEK) {
+    if (week === MVP_WEEK) {
       for (const candidate of [
         { name: p1, stats: p1Stats },
         { name: p2, stats: p2Stats },
@@ -342,7 +391,6 @@ function buildFixturesData(rows) {
   return grouped;
 }
 
-
 function buildMasterStats(rows) {
   const stats = {};
 
@@ -358,7 +406,9 @@ function buildMasterStats(rows) {
       gamesLost: num(row[MASTER_COL.gamesLost]),
       legsFor: num(row[MASTER_COL.legsFor]),
       legsAgainst: num(row[MASTER_COL.legsAgainst]),
-      legsDiff: text(row[MASTER_COL.legsDiff]) || String(num(row[MASTER_COL.legsFor]) - num(row[MASTER_COL.legsAgainst])),
+      legsDiff:
+        text(row[MASTER_COL.legsDiff]) ||
+        String(num(row[MASTER_COL.legsFor]) - num(row[MASTER_COL.legsAgainst])),
       bestCheckout: num(row[MASTER_COL.bestCheckout]),
       tons: num(row[MASTER_COL.tons]),
       best3DA: num(row[MASTER_COL.best3DA]),
@@ -373,11 +423,20 @@ function buildMasterStats(rows) {
 
 export async function GET() {
   try {
-    const [matchRows, fixtureRows, masterRows] = await Promise.all([
-      fetchSheetRows(MATCHES_GID),
-      fetchSheetRows(FIXTURES_GID),
-      fetchSheetRows(MASTER_STATS_GID),
+    const [matchRows, fixtureRows] = await Promise.all([
+      fetchSheetRows(MATCHES_GID, "Matches"),
+      fetchSheetRows(FIXTURES_GID, "Fixtures"),
     ]);
+
+    let masterRows = [];
+    let masterStatsError = "";
+
+    try {
+      masterRows = await fetchSheetRows(MASTER_STATS_GID, "Master Stats");
+    } catch (error) {
+      masterStatsError = error.message || "Master Stats failed";
+      console.error("Master Stats failed:", error);
+    }
 
     const matchData = buildMatchesData(matchRows);
     const fixtures = buildFixturesData(fixtureRows);
@@ -388,7 +447,9 @@ export async function GET() {
         ...matchData,
         fixtures,
         masterStats,
+        masterStatsError,
         currentWeek: CURRENT_WEEK,
+        mvpWeek: MVP_WEEK,
         events: [],
       },
       {
@@ -399,8 +460,12 @@ export async function GET() {
     );
   } catch (error) {
     return Response.json(
-      { error: error.message || "Failed to build league data" },
-      { status: 500 }
+      {
+        error: error.message || "Failed to build league data",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
