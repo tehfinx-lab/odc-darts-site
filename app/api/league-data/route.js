@@ -350,18 +350,27 @@ export async function GET() {
     const fixtures = buildFixturesData(fixtureRows);
 
     return Response.json(
-  {
-    ...matchData,
-    fixtures,
-    currentWeek: CURRENT_WEEK,
-    mvpWeek: MVP_WEEK,
-    events: [],
-  },
-  {
-    headers: {
-      "Cache-Control": "no-store",
-    },
-  }
-);
+      {
+        ...matchData,
+        fixtures,
+        currentWeek: CURRENT_WEEK,
+        mvpWeek: MVP_WEEK,
+        events: [],
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  } catch (error) {
+    return Response.json(
+      {
+        error: error.message || "Failed to build league data",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
