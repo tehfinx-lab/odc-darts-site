@@ -2,6 +2,7 @@ const SHEET_ID = "12g5hf6mPmQDBiDb-kN8zozOJfddmU5utOaq7YCzGRLk";
 const MATCHES_GID = "257719632";
 const FIXTURES_GID = "573028301";
 const CURRENT_WEEK = 7;
+const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
   date: 0, division: 1, p1: 2, p1LegsFor: 3, p1LegsAgainst: 4,
@@ -220,7 +221,7 @@ function buildMatchesData(rows) {
       p2Stats,
     });
 
-    if (week === CURRENT_WEEK) {
+    if (week === MVP_WEEK) {
       for (const candidate of [
         { name: p1, stats: p1Stats },
         { name: p2, stats: p2Stats },
@@ -349,22 +350,18 @@ export async function GET() {
     const fixtures = buildFixturesData(fixtureRows);
 
     return Response.json(
-      {
-        ...matchData,
-        fixtures,
-        currentWeek: CURRENT_WEEK,
-        events: [],
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      }
-    );
-  } catch (error) {
-    return Response.json(
-      { error: error.message || "Failed to build league data" },
-      { status: 500 }
-    );
+  {
+    ...matchData,
+    fixtures,
+    currentWeek: CURRENT_WEEK,
+    mvpWeek: MVP_WEEK,
+    events: [],
+  },
+  {
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  }
+);
   }
 }
