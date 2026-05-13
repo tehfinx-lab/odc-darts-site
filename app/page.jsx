@@ -101,8 +101,11 @@ function Header({ active, setActive }) {
       <header className="sticky top-0 z-50 border-b border-odcCream/10 bg-black/75 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <button onClick={() => go("home")} className="flex items-center gap-3 text-left">
-            <img src="/odc-logo.jpg" alt="ODC logo" className="h-11 w-11 rounded-full object-cover ring-2 ring-odcCream/20" />
-            <div>
+            <img
+  src="/odc-logo.png"
+  alt="ODC logo"
+  className="relative z-10 w-full max-w-[440px] object-contain drop-shadow-[0_0_45px_rgba(229,29,42,0.35)]"
+/>
               <p className="text-sm font-black leading-none">ODC</p>
               <p className="text-[11px] text-odcCream/55">Online Darts Circuit</p>
             </div>
