@@ -195,7 +195,11 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             <div className="mt-5"><SocialButtons /></div>
           </motion.div>
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto w-full max-w-sm">
-            <Card className="relative overflow-hidden p-2"><div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(229,29,42,.22),transparent_58%)]" /><img src="/odc-logo.jpg" alt="ODC logo" className="relative mx-auto aspect-square w-full rounded-full object-cover shadow-glow ring-4 ring-odcCream/15" /></Card>
+            <Card className="relative overflow-hidden p-2"><div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(229,29,42,.22),transparent_58%)]" /><img
+  src="/odc-logo.jpg"
+  alt="ODC logo"
+  className="relative mx-auto aspect-square w-full scale-125 rounded-full object-cover object-center shadow-glow ring-4 ring-odcCream/15"
+/></Card>
           </motion.div>
         </div>
       </section>
@@ -240,7 +244,7 @@ function LeaderboardsPage({ data }) {
 
 function MvpsPage({ data }) {
   const mvps = data.weeklyMvps || [];
-  return <section className="mx-auto max-w-7xl px-4 py-10"><SectionTitle kicker={`Week ${data.currentWeek || 7}`} title="Weekly MVPs" text="One MVP is selected per division using the same ranking logic as the Discord bot: winners only, ranked by 3DA, 9DA, high checkout, 180s and best leg." />{mvps.length === 0 ? <Card><p className="text-lg font-black">No MVPs found for this week yet.</p><p className="mt-2 text-odcCream/60">MVPs appear once completed Week {data.currentWeek || 7} results are added to the Matches sheet.</p></Card> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{mvps.map((mvp) => <Card key={`${mvp.division}-${mvp.player}`}><p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{mvp.division}</p><div className="mt-4 flex items-center gap-3"><Award className="text-odcRed" size={30} /><h3 className="text-2xl font-black">{mvp.player}</h3></div><div className="mt-5 grid grid-cols-2 gap-3"><SmallStat label="3DA" value={mvp.avg} /><SmallStat label="9DA" value={mvp.nineAvg} /><SmallStat label="High C/O" value={mvp.highCheckout} /><SmallStat label="180s" value={mvp.tons} /><SmallStat label="Best Leg" value={mvp.bestLeg} /></div></Card>)}</div>}</section>;
+  return <section className="mx-auto max-w-7xl px-4 py-10"><SectionTitle kicker={`Week ${data.mvpWeek || 6}`} title="Weekly MVPs" text="One MVP is selected per division using the same ranking logic as the Discord bot: winners only, ranked by 3DA, 9DA, high checkout, 180s and best leg." />{mvps.length === 0 ? <Card><p className="text-lg font-black">No MVPs found for this week yet.</p><p className="mt-2 text-odcCream/60">MVPs appear once completed Week {data.mvpWeek || 6} results are added to the Matches sheet.</p></Card> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{mvps.map((mvp) => <Card key={`${mvp.division}-${mvp.player}`}><p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{mvp.division}</p><div className="mt-4 flex items-center gap-3"><Award className="text-odcRed" size={30} /><h3 className="text-2xl font-black">{mvp.player}</h3></div><div className="mt-5 grid grid-cols-2 gap-3"><SmallStat label="3DA" value={mvp.avg} /><SmallStat label="9DA" value={mvp.nineAvg} /><SmallStat label="High C/O" value={mvp.highCheckout} /><SmallStat label="180s" value={mvp.tons} /><SmallStat label="Best Leg" value={mvp.bestLeg} /></div></Card>)}</div>}</section>;
 }
 
 function EventsPage() {
