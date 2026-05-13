@@ -1,26 +1,18 @@
 const SHEET_ID = "12g5hf6mPmQDBiDb-kN8zozOJfddmU5utOaq7YCzGRLk";
-const MATCHES_GID = "257719632"; // Matches tab
+const MATCHES_GID = "257719632";
+const FIXTURES_GID = "573028301";
+const CURRENT_WEEK = 7;
 
-const COL = {
-  date: 0,
-  division: 1,
-  p1: 2,
-  p1LegsFor: 3,
-  p1LegsAgainst: 4,
-  p1Avg: 5,
-  p1NineAvg: 6,
-  p1HighCheckout: 7,
-  p1Tons: 8,
-  p2: 9,
-  p2LegsFor: 10,
-  p2LegsAgainst: 11,
-  p2Avg: 12,
-  p2NineAvg: 13,
-  p2HighCheckout: 14,
-  p2Tons: 15,
-  p1BestLeg: 16,
-  p2BestLeg: 17,
-  week: 19,
+const MATCH_COL = {
+  date: 0, division: 1, p1: 2, p1LegsFor: 3, p1LegsAgainst: 4,
+  p1Avg: 5, p1NineAvg: 6, p1HighCheckout: 7, p1Tons: 8,
+  p2: 9, p2LegsFor: 10, p2LegsAgainst: 11,
+  p2Avg: 12, p2NineAvg: 13, p2HighCheckout: 14, p2Tons: 15,
+  p1BestLeg: 16, p2BestLeg: 17, week: 19,
+};
+
+const FIXTURE_COL = {
+  week: 0, division: 1, home: 2, away: 3, status: 4, notes: 5, date: 6,
 };
 
 function parseCsv(csvText) {
@@ -70,6 +62,33 @@ const num = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+function bestLegRank(value) {
+  const match = text(value).match(/(\d+)/);
+  return match ? Number(match[1]) : 9999;
+}
+
+async function fetchSheetRows(gid) {
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  const res = await fetch(csvUrl, { cache: "no-store" });
+
+  if (!res.ok) {
+    throw new Error(`Google Sheets fetch failed: ${res.status}`);
+  }
+
+  const csv = await res.text();
+  return parseCsv(csv);
+}
+
+function compareRank(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    if (av > bv) return 1;
+    if (av < bv) return -1;
+  }
+  return 0;
+}
+
 function addPlayerMatch(players, division, name, stats) {
   if (!name) return;
 
@@ -106,8 +125,6 @@ function addPlayerMatch(players, division, name, stats) {
   p.tons += stats.tons;
   p.highCheckout = Math.max(p.highCheckout, stats.highCheckout);
 
-  // Best leg = lowest positive number of darts.
-  // P1 pulls from column Q, P2 pulls from column R.
   if (stats.bestLeg > 0) {
     p.bestLeg = p.bestLeg === 0 ? stats.bestLeg : Math.min(p.bestLeg, stats.bestLeg);
   }
@@ -124,14 +141,14 @@ function addPlayerMatch(players, division, name, stats) {
 
   if (stats.legsFor > stats.legsAgainst) {
     p.wins += 1;
-    p.points += 2; // 2 points per win
+    p.points += 2;
     p.form.push("W");
   } else if (stats.legsFor < stats.legsAgainst) {
     p.losses += 1;
     p.form.push("L");
   } else {
     p.draws += 1;
-    p.points += 1; // 1 point per draw
+    p.points += 1;
     p.form.push("D");
   }
 }
@@ -145,52 +162,98 @@ function sortDivisionNames(names) {
   });
 }
 
-function buildLeagueData(rows) {
+function hasRealResult(p1Stats, p2Stats) {
+  return p1Stats.legsFor > 0 || p1Stats.legsAgainst > 0 || p2Stats.legsFor > 0 || p2Stats.legsAgainst > 0;
+}
+
+function buildMatchesData(rows) {
   const playerMap = {};
   const latestResults = [];
+  const mvpCandidates = {};
 
   for (const row of rows.slice(1)) {
-    const division = text(row[COL.division]) || "Unassigned";
-    const p1 = text(row[COL.p1]);
-    const p2 = text(row[COL.p2]);
+    const week = num(row[MATCH_COL.week]);
+    const division = text(row[MATCH_COL.division]) || "Unassigned";
+    const p1 = text(row[MATCH_COL.p1]);
+    const p2 = text(row[MATCH_COL.p2]);
 
     if (!p1 || !p2) continue;
 
     const p1Stats = {
-      legsFor: num(row[COL.p1LegsFor]),
-      legsAgainst: num(row[COL.p1LegsAgainst]),
-      avg: num(row[COL.p1Avg]),
-      nineAvg: num(row[COL.p1NineAvg]),
-      highCheckout: num(row[COL.p1HighCheckout]),
-      tons: num(row[COL.p1Tons]),
-      bestLeg: num(row[COL.p1BestLeg]), // Q = Best Leg P1, player in C
+      legsFor: num(row[MATCH_COL.p1LegsFor]),
+      legsAgainst: num(row[MATCH_COL.p1LegsAgainst]),
+      avg: num(row[MATCH_COL.p1Avg]),
+      nineAvg: num(row[MATCH_COL.p1NineAvg]),
+      highCheckout: num(row[MATCH_COL.p1HighCheckout]),
+      tons: num(row[MATCH_COL.p1Tons]),
+      bestLeg: num(row[MATCH_COL.p1BestLeg]),
+      bestLegRaw: text(row[MATCH_COL.p1BestLeg]),
     };
 
     const p2Stats = {
-      legsFor: num(row[COL.p2LegsFor]),
-      legsAgainst: num(row[COL.p2LegsAgainst]),
-      avg: num(row[COL.p2Avg]),
-      nineAvg: num(row[COL.p2NineAvg]),
-      highCheckout: num(row[COL.p2HighCheckout]),
-      tons: num(row[COL.p2Tons]),
-      bestLeg: num(row[COL.p2BestLeg]), // R = Best Leg P2, player in J
+      legsFor: num(row[MATCH_COL.p2LegsFor]),
+      legsAgainst: num(row[MATCH_COL.p2LegsAgainst]),
+      avg: num(row[MATCH_COL.p2Avg]),
+      nineAvg: num(row[MATCH_COL.p2NineAvg]),
+      highCheckout: num(row[MATCH_COL.p2HighCheckout]),
+      tons: num(row[MATCH_COL.p2Tons]),
+      bestLeg: num(row[MATCH_COL.p2BestLeg]),
+      bestLegRaw: text(row[MATCH_COL.p2BestLeg]),
     };
+
+    if (!hasRealResult(p1Stats, p2Stats)) continue;
 
     addPlayerMatch(playerMap, division, p1, p1Stats);
     addPlayerMatch(playerMap, division, p2, p2Stats);
 
     latestResults.push({
+      id: `${text(row[MATCH_COL.date])}-${division}-${p1}-${p2}-${latestResults.length}`,
       home: p1,
       away: p2,
       score: `${p1Stats.legsFor} - ${p2Stats.legsFor}`,
       avg: `${p1Stats.avg || "-"} / ${p2Stats.avg || "-"}`,
       checkout: `${Math.max(p1Stats.highCheckout, p2Stats.highCheckout) || 0} C/O`,
       division,
-      week: text(row[COL.week]),
-      date: text(row[COL.date]),
+      week,
+      date: text(row[MATCH_COL.date]),
       p1Stats,
       p2Stats,
     });
+
+    if (week === CURRENT_WEEK) {
+      for (const candidate of [
+        { name: p1, stats: p1Stats },
+        { name: p2, stats: p2Stats },
+      ]) {
+        const { name, stats } = candidate;
+        if (!name) continue;
+        if (stats.legsFor <= stats.legsAgainst) continue;
+
+        const rank = [
+          Number(stats.avg.toFixed(4)),
+          Number(stats.nineAvg.toFixed(4)),
+          stats.highCheckout,
+          stats.tons,
+          -bestLegRank(stats.bestLegRaw || stats.bestLeg),
+        ];
+
+        const mvp = {
+          player: name,
+          division,
+          week,
+          avg: Number(stats.avg.toFixed(2)),
+          nineAvg: Number(stats.nineAvg.toFixed(2)),
+          highCheckout: stats.highCheckout,
+          tons: stats.tons,
+          bestLeg: stats.bestLegRaw || stats.bestLeg || "-",
+          rank,
+        };
+
+        if (!mvpCandidates[division] || compareRank(rank, mvpCandidates[division].rank) > 0) {
+          mvpCandidates[division] = mvp;
+        }
+      }
+    }
   }
 
   const players = Object.values(playerMap).map((p) => ({
@@ -203,7 +266,6 @@ function buildLeagueData(rows) {
   }));
 
   const divisionNames = sortDivisionNames([...new Set(players.map((p) => p.division))]);
-
   const tables = {};
 
   for (const division of divisionNames) {
@@ -231,37 +293,74 @@ function buildLeagueData(rows) {
       }));
   }
 
-  const latest = latestResults.reverse().slice(0, 12);
+  const weeklyMvps = sortDivisionNames(Object.keys(mvpCandidates)).map((division) => {
+    const { rank, ...clean } = mvpCandidates[division];
+    return clean;
+  });
 
   return {
     tables,
     players: players.sort((a, b) => b.avg - a.avg),
-    results: latest,
-    events: [],
+    results: latestResults.reverse().slice(0, 12),
+    weeklyMvps,
   };
+}
+
+function buildFixturesData(rows) {
+  const fixtures = [];
+
+  for (const row of rows.slice(1)) {
+    const week = num(row[FIXTURE_COL.week]);
+    const division = text(row[FIXTURE_COL.division]);
+    const home = text(row[FIXTURE_COL.home]);
+    const away = text(row[FIXTURE_COL.away]);
+    const date = text(row[FIXTURE_COL.date]);
+
+    if (week !== CURRENT_WEEK) continue;
+    if (!division || !home || !away) continue;
+
+    fixtures.push({
+      week,
+      division,
+      home,
+      away,
+      date,
+    });
+  }
+
+  const divisionNames = sortDivisionNames([...new Set(fixtures.map((f) => f.division))]);
+  const grouped = {};
+
+  for (const division of divisionNames) {
+    grouped[division] = fixtures.filter((f) => f.division === division);
+  }
+
+  return grouped;
 }
 
 export async function GET() {
   try {
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${MATCHES_GID}`;
-    const res = await fetch(csvUrl, { cache: "no-store" });
+    const [matchRows, fixtureRows] = await Promise.all([
+      fetchSheetRows(MATCHES_GID),
+      fetchSheetRows(FIXTURES_GID),
+    ]);
 
-    if (!res.ok) {
-      return Response.json(
-        { error: `Google Sheets fetch failed: ${res.status}` },
-        { status: 500 }
-      );
-    }
+    const matchData = buildMatchesData(matchRows);
+    const fixtures = buildFixturesData(fixtureRows);
 
-    const csv = await res.text();
-    const rows = parseCsv(csv);
-    const data = buildLeagueData(rows);
-
-    return Response.json(data, {
-      headers: {
-        "Cache-Control": "no-store",
+    return Response.json(
+      {
+        ...matchData,
+        fixtures,
+        currentWeek: CURRENT_WEEK,
+        events: [],
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error) {
     return Response.json(
       { error: error.message || "Failed to build league data" },
