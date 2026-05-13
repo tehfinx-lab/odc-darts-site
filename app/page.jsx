@@ -358,8 +358,59 @@ function TablesPage({ data }) {
 
 function PlayersPage({ data, onSelectPlayer }) {
   const [query, setQuery] = useState("");
-  const filtered = data.players.filter((p) => `${p.name} ${p.team} ${p.division}`.toLowerCase().includes(query.toLowerCase()));
-  return <section className="mx-auto max-w-7xl px-4 py-10"><div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><SectionTitle kicker="Players" title="Player Stats" text="Click any player card to open their full Master Stats profile and recent match history." /><div className="relative mb-7"><Search className="absolute left-4 top-4 text-odcCream/35" size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search player..." className="w-full rounded-2xl border border-odcCream/15 bg-odcNavy px-11 py-4 font-bold text-odcCream outline-none placeholder:text-odcCream/35 md:w-80" /></div></div><div className="grid gap-4 md:grid-cols-3">{filtered.map((p) => <Card key={`${p.division}-${p.name}`}><div className="flex items-start justify-between"><div><h3 className="text-xl font-black">{p.name}</h3><p className="text-sm text-odcCream/50">{p.division}</p></div><Target className="text-odcRed" /></div><div className="mt-5 grid grid-cols-2 gap-3"><SmallStat label="Avg" value={p.avg} /><SmallStat label="180s" value={p.tons} /><SmallStat label="High C/O" value={p.highCheckout || p.checkout} /><SmallStat label="Best Leg" value={p.bestLeg || "-"} /></div></Card>)}</div></section>;
+  const filtered = data.players.filter((p) =>
+    `${p.name} ${p.team} ${p.division}`.toLowerCase().includes(query.toLowerCase())
+  );
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-10">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <SectionTitle
+          kicker="Players"
+          title="Player Stats"
+          text="Click any player card to open their full Master Stats profile and recent match history."
+        />
+
+        <div className="relative mb-7">
+          <Search className="absolute left-4 top-4 text-odcCream/35" size={19} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search player..."
+            className="w-full rounded-2xl border border-odcCream/15 bg-odcNavy px-11 py-4 font-bold text-odcCream outline-none placeholder:text-odcCream/35 md:w-80"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {filtered.map((p) => (
+          <button
+            key={`${p.division}-${p.name}`}
+            type="button"
+            onClick={() => onSelectPlayer(p)}
+            className="block text-left"
+          >
+            <Card className="h-full cursor-pointer transition hover:-translate-y-1 hover:border-odcRed/40">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-xl font-black">{p.name}</h3>
+                  <p className="text-sm text-odcCream/50">{p.division}</p>
+                </div>
+                <Target className="text-odcRed" />
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <SmallStat label="Avg" value={p.avg} />
+                <SmallStat label="180s" value={p.tons} />
+                <SmallStat label="High C/O" value={p.highCheckout || p.checkout} />
+                <SmallStat label="Best Leg" value={p.bestLeg || "-"} />
+              </div>
+            </Card>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function LeaderboardsPage({ data }) {
@@ -369,7 +420,46 @@ function LeaderboardsPage({ data }) {
 
 function MvpsPage({ data }) {
   const mvps = data.weeklyMvps || [];
-  return <section className="mx-auto max-w-7xl px-4 py-10"><SectionTitle kicker={`Week ${data.currentWeek || 7}`} title="Weekly MVPs" text="One MVP is selected per division using the same ranking logic as the Discord bot: winners only, ranked by 3DA, 9DA, high checkout, 180s and best leg." />{mvps.length === 0 ? <Card><p className="text-lg font-black">No MVPs found for this week yet.</p><p className="mt-2 text-odcCream/60">MVPs appear once completed Week {data.currentWeek || 7} results are added to the Matches sheet.</p></Card> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{mvps.map((mvp) => <Card key={`${mvp.division}-${mvp.player}`}><p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{mvp.division}</p><div className="mt-4 flex items-center gap-3"><Award className="text-odcRed" size={30} /><h3 className="text-2xl font-black">{mvp.player}</h3></div><div className="mt-5 grid grid-cols-2 gap-3"><SmallStat label="3DA" value={mvp.avg} /><SmallStat label="9DA" value={mvp.nineAvg} /><SmallStat label="High C/O" value={mvp.highCheckout} /><SmallStat label="180s" value={mvp.tons} /><SmallStat label="Best Leg" value={mvp.bestLeg} /></div></Card>)}</div>}</section>;
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-10">
+      <SectionTitle
+        kicker={`Week ${data.mvpWeek || 6}`}
+        title="Weekly MVPs"
+        text="One MVP is selected per division using the same ranking logic as the Discord bot: winners only, ranked by 3DA, 9DA, high checkout, 180s and best leg."
+      />
+
+      {mvps.length === 0 ? (
+        <Card>
+          <p className="text-lg font-black">No MVPs found for this week yet.</p>
+          <p className="mt-2 text-odcCream/60">
+            MVPs appear once completed Week {data.mvpWeek || 6} results are added to the Matches sheet.
+          </p>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {mvps.map((mvp) => (
+            <Card key={`${mvp.division}-${mvp.player}`}>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
+                {mvp.division}
+              </p>
+              <div className="mt-4 flex items-center gap-3">
+                <Award className="text-odcRed" size={30} />
+                <h3 className="text-2xl font-black">{mvp.player}</h3>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <SmallStat label="3DA" value={mvp.avg} />
+                <SmallStat label="9DA" value={mvp.nineAvg} />
+                <SmallStat label="High C/O" value={mvp.highCheckout} />
+                <SmallStat label="180s" value={mvp.tons} />
+                <SmallStat label="Best Leg" value={mvp.bestLeg} />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function EventsPage() {
