@@ -283,9 +283,17 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             <div className="mt-7 flex flex-wrap gap-3"><button onClick={() => setActive("fixtures")} className="rounded-2xl bg-odcRed px-5 py-3 font-black text-white shadow-glow">Current Fixtures</button><button onClick={() => setActive("tables")} className="rounded-2xl border border-odcCream/20 px-5 py-3 font-black">View Tables</button></div>
             <div className="mt-5"><SocialButtons /></div>
           </motion.div>
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto w-full max-w-sm">
-            <Card className="relative overflow-hidden p-2"><div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(229,29,42,.22),transparent_58%)]" /><img src="/odc-logo.jpg" alt="ODC logo" className="relative mx-auto aspect-square w-full scale-150 rounded-full object-cover object-center shadow-glow ring-4 ring-odcCream/15" /></Card>
-          </motion.div>
+          <motion.div
+  initial={{ opacity: 0, scale: 0.95 }}
+  animate={{ opacity: 1, scale: 1 }}
+  className="mx-auto flex w-full max-w-md items-center justify-center"
+>
+  <img
+    src="/odc-logo.jpg"
+    alt="ODC logo"
+    className="w-full max-w-[420px] rounded-none object-contain drop-shadow-[0_0_35px_rgba(229,29,42,0.25)]"
+  />
+</motion.div>
         </div>
       </section>
       <section className="mx-auto max-w-7xl px-4 py-8"><div className="grid gap-3 md:grid-cols-4"><SmallStat label="Players" value={data.players.length} icon={Users} /><SmallStat label="Divisions" value={Object.keys(data.tables).length} icon={Shield} /><SmallStat label={`Week ${data.currentWeek || 7} Fixtures`} value={Object.values(data.fixtures || {}).flat().length} icon={CalendarCheck} /><SmallStat label="Updates" value={status === "live" ? "Live" : "Demo"} icon={Zap} /></div></section>
