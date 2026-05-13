@@ -807,6 +807,7 @@ export default function App() {
 
       <BottomNav active={active} setActive={setActive} />
       <MatchDetailsModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
-      <PlayerDetailsModal player={selectedPlayer} masterStats={data.masterStats || {}} matches={data.allResults || []} onClose={() => setSelectedPlayer(null)} />
+            <PlayerDetailsModal player={selectedPlayer} masterStats={data.masterStats || {}} matches={data.allResults || []} onClose={() => setSelectedPlayer(null)} />
     </main>
   );
+}
