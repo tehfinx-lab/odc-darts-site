@@ -274,30 +274,95 @@ function PlayerDetailsModal({ player, masterStats, matches, onClose }) {
 function HomePage({ setActive, data, status, onSelectMatch }) {
   return (
     <div>
-      <section className="relative overflow-hidden"><div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#123047_0%,#071723_36%,#050505_74%)]" /><div className="absolute -right-20 top-16 h-72 w-72 rounded-full bg-odcRed/20 blur-3xl" />
-        <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-10 md:grid-cols-[1.05fr_0.95fr] md:py-20">
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#123047_0%,#071723_36%,#050505_74%)]" />
+        <div className="absolute -right-20 top-16 h-72 w-72 rounded-full bg-odcRed/20 blur-3xl" />
+
+        <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 md:grid-cols-[1.05fr_0.95fr] md:py-20">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-odcRed/35 bg-odcRed/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-odcCream/85"><Target size={15} /> {status === "live" ? "Live league data" : "Loading league data"}</div>
-            <h1 className="text-4xl font-black tracking-tight md:text-7xl">Welcome to the <span className="text-odcRed">ODC.</span></h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-odcCream/70 md:text-lg">The home of competitive online darts. Follow live standings, weekly fixtures, match results, player statistics and season leaderboards across the Online Darts Circuit.</p>
-            <div className="mt-7 flex flex-wrap gap-3"><button onClick={() => setActive("fixtures")} className="rounded-2xl bg-odcRed px-5 py-3 font-black text-white shadow-glow">Current Fixtures</button><button onClick={() => setActive("tables")} className="rounded-2xl border border-odcCream/20 px-5 py-3 font-black">View Tables</button></div>
-            <div className="mt-5"><SocialButtons /></div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-odcRed/35 bg-odcRed/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-odcCream/85">
+              <Target size={15} /> {status === "live" ? "Live league data" : "Loading league data"}
+            </div>
+
+            <h1 className="text-4xl font-black tracking-tight md:text-7xl">
+              Welcome to the <span className="text-odcRed">ODC.</span>
+            </h1>
+
+            <p className="mt-5 max-w-2xl text-base leading-8 text-odcCream/70 md:text-lg">
+              The home of competitive online darts. Follow live standings, weekly fixtures, match results, player statistics and season leaderboards across the Online Darts Circuit.
+            </p>
+
+            <div className="mt-7 flex flex-wrap gap-3">
+              <button onClick={() => setActive("fixtures")} className="rounded-2xl bg-odcRed px-5 py-3 font-black text-white shadow-glow">
+                Current Fixtures
+              </button>
+              <button onClick={() => setActive("tables")} className="rounded-2xl border border-odcCream/20 px-5 py-3 font-black">
+                View Tables
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <SocialButtons />
+            </div>
           </motion.div>
+
           <motion.div
-  initial={{ opacity: 0, scale: 0.95 }}
-  animate={{ opacity: 1, scale: 1 }}
-  className="mx-auto flex w-full max-w-md items-center justify-center"
->
-  <img
-    src="/odc-logo.jpg"
-    alt="ODC logo"
-    className="w-full max-w-[420px] rounded-none object-contain drop-shadow-[0_0_35px_rgba(229,29,42,0.25)]"
-  />
-</motion.div>
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative mx-auto flex w-full max-w-xl items-center justify-center"
+          >
+            <div className="absolute h-72 w-72 rounded-full bg-odcRed/10 blur-3xl md:h-96 md:w-96" />
+
+            <img
+              src="/odc-logo.jpg"
+              alt="ODC logo"
+              className="relative z-10 w-full max-w-[460px] object-contain mix-blend-screen drop-shadow-[0_0_45px_rgba(229,29,42,0.25)]"
+            />
+          </motion.div>
         </div>
       </section>
-      <section className="mx-auto max-w-7xl px-4 py-8"><div className="grid gap-3 md:grid-cols-4"><SmallStat label="Players" value={data.players.length} icon={Users} /><SmallStat label="Divisions" value={Object.keys(data.tables).length} icon={Shield} /><SmallStat label={`Week ${data.currentWeek || 7} Fixtures`} value={Object.values(data.fixtures || {}).flat().length} icon={CalendarCheck} /><SmallStat label="Updates" value={status === "live" ? "Live" : "Demo"} icon={Zap} /></div></section>
-      <section className="mx-auto max-w-7xl px-4 py-10"><SectionTitle kicker="Latest Results" title="Recent Match Results" text="Review the latest completed ODC league matches and open any result for a full player-by-player breakdown." /><div className="grid gap-4 md:grid-cols-3">{data.results.slice(0, 6).map((r, index) => <button key={r.id || `${r.home}-${r.away}-${index}`} onClick={() => onSelectMatch(r)} className="text-left"><Card className="h-full transition hover:-translate-y-1 hover:border-odcRed/40"><p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{r.division || "Match Result"}</p><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3"><p className="font-black">{r.home}</p><p className="rounded-xl bg-odcRed px-3 py-1 text-lg font-black text-white">{r.score}</p><p className="text-right font-black">{r.away}</p></div><div className="mt-4 grid grid-cols-2 gap-2 text-sm text-odcCream/60"><span>{r.home}: {r.p1Stats?.avg || "-"} avg</span><span className="text-right">{r.away}: {r.p2Stats?.avg || "-"} avg</span><span>{r.home}: {r.p1Stats?.highCheckout || 0} C/O</span><span className="text-right">{r.away}: {r.p2Stats?.highCheckout || 0} C/O</span></div></Card></button>)}</div></section>
+
+      <section className="mx-auto max-w-7xl px-4 py-8">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SmallStat label="Players" value={data.players.length} icon={Users} />
+          <SmallStat label="Divisions" value={Object.keys(data.tables).length} icon={Shield} />
+          <SmallStat label={`Week ${data.currentWeek || 7} Fixtures`} value={Object.values(data.fixtures || {}).flat().length} icon={CalendarCheck} />
+          <SmallStat label="Updates" value={status === "live" ? "Live" : "Demo"} icon={Zap} />
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-10">
+        <SectionTitle
+          kicker="Latest Results"
+          title="Recent Match Results"
+          text="Review the latest completed ODC league matches and open any result for a full player-by-player breakdown."
+        />
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {data.results.slice(0, 6).map((r, index) => (
+            <button key={r.id || `${r.home}-${r.away}-${index}`} onClick={() => onSelectMatch(r)} className="text-left">
+              <Card className="h-full transition hover:-translate-y-1 hover:border-odcRed/40">
+                <p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
+                  {r.division || "Match Result"}
+                </p>
+
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <p className="font-black">{r.home}</p>
+                  <p className="rounded-xl bg-odcRed px-3 py-1 text-lg font-black text-white">{r.score}</p>
+                  <p className="text-right font-black">{r.away}</p>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-odcCream/60">
+                  <span>{r.home}: {r.p1Stats?.avg || "-"} avg</span>
+                  <span className="text-right">{r.away}: {r.p2Stats?.avg || "-"} avg</span>
+                  <span>{r.home}: {r.p1Stats?.highCheckout || 0} C/O</span>
+                  <span className="text-right">{r.away}: {r.p2Stats?.highCheckout || 0} C/O</span>
+                </div>
+              </Card>
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
