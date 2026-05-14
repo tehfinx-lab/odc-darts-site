@@ -32,6 +32,7 @@ const pages = [
   { id: "fixtures", label: "Fixtures", icon: CalendarCheck },
   { id: "results", label: "Results", icon: ClipboardList },
   { id: "tables", label: "Tables", icon: Table2 },
+  { id: "duo", label: "Duo League", icon: Trophy },
   { id: "players", label: "Players", icon: Users },
   { id: "leaderboards", label: "Leaders", icon: BarChart3 },
   { id: "mvps", label: "MVPs", icon: Award },
@@ -401,6 +402,9 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
               <button onClick={() => setActive("tables")} className="rounded-2xl border border-odcCream/20 px-5 py-3 font-black">
                 View Tables
               </button>
+              <button onClick={() => setActive("duo")} className="rounded-2xl border border-odcRed/35 bg-odcRed/10 px-5 py-3 font-black text-odcCream">
+                Duo League
+              </button>
             </div>
 
             <div className="mt-5">
@@ -626,6 +630,183 @@ function TablesPage({ data }) {
   );
 }
 
+function DuoLeaguePage({ data }) {
+  const duo = data.duoLeague || {};
+  const groups = duo.groups || {};
+  const groupNames = Object.keys(groups);
+  const [selected, setSelected] = useState(groupNames[0] || "Group A");
+
+  useEffect(() => {
+    if (!groups[selected] && groupNames[0]) setSelected(groupNames[0]);
+  }, [groups, selected, groupNames]);
+
+  const rows = groups[selected] || [];
+  const qualifiers = duo.qualifiers || [];
+  const thirdPlace = duo.thirdPlace || [];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-10">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <SectionTitle
+          kicker="Dynamic Duo League"
+          title="Group Tables"
+          text="Follow the ODC Duo League group standings and knockout qualification places."
+        />
+
+        <div className="relative mb-7">
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
+          >
+            {groupNames.map((name) => (
+              <option key={name}>{name}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-4 top-4" />
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <Card>
+          <p className="text-lg font-black">No Duo League table data found.</p>
+          <p className="mt-2 text-odcCream/60">
+            Check the Duo League sheet is public and the standings section is filled in.
+          </p>
+        </Card>
+      ) : (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full min-w-[900px] border-collapse">
+            <thead className="bg-odcNavy">
+              <tr className="text-left text-xs uppercase tracking-[0.22em] text-odcCream/55">
+                <th className="p-4">#</th>
+                <th className="p-4">Team</th>
+                <th className="p-4">Avg</th>
+                <th className="p-4">P</th>
+                <th className="p-4">W</th>
+                <th className="p-4">D</th>
+                <th className="p-4">L</th>
+                <th className="p-4">LF</th>
+                <th className="p-4">LA</th>
+                <th className="p-4">LD</th>
+                <th className="p-4">Pts</th>
+                <th className="p-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={`${selected}-${row.team}`} className="border-t border-odcCream/10">
+                  <td className="p-4 font-black text-odcRed">{row.rank || "-"}</td>
+                  <td className="p-4 font-black">{row.team}</td>
+                  <td className="p-4">{row.teamAvg || "-"}</td>
+                  <td className="p-4">{row.played}</td>
+                  <td className="p-4">{row.wins}</td>
+                  <td className="p-4">{row.draws}</td>
+                  <td className="p-4">{row.losses}</td>
+                  <td className="p-4">{row.legsFor}</td>
+                  <td className="p-4">{row.legsAgainst}</td>
+                  <td className="p-4">{row.legDiff}</td>
+                  <td className="p-4 text-xl font-black">{row.points}</td>
+                  <td className="p-4">
+                    {row.status ? (
+                      <span className="rounded-xl bg-odcRed/15 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-odcRed">
+                        {row.status}
+                      </span>
+                    ) : (
+                      <span className="text-odcCream/35">-</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      <div className="mt-12">
+        <SectionTitle
+          kicker="Knockout"
+          title="Seeded Qualifiers"
+          text="Current knockout qualification order from the Duo League group stage."
+        />
+
+        {qualifiers.length === 0 ? (
+          <Card>
+            <p className="text-lg font-black">No qualifiers found yet.</p>
+          </Card>
+        ) : (
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full min-w-[760px] border-collapse">
+              <thead className="bg-odcNavy">
+                <tr className="text-left text-xs uppercase tracking-[0.22em] text-odcCream/55">
+                  <th className="p-4">Seed</th>
+                  <th className="p-4">Team</th>
+                  <th className="p-4">Group</th>
+                  <th className="p-4">Finish</th>
+                  <th className="p-4">Avg</th>
+                  <th className="p-4">Pts</th>
+                  <th className="p-4">LD</th>
+                  <th className="p-4">LF</th>
+                </tr>
+              </thead>
+              <tbody>
+                {qualifiers.map((q) => (
+                  <tr key={`${q.seed}-${q.team}`} className="border-t border-odcCream/10">
+                    <td className="p-4 text-xl font-black text-odcRed">{q.seed}</td>
+                    <td className="p-4 font-black">{q.team}</td>
+                    <td className="p-4">{q.group}</td>
+                    <td className="p-4">{q.finish}</td>
+                    <td className="p-4">{q.teamAvg || "-"}</td>
+                    <td className="p-4 font-black">{q.points}</td>
+                    <td className="p-4">{q.legDiff}</td>
+                    <td className="p-4">{q.legsFor}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </div>
+
+      <div className="mt-12">
+        <SectionTitle
+          kicker="Qualification"
+          title="Best Third-Place Ranking"
+          text="The best third-place teams are ranked for the remaining knockout places."
+        />
+
+        {thirdPlace.length === 0 ? (
+          <Card>
+            <p className="text-lg font-black">No third-place ranking found yet.</p>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            {thirdPlace.map((team) => (
+              <Card key={`${team.group}-${team.team}`}>
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
+                  {team.group}
+                </p>
+                <h3 className="mt-3 text-xl font-black">{team.team}</h3>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <SmallStat label="Rank" value={team.rank || "-"} />
+                  <SmallStat label="Avg" value={team.teamAvg || "-"} />
+                  <SmallStat label="Pts" value={team.points} />
+                  <SmallStat label="LD" value={team.legDiff} />
+                </div>
+
+                <p className="mt-4 text-sm font-black text-odcCream/70">
+                  Qualifies: <span className="text-odcRed">{team.qualifies || "No"}</span>
+                </p>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function PlayersPage({ data, onSelectPlayer }) {
   const [query, setQuery] = useState("");
   const filtered = data.players.filter((p) => `${p.name} ${p.team} ${p.division}`.toLowerCase().includes(query.toLowerCase()));
@@ -795,6 +976,7 @@ export default function App() {
         {active === "fixtures" && <FixturesPage data={data} />}
         {active === "results" && <ResultsPage data={data} onSelectMatch={setSelectedMatch} />}
         {active === "tables" && <TablesPage data={data} />}
+        {active === "duo" && <DuoLeaguePage data={data} />}
         {active === "players" && <PlayersPage data={data} onSelectPlayer={setSelectedPlayer} />}
         {active === "leaderboards" && <LeaderboardsPage data={data} />}
         {active === "mvps" && <MvpsPage data={data} />}
@@ -807,7 +989,7 @@ export default function App() {
 
       <BottomNav active={active} setActive={setActive} />
       <MatchDetailsModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
-            <PlayerDetailsModal player={selectedPlayer} masterStats={data.masterStats || {}} matches={data.allResults || []} onClose={() => setSelectedPlayer(null)} />
+      <PlayerDetailsModal player={selectedPlayer} masterStats={data.masterStats || {}} matches={data.allResults || []} onClose={() => setSelectedPlayer(null)} />
     </main>
   );
 }
