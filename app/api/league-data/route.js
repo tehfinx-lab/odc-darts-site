@@ -435,71 +435,59 @@ function buildDuoLeagueData(rows) {
     "Group C": [],
   };
 
-  const clean = (value) => text(value).toLowerCase();
+  const groupNames = ["Group A", "Group B", "Group C"];
+  const headerRows = [];
 
-  function findGroupStandingsHeader(groupName) {
-    const titleText = `${groupName.toLowerCase()} standings`;
+  // Find the standings header rows.
+  // In your sheet the header row has:
+  // Match | Week | Home Team | Away Team | ... | Winner | blank | Team | blank avg | P | W | D | L | LF | LA | LD | Pts | Sort Key | Rank | Status
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r] || [];
 
-    for (let r = 0; r < rows.length; r++) {
-      const row = rows[r] || [];
+    const hasFixtureHeader =
+      text(row[0]).toLowerCase() === "match" &&
+      text(row[1]).toLowerCase() === "week" &&
+      text(row[2]).toLowerCase() === "home team";
 
-      for (let c = 0; c < row.length; c++) {
-        if (clean(row[c]).includes(titleText)) {
-          const titleCol = c;
+    const hasStandingHeader =
+      text(row[9]).toLowerCase() === "team" &&
+      text(row[11]).toLowerCase() === "p" &&
+      text(row[18]).toLowerCase() === "pts";
 
-          for (let headerRow = r; headerRow <= r + 3; headerRow++) {
-            const possibleHeader = rows[headerRow] || [];
-
-            for (let teamCol = titleCol; teamCol < possibleHeader.length; teamCol++) {
-              const isTeamHeader = clean(possibleHeader[teamCol]) === "team";
-              const hasP = clean(possibleHeader[teamCol + 1]) === "p";
-              const hasPts = clean(possibleHeader[teamCol + 8]) === "pts";
-
-              if (isTeamHeader && hasP && hasPts) {
-                return {
-                  headerRow,
-                  teamCol,
-                };
-              }
-            }
-          }
-        }
-      }
+    if (hasFixtureHeader && hasStandingHeader) {
+      headerRows.push(r);
     }
-
-    return null;
   }
 
-  for (const groupName of Object.keys(groups)) {
-    const found = findGroupStandingsHeader(groupName);
-    if (!found) continue;
+  for (let g = 0; g < groupNames.length; g++) {
+    const groupName = groupNames[g];
+    const headerRow = headerRows[g];
 
-    const { headerRow, teamCol } = found;
+    if (headerRow === undefined) continue;
 
-    for (let r = headerRow + 1; r < headerRow + 10; r++) {
+    // Each group has 4 teams directly under the header row.
+    for (let r = headerRow + 1; r <= headerRow + 4; r++) {
       const row = rows[r] || [];
-      const team = text(row[teamCol]);
 
+      const team = text(row[9]);
       if (!team) continue;
-      if (team.toLowerCase() === "team") continue;
-      if (team.toLowerCase().includes("fixture")) continue;
-      if (team.toLowerCase().includes("standings")) continue;
 
-      const played = num(row[teamCol + 1]);
-      const wins = num(row[teamCol + 2]);
-      const draws = num(row[teamCol + 3]);
-      const losses = num(row[teamCol + 4]);
-      const legsFor = num(row[teamCol + 5]);
-      const legsAgainst = num(row[teamCol + 6]);
-      const legDiff = text(row[teamCol + 7]) || String(legsFor - legsAgainst);
-      const points = num(row[teamCol + 8]);
-      const rank = num(row[teamCol + 10]) || groups[groupName].length + 1;
-      const status = text(row[teamCol + 11]);
+      const teamAvg = num(row[10]);
+      const played = num(row[11]);
+      const wins = num(row[12]);
+      const draws = num(row[13]);
+      const losses = num(row[14]);
+      const legsFor = num(row[15]);
+      const legsAgainst = num(row[16]);
+      const legDiff = text(row[17]) || String(legsFor - legsAgainst);
+      const points = num(row[18]);
+      const rank = num(row[20]) || groups[groupName].length + 1;
+      const status = text(row[21]);
 
       groups[groupName].push({
         group: groupName,
         team,
-        teamAvg: 0,
+        teamAvg,
         played,
         wins,
         draws,
@@ -519,6 +507,7 @@ function buildDuoLeagueData(rows) {
         b.points - a.points ||
         Number(b.legDiff) - Number(a.legDiff) ||
         b.legsFor - a.legsFor ||
+        b.teamAvg - a.teamAvg ||
         a.team.localeCompare(b.team)
       );
     });
