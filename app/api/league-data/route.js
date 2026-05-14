@@ -529,7 +529,7 @@ function buildDuoLeagueData(rows) {
     thirdPlace: [],
     qualifiers: [],
   };
-}}
+}
 
 export async function GET() {
   try {
