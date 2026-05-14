@@ -429,47 +429,97 @@ function buildMasterStats(rows) {
 }
 
 function buildDuoLeagueData(rows) {
+  const clean = (value) => text(value).toLowerCase();
+
   const groups = {
     "Group A": [],
     "Group B": [],
     "Group C": [],
   };
 
-  const getStandingRow = (row, group) => {
-    const team = text(row[9]);
-    if (!team) return null;
-
-    return {
-      group,
-      team,
-      teamAvg: num(row[10]),
-      played: num(row[11]),
-      wins: num(row[12]),
-      draws: num(row[13]),
-      losses: num(row[14]),
-      legsFor: num(row[15]),
-      legsAgainst: num(row[16]),
-      legDiff: text(row[17]),
-      points: num(row[18]),
-      rank: num(row[20]),
-      status: text(row[21]),
-    };
+  const findCell = (row, names) => {
+    for (let i = 0; i < row.length; i++) {
+      const cell = clean(row[i]);
+      if (names.some((name) => cell === name || cell.includes(name))) {
+        return i;
+      }
+    }
+    return -1;
   };
 
-  const standingBlocks = [
-    { group: "Group A", start: 5, end: 8 },
-    { group: "Group B", start: 21, end: 24 },
-    { group: "Group C", start: 37, end: 40 },
-  ];
+  const findHeaderNearGroup = (groupName) => {
+    const groupIndex = rows.findIndex((row) =>
+      row.some((cell) => clean(cell).includes(groupName.toLowerCase()))
+    );
 
-  for (const block of standingBlocks) {
-    for (let i = block.start; i <= block.end; i++) {
-      const row = rows[i] || [];
-      const standing = getStandingRow(row, block.group);
-      if (standing) groups[block.group].push(standing);
+    if (groupIndex === -1) return null;
+
+    for (let r = groupIndex; r < Math.min(rows.length, groupIndex + 18); r++) {
+      const row = rows[r] || [];
+      const teamCol = findCell(row, ["team"]);
+      const ptsCol = findCell(row, ["pts", "points"]);
+
+      if (teamCol !== -1 && ptsCol !== -1) {
+        return {
+          headerRow: r,
+          teamCol,
+          avgCol: findCell(row, ["avg", "team avg"]),
+          playedCol: findCell(row, ["p", "played"]),
+          winsCol: findCell(row, ["w", "wins"]),
+          drawsCol: findCell(row, ["d", "draws"]),
+          lossesCol: findCell(row, ["l", "losses"]),
+          legsForCol: findCell(row, ["lf", "legs for"]),
+          legsAgainstCol: findCell(row, ["la", "legs against"]),
+          legDiffCol: findCell(row, ["ld", "+/-", "diff"]),
+          pointsCol: ptsCol,
+          rankCol: findCell(row, ["rank", "#", "pos"]),
+          statusCol: findCell(row, ["status", "qualifies", "qualification"]),
+        };
+      }
     }
 
-    groups[block.group].sort((a, b) => {
+    return null;
+  };
+
+  const getValue = (row, col) => (col >= 0 ? row[col] : "");
+
+  for (const groupName of Object.keys(groups)) {
+    const header = findHeaderNearGroup(groupName);
+    if (!header) continue;
+
+    for (let r = header.headerRow + 1; r < Math.min(rows.length, header.headerRow + 10); r++) {
+      const row = rows[r] || [];
+      const team = text(getValue(row, header.teamCol));
+
+      if (!team) continue;
+      if (team.toLowerCase().includes("team")) continue;
+      if (team.toLowerCase().includes("fixture")) continue;
+      if (team.toLowerCase().includes("standing")) continue;
+      if (team.toLowerCase().includes("group")) continue;
+
+      const item = {
+        group: groupName,
+        team,
+        teamAvg: num(getValue(row, header.avgCol)),
+        played: num(getValue(row, header.playedCol)),
+        wins: num(getValue(row, header.winsCol)),
+        draws: num(getValue(row, header.drawsCol)),
+        losses: num(getValue(row, header.lossesCol)),
+        legsFor: num(getValue(row, header.legsForCol)),
+        legsAgainst: num(getValue(row, header.legsAgainstCol)),
+        legDiff: text(getValue(row, header.legDiffCol)),
+        points: num(getValue(row, header.pointsCol)),
+        rank: num(getValue(row, header.rankCol)),
+        status: text(getValue(row, header.statusCol)),
+      };
+
+      if (!item.rank) item.rank = groups[groupName].length + 1;
+      if (!item.legDiff) item.legDiff = String(item.legsFor - item.legsAgainst);
+
+      groups[groupName].push(item);
+    }
+
+    groups[groupName].sort((a, b) => {
       return (
         a.rank - b.rank ||
         b.points - a.points ||
@@ -481,48 +531,114 @@ function buildDuoLeagueData(rows) {
     });
   }
 
-  const thirdPlace = [];
-
-  for (let i = 54; i <= 56; i++) {
-    const row = rows[i] || [];
-    const team = text(row[1]);
-    if (!team) continue;
-
-    thirdPlace.push({
-      group: text(row[0]),
-      team,
-      teamAvg: num(row[2]),
-      points: num(row[3]),
-      legDiff: text(row[4]),
-      legsFor: num(row[5]),
-      rank: num(row[7]),
-      qualifies: text(row[8]),
-    });
-  }
-
   const qualifiers = [];
 
-  for (let i = 54; i <= 61; i++) {
-    const row = rows[i] || [];
-    const seed = num(row[9]);
-    const team = text(row[10]);
+  const qualifierTitleRow = rows.findIndex((row) =>
+    row.some((cell) => clean(cell).includes("seeded") && clean(cell).includes("qualifier"))
+  );
 
-    if (!seed || !team) continue;
+  if (qualifierTitleRow !== -1) {
+    let header = null;
 
-    qualifiers.push({
-      seed,
-      team,
-      group: text(row[11]),
-      finish: text(row[12]),
-      teamAvg: num(row[13]),
-      points: num(row[14]),
-      legDiff: text(row[15]),
-      legsFor: num(row[16]),
-    });
+    for (let r = qualifierTitleRow; r < Math.min(rows.length, qualifierTitleRow + 8); r++) {
+      const row = rows[r] || [];
+      const seedCol = findCell(row, ["seed"]);
+      const teamCol = findCell(row, ["team"]);
+
+      if (seedCol !== -1 && teamCol !== -1) {
+        header = {
+          headerRow: r,
+          seedCol,
+          teamCol,
+          groupCol: findCell(row, ["group"]),
+          finishCol: findCell(row, ["finish"]),
+          avgCol: findCell(row, ["avg", "team avg"]),
+          pointsCol: findCell(row, ["pts", "points"]),
+          legDiffCol: findCell(row, ["ld", "+/-", "diff"]),
+          legsForCol: findCell(row, ["lf", "legs for"]),
+        };
+        break;
+      }
+    }
+
+    if (header) {
+      for (let r = header.headerRow + 1; r < Math.min(rows.length, header.headerRow + 12); r++) {
+        const row = rows[r] || [];
+        const seed = num(getValue(row, header.seedCol));
+        const team = text(getValue(row, header.teamCol));
+
+        if (!seed || !team) continue;
+
+        qualifiers.push({
+          seed,
+          team,
+          group: text(getValue(row, header.groupCol)),
+          finish: text(getValue(row, header.finishCol)),
+          teamAvg: num(getValue(row, header.avgCol)),
+          points: num(getValue(row, header.pointsCol)),
+          legDiff: text(getValue(row, header.legDiffCol)),
+          legsFor: num(getValue(row, header.legsForCol)),
+        });
+      }
+    }
   }
 
-  thirdPlace.sort((a, b) => a.rank - b.rank);
+  const thirdPlace = [];
+
+  const thirdPlaceTitleRow = rows.findIndex((row) =>
+    row.some((cell) => {
+      const value = clean(cell);
+      return value.includes("third") || value.includes("3rd");
+    })
+  );
+
+  if (thirdPlaceTitleRow !== -1) {
+    let header = null;
+
+    for (let r = thirdPlaceTitleRow; r < Math.min(rows.length, thirdPlaceTitleRow + 8); r++) {
+      const row = rows[r] || [];
+      const teamCol = findCell(row, ["team"]);
+      const groupCol = findCell(row, ["group"]);
+
+      if (teamCol !== -1 && groupCol !== -1) {
+        header = {
+          headerRow: r,
+          groupCol,
+          teamCol,
+          avgCol: findCell(row, ["avg", "team avg"]),
+          pointsCol: findCell(row, ["pts", "points"]),
+          legDiffCol: findCell(row, ["ld", "+/-", "diff"]),
+          legsForCol: findCell(row, ["lf", "legs for"]),
+          rankCol: findCell(row, ["rank", "#", "pos"]),
+          qualifiesCol: findCell(row, ["qualifies", "qualified", "status"]),
+        };
+        break;
+      }
+    }
+
+    if (header) {
+      for (let r = header.headerRow + 1; r < Math.min(rows.length, header.headerRow + 8); r++) {
+        const row = rows[r] || [];
+        const team = text(getValue(row, header.teamCol));
+
+        if (!team) continue;
+
+        thirdPlace.push({
+          group: text(getValue(row, header.groupCol)),
+          team,
+          teamAvg: num(getValue(row, header.avgCol)),
+          points: num(getValue(row, header.pointsCol)),
+          legDiff: text(getValue(row, header.legDiffCol)),
+          legsFor: num(getValue(row, header.legsForCol)),
+          rank: num(getValue(row, header.rankCol)) || thirdPlace.length + 1,
+          qualifies: text(getValue(row, header.qualifiesCol)),
+        });
+      }
+    }
+  }
+
   qualifiers.sort((a, b) => a.seed - b.seed);
+  thirdPlace.sort((a, b) => a.rank - b.rank);
 
   return {
     groups,
