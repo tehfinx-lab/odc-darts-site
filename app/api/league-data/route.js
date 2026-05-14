@@ -3,6 +3,9 @@ const MATCHES_GID = "257719632";
 const FIXTURES_GID = "573028301";
 const MASTER_STATS_GID = "1607751142";
 
+const DUO_SHEET_ID = "1nN_dbDGg482nZTB1ghwLgxvKJ5My-3PG";
+const DUO_GID = "1207445903";
+
 const CURRENT_WEEK = 7;
 const MVP_WEEK = CURRENT_WEEK - 1;
 
@@ -107,8 +110,8 @@ function bestLegRank(value) {
   return match ? Number(match[1]) : 9999;
 }
 
-async function fetchSheetRows(gid, label = "Sheet") {
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+async function fetchCsvRows(sheetId, gid, label = "Sheet") {
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
   const res = await fetch(csvUrl, { cache: "no-store" });
 
   if (!res.ok) {
@@ -122,6 +125,10 @@ async function fetchSheetRows(gid, label = "Sheet") {
   }
 
   return parseCsv(csv);
+}
+
+async function fetchSheetRows(gid, label = "Sheet") {
+  return fetchCsvRows(SHEET_ID, gid, label);
 }
 
 function compareRank(a, b) {
@@ -421,11 +428,115 @@ function buildMasterStats(rows) {
   return stats;
 }
 
+function buildDuoLeagueData(rows) {
+  const groups = {
+    "Group A": [],
+    "Group B": [],
+    "Group C": [],
+  };
+
+  const getStandingRow = (row, group) => {
+    const team = text(row[9]);
+    if (!team) return null;
+
+    return {
+      group,
+      team,
+      teamAvg: num(row[10]),
+      played: num(row[11]),
+      wins: num(row[12]),
+      draws: num(row[13]),
+      losses: num(row[14]),
+      legsFor: num(row[15]),
+      legsAgainst: num(row[16]),
+      legDiff: text(row[17]),
+      points: num(row[18]),
+      rank: num(row[20]),
+      status: text(row[21]),
+    };
+  };
+
+  const standingBlocks = [
+    { group: "Group A", start: 5, end: 8 },
+    { group: "Group B", start: 21, end: 24 },
+    { group: "Group C", start: 37, end: 40 },
+  ];
+
+  for (const block of standingBlocks) {
+    for (let i = block.start; i <= block.end; i++) {
+      const row = rows[i] || [];
+      const standing = getStandingRow(row, block.group);
+      if (standing) groups[block.group].push(standing);
+    }
+
+    groups[block.group].sort((a, b) => {
+      return (
+        a.rank - b.rank ||
+        b.points - a.points ||
+        Number(b.legDiff) - Number(a.legDiff) ||
+        b.legsFor - a.legsFor ||
+        b.teamAvg - a.teamAvg ||
+        a.team.localeCompare(b.team)
+      );
+    });
+  }
+
+  const thirdPlace = [];
+
+  for (let i = 54; i <= 56; i++) {
+    const row = rows[i] || [];
+    const team = text(row[1]);
+    if (!team) continue;
+
+    thirdPlace.push({
+      group: text(row[0]),
+      team,
+      teamAvg: num(row[2]),
+      points: num(row[3]),
+      legDiff: text(row[4]),
+      legsFor: num(row[5]),
+      rank: num(row[7]),
+      qualifies: text(row[8]),
+    });
+  }
+
+  const qualifiers = [];
+
+  for (let i = 54; i <= 61; i++) {
+    const row = rows[i] || [];
+    const seed = num(row[9]);
+    const team = text(row[10]);
+
+    if (!seed || !team) continue;
+
+    qualifiers.push({
+      seed,
+      team,
+      group: text(row[11]),
+      finish: text(row[12]),
+      teamAvg: num(row[13]),
+      points: num(row[14]),
+      legDiff: text(row[15]),
+      legsFor: num(row[16]),
+    });
+  }
+
+  thirdPlace.sort((a, b) => a.rank - b.rank);
+  qualifiers.sort((a, b) => a.seed - b.seed);
+
+  return {
+    groups,
+    thirdPlace,
+    qualifiers,
+  };
+}
+
 export async function GET() {
   try {
-    const [matchRows, fixtureRows] = await Promise.all([
+    const [matchRows, fixtureRows, duoRows] = await Promise.all([
       fetchSheetRows(MATCHES_GID, "Matches"),
       fetchSheetRows(FIXTURES_GID, "Fixtures"),
+      fetchCsvRows(DUO_SHEET_ID, DUO_GID, "Duo League"),
     ]);
 
     let masterRows = [];
@@ -441,11 +552,13 @@ export async function GET() {
     const matchData = buildMatchesData(matchRows);
     const fixtures = buildFixturesData(fixtureRows);
     const masterStats = buildMasterStats(masterRows);
+    const duoLeague = buildDuoLeagueData(duoRows);
 
     return Response.json(
       {
         ...matchData,
         fixtures,
+        duoLeague,
         masterStats,
         masterStatsError,
         currentWeek: CURRENT_WEEK,
