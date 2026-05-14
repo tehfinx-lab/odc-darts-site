@@ -435,73 +435,76 @@ function buildDuoLeagueData(rows) {
     "Group C": [],
   };
 
-  const groupNames = ["Group A", "Group B", "Group C"];
-  const headerRows = [];
+  const groupConfig = [
+    { group: "Group A", firstMatchId: "A1" },
+    { group: "Group B", firstMatchId: "B1" },
+    { group: "Group C", firstMatchId: "C1" },
+  ];
 
-  // Find the standings header rows.
-  // In your sheet the header row has:
-  // Match | Week | Home Team | Away Team | ... | Winner | blank | Team | blank avg | P | W | D | L | LF | LA | LD | Pts | Sort Key | Rank | Status
-  for (let r = 0; r < rows.length; r++) {
-    const row = rows[r] || [];
+  // Exact standings columns from your sheet:
+  // J = Team
+  // K = Team Avg
+  // L = P
+  // M = W
+  // N = D
+  // O = L
+  // P = LF
+  // Q = LA
+  // R = LD
+  // S = Pts
+  // T = Sort Key
+  // U = Rank
+  // V = Status
+  const DUO_COL = {
+    matchId: 0,
+    team: 9,
+    teamAvg: 10,
+    played: 11,
+    wins: 12,
+    draws: 13,
+    losses: 14,
+    legsFor: 15,
+    legsAgainst: 16,
+    legDiff: 17,
+    points: 18,
+    sortKey: 19,
+    rank: 20,
+    status: 21,
+  };
 
-    const hasFixtureHeader =
-      text(row[0]).toLowerCase() === "match" &&
-      text(row[1]).toLowerCase() === "week" &&
-      text(row[2]).toLowerCase() === "home team";
+  for (const config of groupConfig) {
+    const startRow = rows.findIndex((row) => text(row[DUO_COL.matchId]) === config.firstMatchId);
 
-    const hasStandingHeader =
-      text(row[9]).toLowerCase() === "team" &&
-      text(row[11]).toLowerCase() === "p" &&
-      text(row[18]).toLowerCase() === "pts";
+    if (startRow === -1) continue;
 
-    if (hasFixtureHeader && hasStandingHeader) {
-      headerRows.push(r);
-    }
-  }
-
-  for (let g = 0; g < groupNames.length; g++) {
-    const groupName = groupNames[g];
-    const headerRow = headerRows[g];
-
-    if (headerRow === undefined) continue;
-
-    // Each group has 4 teams directly under the header row.
-    for (let r = headerRow + 1; r <= headerRow + 4; r++) {
+    // Each group has exactly 4 teams in the standings table.
+    for (let r = startRow; r < startRow + 4; r++) {
       const row = rows[r] || [];
+      const team = text(row[DUO_COL.team]);
 
-      const team = text(row[9]);
       if (!team) continue;
 
-      const teamAvg = num(row[10]);
-      const played = num(row[11]);
-      const wins = num(row[12]);
-      const draws = num(row[13]);
-      const losses = num(row[14]);
-      const legsFor = num(row[15]);
-      const legsAgainst = num(row[16]);
-      const legDiff = text(row[17]) || String(legsFor - legsAgainst);
-      const points = num(row[18]);
-      const rank = num(row[20]) || groups[groupName].length + 1;
-      const status = text(row[21]);
+      const legsFor = num(row[DUO_COL.legsFor]);
+      const legsAgainst = num(row[DUO_COL.legsAgainst]);
 
-      groups[groupName].push({
-        group: groupName,
+      groups[config.group].push({
+        group: config.group,
         team,
-        teamAvg,
-        played,
-        wins,
-        draws,
-        losses,
+        teamAvg: num(row[DUO_COL.teamAvg]),
+        played: num(row[DUO_COL.played]),
+        wins: num(row[DUO_COL.wins]),
+        draws: num(row[DUO_COL.draws]),
+        losses: num(row[DUO_COL.losses]),
         legsFor,
         legsAgainst,
-        legDiff,
-        points,
-        rank,
-        status,
+        legDiff: text(row[DUO_COL.legDiff]) || String(legsFor - legsAgainst),
+        points: num(row[DUO_COL.points]),
+        rank: num(row[DUO_COL.rank]) || groups[config.group].length + 1,
+        status: text(row[DUO_COL.status]),
       });
     }
 
-    groups[groupName].sort((a, b) => {
+    groups[config.group].sort((a, b) => {
       return (
         a.rank - b.rank ||
         b.points - a.points ||
