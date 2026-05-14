@@ -633,16 +633,16 @@ function TablesPage({ data }) {
 function DuoLeaguePage({ data }) {
   const duo = data.duoLeague || {};
   const groups = duo.groups || {};
-  const groupNames = Object.keys(groups);
+  const groupNames = Object.keys(groups).filter((name) => (groups[name] || []).length > 0);
   const [selected, setSelected] = useState(groupNames[0] || "Group A");
 
   useEffect(() => {
-    if (!groups[selected] && groupNames[0]) setSelected(groupNames[0]);
-  }, [groups, selected, groupNames]);
+    if (!groupNames.includes(selected) && groupNames[0]) {
+      setSelected(groupNames[0]);
+    }
+  }, [groupNames, selected]);
 
   const rows = groups[selected] || [];
-  const qualifiers = duo.qualifiers || [];
-  const thirdPlace = duo.thirdPlace || [];
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
@@ -650,7 +650,7 @@ function DuoLeaguePage({ data }) {
         <SectionTitle
           kicker="Dynamic Duo League"
           title="Group Tables"
-          text="Follow the ODC Duo League group standings and knockout qualification places."
+          text="Current ODC Dynamic Duo League standings by group."
         />
 
         <div className="relative mb-7">
@@ -659,7 +659,7 @@ function DuoLeaguePage({ data }) {
             onChange={(e) => setSelected(e.target.value)}
             className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
           >
-            {groupNames.map((name) => (
+            {["Group A", "Group B", "Group C"].map((name) => (
               <option key={name}>{name}</option>
             ))}
           </select>
@@ -671,7 +671,7 @@ function DuoLeaguePage({ data }) {
         <Card>
           <p className="text-lg font-black">No Duo League table data found.</p>
           <p className="mt-2 text-odcCream/60">
-            Check the Duo League sheet is public and the standings section is filled in.
+            The standings table could not be read from the Duo League sheet.
           </p>
         </Card>
       ) : (
@@ -696,7 +696,7 @@ function DuoLeaguePage({ data }) {
             <tbody>
               {rows.map((row) => (
                 <tr key={`${selected}-${row.team}`} className="border-t border-odcCream/10">
-                  <td className="p-4 font-black text-odcRed">{row.rank || "-"}</td>
+                  <td className="p-4 font-black text-odcRed">{row.rank}</td>
                   <td className="p-4 font-black">{row.team}</td>
                   <td className="p-4">{row.teamAvg || "-"}</td>
                   <td className="p-4">{row.played}</td>
@@ -722,87 +722,6 @@ function DuoLeaguePage({ data }) {
           </table>
         </Card>
       )}
-
-      <div className="mt-12">
-        <SectionTitle
-          kicker="Knockout"
-          title="Seeded Qualifiers"
-          text="Current knockout qualification order from the Duo League group stage."
-        />
-
-        {qualifiers.length === 0 ? (
-          <Card>
-            <p className="text-lg font-black">No qualifiers found yet.</p>
-          </Card>
-        ) : (
-          <Card className="overflow-x-auto p-0">
-            <table className="w-full min-w-[760px] border-collapse">
-              <thead className="bg-odcNavy">
-                <tr className="text-left text-xs uppercase tracking-[0.22em] text-odcCream/55">
-                  <th className="p-4">Seed</th>
-                  <th className="p-4">Team</th>
-                  <th className="p-4">Group</th>
-                  <th className="p-4">Finish</th>
-                  <th className="p-4">Avg</th>
-                  <th className="p-4">Pts</th>
-                  <th className="p-4">LD</th>
-                  <th className="p-4">LF</th>
-                </tr>
-              </thead>
-              <tbody>
-                {qualifiers.map((q) => (
-                  <tr key={`${q.seed}-${q.team}`} className="border-t border-odcCream/10">
-                    <td className="p-4 text-xl font-black text-odcRed">{q.seed}</td>
-                    <td className="p-4 font-black">{q.team}</td>
-                    <td className="p-4">{q.group}</td>
-                    <td className="p-4">{q.finish}</td>
-                    <td className="p-4">{q.teamAvg || "-"}</td>
-                    <td className="p-4 font-black">{q.points}</td>
-                    <td className="p-4">{q.legDiff}</td>
-                    <td className="p-4">{q.legsFor}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )}
-      </div>
-
-      <div className="mt-12">
-        <SectionTitle
-          kicker="Qualification"
-          title="Best Third-Place Ranking"
-          text="The best third-place teams are ranked for the remaining knockout places."
-        />
-
-        {thirdPlace.length === 0 ? (
-          <Card>
-            <p className="text-lg font-black">No third-place ranking found yet.</p>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3">
-            {thirdPlace.map((team) => (
-              <Card key={`${team.group}-${team.team}`}>
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
-                  {team.group}
-                </p>
-                <h3 className="mt-3 text-xl font-black">{team.team}</h3>
-
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <SmallStat label="Rank" value={team.rank || "-"} />
-                  <SmallStat label="Avg" value={team.teamAvg || "-"} />
-                  <SmallStat label="Pts" value={team.points} />
-                  <SmallStat label="LD" value={team.legDiff} />
-                </div>
-
-                <p className="mt-4 text-sm font-black text-odcCream/70">
-                  Qualifies: <span className="text-odcRed">{team.qualifies || "No"}</span>
-                </p>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
     </section>
   );
 }
