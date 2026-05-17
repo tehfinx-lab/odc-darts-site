@@ -476,47 +476,109 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
 function FixturesPage({ data }) {
   const fixtures = data.fixtures || {};
   const divisionNames = Object.keys(fixtures);
-  const [selected, setSelected] = useState(divisionNames[0] || "");
-  useEffect(() => {
-    if (!fixtures[selected] && divisionNames[0]) setSelected(divisionNames[0]);
-  }, [fixtures, selected, divisionNames]);
 
-  const rows = fixtures[selected] || [];
+  const [selectedDivision, setSelectedDivision] = useState(divisionNames[0] || "");
+  const [selectedWeek, setSelectedWeek] = useState("current");
+
+  useEffect(() => {
+    if (!fixtures[selectedDivision] && divisionNames[0]) {
+      setSelectedDivision(divisionNames[0]);
+    }
+  }, [fixtures, selectedDivision, divisionNames]);
+
+  const currentWeek = data.currentWeek || 1;
+  const targetWeek =
+    selectedWeek === "next" ? currentWeek + 1 : currentWeek;
+
+  const rows = (fixtures[selectedDivision] || []).filter(
+    (fixture) => Number(fixture.week) === Number(targetWeek)
+  );
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <SectionTitle kicker={`Week ${data.currentWeek || 7}`} title="Current Fixtures" text="View this week’s scheduled ODC league fixtures by division." />
-        <div className="relative mb-7">
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
-          >
-            {divisionNames.map((name) => (
-              <option key={name}>{name}</option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-4 top-4" />
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <SectionTitle
+          kicker={`Week ${targetWeek}`}
+          title="Fixtures"
+          text="View fixtures by division and week."
+        />
+
+        <div className="flex flex-col gap-3 md:flex-row">
+          {/* Division Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedDivision}
+              onChange={(e) => setSelectedDivision(e.target.value)}
+              className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
+            >
+              {divisionNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+
+            <ChevronDown className="pointer-events-none absolute right-4 top-4" />
+          </div>
+
+          {/* Week Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedWeek}
+              onChange={(e) => setSelectedWeek(e.target.value)}
+              className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-56"
+            >
+              <option value="current">
+                This Week (Week {currentWeek})
+              </option>
+
+              <option value="next">
+                Next Week (Week {currentWeek + 1})
+              </option>
+            </select>
+
+            <ChevronDown className="pointer-events-none absolute right-4 top-4" />
+          </div>
         </div>
       </div>
 
       {rows.length === 0 ? (
         <Card>
-          <p className="text-lg font-black">No fixtures listed for this week.</p>
-          <p className="mt-2 text-odcCream/60">Fixtures will appear here once Week {data.currentWeek || 7} matches have been added.</p>
+          <p className="text-lg font-black">
+            No fixtures listed for Week {targetWeek}.
+          </p>
+
+          <p className="mt-2 text-odcCream/60">
+            Fixtures will appear here once they’ve been added.
+          </p>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((fixture, index) => (
-            <Card key={`${fixture.division}-${fixture.home}-${fixture.away}-${index}`}>
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{fixture.division}</p>
+            <Card
+              key={`${fixture.division}-${fixture.home}-${fixture.away}-${index}`}
+            >
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
+                {fixture.division} • Week {fixture.week}
+              </p>
+
               <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                 <p className="text-lg font-black">{fixture.home}</p>
-                <p className="rounded-xl bg-odcRed px-3 py-1 text-sm font-black text-white">VS</p>
-                <p className="text-right text-lg font-black">{fixture.away}</p>
+
+                <p className="rounded-xl bg-odcRed px-3 py-1 text-sm font-black text-white">
+                  VS
+                </p>
+
+                <p className="text-right text-lg font-black">
+                  {fixture.away}
+                </p>
               </div>
-              <p className="mt-4 text-sm text-odcCream/60">{fixture.date ? `Scheduled: ${fixture.date}` : "Date to be confirmed"}</p>
+
+              <p className="mt-4 text-sm text-odcCream/60">
+                {fixture.date
+                  ? `Scheduled: ${fixture.date}`
+                  : "Date to be confirmed"}
+              </p>
             </Card>
           ))}
         </div>
