@@ -31,189 +31,259 @@ export default function Splash() {
     const SEG_ORDER = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
 
     const drawBoard = () => {
-      // Outer surround
-      const surroundGrad = ctx.createRadialGradient(cx, cy, r * 0.95, cx, cy, r * 1.12);
-      surroundGrad.addColorStop(0, "#3a1f08");
-      surroundGrad.addColorStop(1, "#1a0d03");
+      // Outer wood surround
+      const woodGrad = ctx.createRadialGradient(cx, cy, r * 0.98, cx, cy, r * 1.18);
+      woodGrad.addColorStop(0, "#4a2208");
+      woodGrad.addColorStop(0.4, "#2e1404");
+      woodGrad.addColorStop(1, "#1a0a02");
       ctx.beginPath();
-      ctx.arc(cx, cy, r * 1.12, 0, Math.PI * 2);
-      ctx.fillStyle = surroundGrad;
+      ctx.arc(cx, cy, r * 1.18, 0, Math.PI * 2);
+      ctx.fillStyle = woodGrad;
       ctx.fill();
 
-      // Metal outer ring
+      // Wood grain lines
+      for (let i = 0; i < 18; i++) {
+        const angle = (i / 18) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 1.02 + i * 1.2, angle, angle + 0.18);
+        ctx.strokeStyle = "rgba(80,35,5,0.3)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // Metal outer band
+      const metalGrad = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
+      metalGrad.addColorStop(0, "#666");
+      metalGrad.addColorStop(0.3, "#ccc");
+      metalGrad.addColorStop(0.7, "#aaa");
+      metalGrad.addColorStop(1, "#555");
       ctx.beginPath();
       ctx.arc(cx, cy, r * 1.01, 0, Math.PI * 2);
-      ctx.strokeStyle = "#888";
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = metalGrad;
+      ctx.lineWidth = 4;
       ctx.stroke();
 
       const startAngle = -Math.PI / 2 - Math.PI / 20;
 
+      // Draw all segments
       for (let i = 0; i < 20; i++) {
         const a1 = startAngle + (i / 20) * Math.PI * 2;
         const a2 = startAngle + ((i + 1) / 20) * Math.PI * 2;
         const isEven = i % 2 === 0;
 
-        // Main sisal segment
+        // Outer sisal (between double and number)
         ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, r * 0.74, a1, a2);
+        ctx.arc(cx, cy, r * 0.915, a1, a2);
+        ctx.arc(cx, cy, r * 0.76, a2, a1, true);
         ctx.closePath();
-        ctx.fillStyle = isEven ? "#1a1a18" : "#e8dfc0";
-        ctx.fill();
-
-        // Treble ring
-        ctx.beginPath();
-        ctx.arc(cx, cy, r * 0.595, a1, a2);
-        ctx.arc(cx, cy, r * 0.535, a2, a1, true);
-        ctx.closePath();
-        ctx.fillStyle = isEven ? "#cc1a22" : "#1a7a3a";
-        ctx.fill();
-
-        // Inner sisal
-        ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(a1) * r * 0.535, cy + Math.sin(a1) * r * 0.535);
-        ctx.arc(cx, cy, r * 0.535, a1, a2);
-        ctx.arc(cx, cy, r * 0.155, a2, a1, true);
-        ctx.closePath();
-        ctx.fillStyle = isEven ? "#1a1a18" : "#e8dfc0";
+        ctx.fillStyle = isEven ? "#1c1c1a" : "#ede0bc";
         ctx.fill();
 
         // Double ring
         ctx.beginPath();
-        ctx.arc(cx, cy, r * 0.99, a1, a2);
-        ctx.arc(cx, cy, r * 0.92, a2, a1, true);
+        ctx.arc(cx, cy, r * 0.985, a1, a2);
+        ctx.arc(cx, cy, r * 0.915, a2, a1, true);
         ctx.closePath();
-        ctx.fillStyle = isEven ? "#cc1a22" : "#1a7a3a";
+        ctx.fillStyle = isEven ? "#c8181f" : "#1a7535";
         ctx.fill();
 
-        // Outer sisal band
+        // Middle sisal
         ctx.beginPath();
-        ctx.arc(cx, cy, r * 0.92, a1, a2);
-        ctx.arc(cx, cy, r * 0.74, a2, a1, true);
+        ctx.arc(cx, cy, r * 0.615, a1, a2);
+        ctx.arc(cx, cy, r * 0.555, a2, a1, true);
         ctx.closePath();
-        ctx.fillStyle = isEven ? "#1a1a18" : "#e8dfc0";
+        ctx.fillStyle = isEven ? "#c8181f" : "#1a7535";
         ctx.fill();
 
-        // Wire lines
+        // Inner sisal
         ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(a1) * r * 0.155, cy + Math.sin(a1) * r * 0.155);
-        ctx.lineTo(cx + Math.cos(a1) * r * 0.99, cy + Math.sin(a1) * r * 0.99);
-        ctx.strokeStyle = "rgba(180,180,180,0.6)";
-        ctx.lineWidth = 0.8;
+        ctx.arc(cx, cy, r * 0.555, a1, a2);
+        ctx.arc(cx, cy, r * 0.16, a2, a1, true);
+        ctx.closePath();
+        ctx.fillStyle = isEven ? "#1c1c1a" : "#ede0bc";
+        ctx.fill();
+
+        // Treble ring
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.76, a1, a2);
+        ctx.arc(cx, cy, r * 0.615, a2, a1, true);
+        ctx.closePath();
+        ctx.fillStyle = isEven ? "#c8181f" : "#1a7535";
+        ctx.fill();
+      }
+
+      // Wire overlay — all rings
+      const wireColor = "rgba(160,160,160,0.75)";
+      [r*0.985, r*0.915, r*0.76, r*0.615, r*0.555, r*0.16].forEach(radius => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = wireColor;
+        ctx.lineWidth = 1.2;
         ctx.stroke();
+      });
 
-        // Numbers
+      // Wire segment dividers
+      for (let i = 0; i < 20; i++) {
+        const a = startAngle + (i / 20) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * r * 0.16, cy + Math.sin(a) * r * 0.16);
+        ctx.lineTo(cx + Math.cos(a) * r * 0.985, cy + Math.sin(a) * r * 0.985);
+        ctx.strokeStyle = wireColor;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+
+      // Numbers
+      for (let i = 0; i < 20; i++) {
         const na = startAngle + ((i + 0.5) / 20) * Math.PI * 2;
+        const nx = cx + Math.cos(na) * r * 1.065;
+        const ny = cy + Math.sin(na) * r * 1.065;
         ctx.save();
-        ctx.translate(cx + Math.cos(na) * r * 1.065, cy + Math.sin(na) * r * 1.065);
+        ctx.translate(nx, ny);
         ctx.fillStyle = "#F8EBC6";
-        ctx.font = `bold ${Math.round(r * 0.1)}px Arial`;
+        ctx.font = `900 ${Math.round(r * 0.105)}px Arial Black, Arial`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(0,0,0,0.8)";
+        ctx.shadowBlur = 4;
         ctx.fillText(SEG_ORDER[i], 0, 0);
         ctx.restore();
       }
 
-      // Ring wires
-      [r*0.99, r*0.92, r*0.74, r*0.595, r*0.535, r*0.155].forEach(radius => {
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(200,200,200,0.5)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      });
-
-      // 25 bull outer
+      // Bull outer (25)
+      const bullGrad25 = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.16);
+      bullGrad25.addColorStop(0, "#1a8a40");
+      bullGrad25.addColorStop(1, "#145c2a");
       ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.155, 0, Math.PI * 2);
-      ctx.fillStyle = "#1a7a3a";
+      ctx.arc(cx, cy, r * 0.16, 0, Math.PI * 2);
+      ctx.fillStyle = bullGrad25;
       ctx.fill();
-      ctx.strokeStyle = "rgba(200,200,200,0.5)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = wireColor;
+      ctx.lineWidth = 1.2;
       ctx.stroke();
 
       // Bullseye
+      const bullGrad = ctx.createRadialGradient(cx - r*0.02, cy - r*0.02, 0, cx, cy, r * 0.075);
+      bullGrad.addColorStop(0, "#e82020");
+      bullGrad.addColorStop(1, "#9a1010");
       ctx.beginPath();
       ctx.arc(cx, cy, r * 0.075, 0, Math.PI * 2);
-      ctx.fillStyle = "#cc1a22";
+      ctx.fillStyle = bullGrad;
+      ctx.fill();
+      ctx.strokeStyle = wireColor;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Bull highlight
+      ctx.beginPath();
+      ctx.arc(cx - r*0.025, cy - r*0.025, r * 0.028, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
       ctx.fill();
 
-      // Bull shine
+      // Board lighting — top left sheen
+      const sheen = ctx.createRadialGradient(cx - r*0.3, cy - r*0.3, 0, cx, cy, r);
+      sheen.addColorStop(0, "rgba(255,255,255,0.04)");
+      sheen.addColorStop(1, "rgba(0,0,0,0)");
       ctx.beginPath();
-      ctx.arc(cx - r*0.02, cy - r*0.02, r * 0.025, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.arc(cx, cy, r * 0.985, 0, Math.PI * 2);
+      ctx.fillStyle = sheen;
       ctx.fill();
     };
 
-    const drawDart = (x, y, angle, alpha = 1) => {
+    const drawDart = (x, y, angle) => {
       ctx.save();
-      ctx.globalAlpha = alpha;
       ctx.translate(x, y);
       ctx.rotate(angle);
 
-      // Shadow
-      ctx.shadowColor = "rgba(0,0,0,0.6)";
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetX = 3;
-      ctx.shadowOffsetY = 3;
+      ctx.shadowColor = "rgba(0,0,0,0.7)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetX = 4;
+      ctx.shadowOffsetY = 4;
 
-      // Point
+      // Steel tip
+      const tipGrad = ctx.createLinearGradient(8, -1.5, 8, 1.5);
+      tipGrad.addColorStop(0, "#e0e0e0");
+      tipGrad.addColorStop(0.5, "#ffffff");
+      tipGrad.addColorStop(1, "#888");
       ctx.beginPath();
-      ctx.moveTo(30, 0);
-      ctx.lineTo(10, -1);
-      ctx.lineTo(10, 1);
+      ctx.moveTo(32, 0);
+      ctx.lineTo(10, -1.5);
+      ctx.lineTo(10, 1.5);
       ctx.closePath();
-      ctx.fillStyle = "#bbb";
+      ctx.fillStyle = tipGrad;
       ctx.fill();
 
-      // Barrel with gradient
-      const bg = ctx.createLinearGradient(-12, -5, -12, 5);
-      bg.addColorStop(0, "#f0d060");
-      bg.addColorStop(0.3, "#fce88a");
-      bg.addColorStop(0.7, "#d4a820");
-      bg.addColorStop(1, "#8a6010");
-      ctx.beginPath();
-      ctx.roundRect(-12, -5, 28, 10, 3);
-      ctx.fillStyle = bg;
+      // Barrel
+      const barrelGrad = ctx.createLinearGradient(-14, -6, -14, 6);
+      barrelGrad.addColorStop(0, "#c8a020");
+      barrelGrad.addColorStop(0.15, "#f8e060");
+      barrelGrad.addColorStop(0.35, "#ffe87a");
+      barrelGrad.addColorStop(0.65, "#d4900a");
+      barrelGrad.addColorStop(0.85, "#a06808");
+      barrelGrad.addColorStop(1, "#c8a020");
       ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.roundRect(-14, -6, 26, 12, 3);
+      ctx.fillStyle = barrelGrad;
       ctx.fill();
 
-      // Knurling
-      for (let k = -8; k <= 10; k += 3.5) {
+      // Knurling grooves
+      for (let k = -11; k <= 9; k += 2.8) {
         ctx.beginPath();
-        ctx.moveTo(k, -5);
-        ctx.lineTo(k + 1.5, -5);
-        ctx.lineTo(k + 1.5, 5);
-        ctx.lineTo(k, 5);
-        ctx.fillStyle = "rgba(0,0,0,0.18)";
+        ctx.rect(k, -6, 1.2, 12);
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
         ctx.fill();
       }
 
-      // Shaft
+      // Barrel highlight
       ctx.beginPath();
-      ctx.rect(-30, -2, 18, 4);
-      ctx.fillStyle = "#222";
+      ctx.roundRect(-14, -6, 26, 4, [3, 3, 0, 0]);
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
       ctx.fill();
 
-      // Flight
+      // Shaft (carbon look)
+      const shaftGrad = ctx.createLinearGradient(-34, -3, -34, 3);
+      shaftGrad.addColorStop(0, "#444");
+      shaftGrad.addColorStop(0.5, "#888");
+      shaftGrad.addColorStop(1, "#333");
       ctx.beginPath();
-      ctx.moveTo(-30, 0);
-      ctx.bezierCurveTo(-34, -2, -44, -14, -46, -16);
-      ctx.lineTo(-38, 0);
-      ctx.bezierCurveTo(-44, 14, -34, 2, -30, 0);
-      ctx.closePath();
-      ctx.fillStyle = "#E51D2A";
-      ctx.strokeStyle = "#a01018";
-      ctx.lineWidth = 0.5;
+      ctx.rect(-34, -2.5, 20, 5);
+      ctx.fillStyle = shaftGrad;
       ctx.fill();
+
+      // Flight — shaped like real dart flight
+      const flightColor = "#E51D2A";
+      const flightDark = "#8a0e14";
+
+      // Left flight
+      ctx.beginPath();
+      ctx.moveTo(-34, -1);
+      ctx.bezierCurveTo(-38, -3, -50, -18, -52, -22);
+      ctx.bezierCurveTo(-50, -18, -42, -8, -34, -1);
+      ctx.closePath();
+      ctx.fillStyle = flightColor;
+      ctx.fill();
+      ctx.strokeStyle = flightDark;
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      // Right flight
+      ctx.beginPath();
+      ctx.moveTo(-34, 1);
+      ctx.bezierCurveTo(-38, 3, -50, 18, -52, 22);
+      ctx.bezierCurveTo(-50, 18, -42, 8, -34, 1);
+      ctx.closePath();
+      ctx.fillStyle = flightColor;
+      ctx.fill();
+      ctx.strokeStyle = flightDark;
+      ctx.lineWidth = 0.5;
       ctx.stroke();
 
       // Flight shine
       ctx.beginPath();
-      ctx.moveTo(-31, -1);
-      ctx.bezierCurveTo(-34, -2, -40, -8, -42, -10);
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.moveTo(-35, -2);
+      ctx.bezierCurveTo(-39, -5, -46, -12, -48, -15);
+      ctx.strokeStyle = "rgba(255,255,255,0.3)";
       ctx.lineWidth = 1;
       ctx.stroke();
 
@@ -224,28 +294,20 @@ export default function Splash() {
     let flyProgress = 0;
     let flyFrom = { x: 0, y: 0 };
     let flyTo = { x: 0, y: 0 };
-    let clickTarget = { x: 0, y: 0 };
     let stuckX = 0, stuckY = 0;
-
-    const getIdlePos = () => ({ x: cx - r - 140, y: cy + 50 });
 
     const throwDart = (tx, ty) => {
       if (phase !== "idle") return;
       setThrown(true);
       phase = "flying";
       flyProgress = 0;
-      const idle = getIdlePos();
-      flyFrom = { x: idle.x, y: idle.y };
-      // Aim exactly where clicked, clamped inside board
-      const dx = tx - cx;
-      const dy = ty - cy;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      const maxDist = r * 0.9;
-      if (dist > maxDist) {
-        flyTo = { x: cx + (dx/dist)*maxDist, y: cy + (dy/dist)*maxDist };
-      } else {
-        flyTo = { x: tx, y: ty };
-      }
+      flyFrom = { x: cx - r - 140, y: cy + 50 };
+      const dx = tx - cx, dy = ty - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxDist = r * 0.88;
+      flyTo = dist > maxDist
+        ? { x: cx + (dx / dist) * maxDist, y: cy + (dy / dist) * maxDist }
+        : { x: tx, y: ty };
     };
 
     window.__throwDart = throwDart;
@@ -253,9 +315,9 @@ export default function Splash() {
     const loop = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Ambient glow
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.5);
-      glow.addColorStop(0, "rgba(229,29,42,0.05)");
+      // Subtle board glow
+      const glow = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 1.6);
+      glow.addColorStop(0, "rgba(229,29,42,0.04)");
       glow.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -263,17 +325,16 @@ export default function Splash() {
       drawBoard();
 
       if (phase === "idle") {
-        const idle = getIdlePos();
-        const wobble = Math.sin(Date.now() / 700) * 5;
-        drawDart(idle.x + wobble, idle.y, -0.1);
+        const wobble = Math.sin(Date.now() / 800) * 4;
+        drawDart(cx - r - 140 + wobble, cy + 50, -0.08);
       }
 
       if (phase === "flying") {
-        flyProgress += 0.038;
+        flyProgress += 0.036;
         const t = Math.min(flyProgress, 1);
-        const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
         const px = flyFrom.x + (flyTo.x - flyFrom.x) * ease;
-        const py = flyFrom.y + (flyTo.y - flyFrom.y) * ease - Math.sin(t * Math.PI) * 70;
+        const py = flyFrom.y + (flyTo.y - flyFrom.y) * ease - Math.sin(t * Math.PI) * 65;
         const angle = Math.atan2(flyTo.y - flyFrom.y, flyTo.x - flyFrom.x);
         drawDart(px, py, angle);
 
@@ -281,19 +342,16 @@ export default function Splash() {
           phase = "stuck";
           stuckX = flyTo.x;
           stuckY = flyTo.y;
-          // Particle burst
-          for (let i = 0; i < 32; i++) {
+          for (let i = 0; i < 28; i++) {
             const a = Math.random() * Math.PI * 2;
-            const s = 2 + Math.random() * 6;
-            particles.push({ x: stuckX, y: stuckY, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, color: Math.random() > 0.5 ? "#E51D2A" : "#F8EBC6", size: 2 + Math.random() * 4 });
+            const s = 1.5 + Math.random() * 5;
+            particles.push({ x: stuckX, y: stuckY, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, color: Math.random() > 0.5 ? "#E51D2A" : "#F8EBC6", size: 1.5 + Math.random() * 3 });
           }
           setTimeout(() => { window.location.replace("/?from=splash"); }, 1100);
         }
       }
 
-      if (phase === "stuck") {
-        drawDart(stuckX, stuckY, -0.08);
-      }
+      if (phase === "stuck") drawDart(stuckX, stuckY, -0.08);
 
       particles = particles.filter(p => p.life > 0);
       particles.forEach(p => {
@@ -303,7 +361,7 @@ export default function Splash() {
         ctx.globalAlpha = p.life;
         ctx.fill();
         ctx.globalAlpha = 1;
-        p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.life -= 0.025;
+        p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= 0.022;
       });
 
       animId = requestAnimationFrame(loop);
@@ -313,12 +371,11 @@ export default function Splash() {
     return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
   }, []);
 
-  const handleClick = (e) => {
-    window.__throwDart?.(e.clientX, e.clientY);
-  };
-
   return (
-    <div className="relative flex h-screen w-screen cursor-crosshair items-center justify-center overflow-hidden bg-black" onClick={handleClick}>
+    <div
+      className="relative flex h-screen w-screen cursor-crosshair items-center justify-center overflow-hidden bg-black"
+      onClick={(e) => window.__throwDart?.(e.clientX, e.clientY)}
+    >
       <canvas ref={canvasRef} className="absolute inset-0" />
       <div className="pointer-events-none absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
         <img src="/odc-logo.png" alt="ODC" className="h-14 w-14 object-contain drop-shadow-[0_0_18px_rgba(229,29,42,0.4)]" />
