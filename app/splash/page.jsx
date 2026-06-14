@@ -2,408 +2,354 @@
 import { useEffect, useRef, useState } from "react";
 
 export default function Splash() {
-  const canvasRef = useRef(null);
+  const mountRef = useRef(null);
   const [hint, setHint] = useState(true);
   const [thrown, setThrown] = useState(false);
 
-  useEffect(() => { setTimeout(() => setHint(false), 3000); }, []);
+  useEffect(() => {
+    setTimeout(() => setHint(false), 3000);
+  }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    let animId, particles = [];
-    let cx, cy, r;
+    let THREE, renderer, scene, camera, animId;
+    let board, dart, dartGroup;
+    let phase = "idle";
+    let flyProgress = 0;
+    let clickPoint = { x: 0, y: 0 };
 
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      cx = canvas.width / 2;
-      cy = canvas.height / 2;
-      r = Math.min(canvas.width, canvas.height) * 0.29;
+    const mount = mountRef.current;
+
+    const init = async () => {
+      THREE = await import("three");
+
+      // Scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x050505);
+      scene.fog = new THREE.Fog(0x050505, 8, 20);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 0, 5.5);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      mount.appendChild(renderer.domElement);
+
+      // Lights
+      const ambient = new THREE.AmbientLight(0x1a0a05, 2);
+      scene.add(ambient);
+
+      // Main spotlight from above-left
+      const spot1 = new THREE.SpotLight(0xffd0a0, 80);
+      spot1.position.set(-3, 5, 4);
+      spot1.angle = 0.35;
+      spot1.penumbra = 0.7;
+      spot1.castShadow = true;
+      spot1.shadow.mapSize.width = 2048;
+      spot1.shadow.mapSize.height = 2048;
+      scene.add(spot1);
+
+      // Rim light from right
+      const spot2 = new THREE.SpotLight(0xff2020, 15);
+      spot2.position.set(4, 2, 3);
+      spot2.angle = 0.5;
+      spot2.penumbra = 1;
+      scene.add(spot2);
+
+      // Floor bounce
+      const point1 = new THREE.PointLight(0x200a00, 10, 8);
+      point1.position.set(0, -3, 2);
+      scene.add(point1);
+
+      // Build board
+      buildBoard(THREE, scene);
+
+      // Build dart
+      buildDart(THREE, scene);
+
+      // Wall behind board
+      const wallGeo = new THREE.PlaneGeometry(12, 8);
+      const wallMat = new THREE.MeshStandardMaterial({
+        color: 0x1a0a04,
+        roughness: 0.95,
+        metalness: 0,
+      });
+      const wall = new THREE.Mesh(wallGeo, wallMat);
+      wall.position.z = -1.2;
+      wall.receiveShadow = true;
+      scene.add(wall);
+
+      window.addEventListener("resize", onResize);
+      animate();
     };
-    resize();
-    window.addEventListener("resize", resize);
 
-    const SEG = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+    const buildBoard = (THREE, scene) => {
+      board = new THREE.Group();
 
-    const drawBoard = () => {
+      const SEG = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+
+      // Wood surround
+      const surroundGeo = new THREE.CylinderGeometry(1.22, 1.22, 0.12, 64);
+      const surroundMat = new THREE.MeshStandardMaterial({
+        color: 0x3a1804,
+        roughness: 0.85,
+        metalness: 0.05,
+      });
+      const surround = new THREE.Mesh(surroundGeo, surroundMat);
+      surround.rotation.x = Math.PI / 2;
+      surround.castShadow = true;
+      surround.receiveShadow = true;
+      board.add(surround);
+
+      // Draw the face on a canvas texture
+      const size = 1024;
+      const cv = document.createElement("canvas");
+      cv.width = size; cv.height = size;
+      const ctx = cv.getContext("2d");
+      const cx = size / 2, cy = size / 2, r = size * 0.46;
+
       const SA = -Math.PI / 2 - Math.PI / 20;
 
-      // ── Wood surround ──────────────────────────────
-      for (let ring = 0; ring < 6; ring++) {
-        const rOuter = r * (1.22 - ring * 0.004);
-        const rInner = r * (1.185 - ring * 0.004);
-        const woodColors = ["#5c2d0a","#3e1c06","#6a3410","#2e1404","#7a3e14","#3a1a05"];
-        ctx.beginPath();
-        ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
-        ctx.fillStyle = woodColors[ring];
-        ctx.fill();
-      }
-      const woodBase = ctx.createRadialGradient(cx - r*0.2, cy - r*0.2, r*0.8, cx, cy, r*1.22);
-      woodBase.addColorStop(0, "rgba(120,60,10,0.4)");
-      woodBase.addColorStop(1, "rgba(10,4,0,0.6)");
+      // Black base
+      ctx.fillStyle = "#111";
+      ctx.fillRect(0, 0, size, size);
       ctx.beginPath();
-      ctx.arc(cx, cy, r * 1.22, 0, Math.PI * 2);
-      ctx.fillStyle = woodBase;
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = "#111";
       ctx.fill();
 
-      // ── Outer metal ring ───────────────────────────
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 1.005, 0, Math.PI * 2);
-      ctx.strokeStyle = "#999";
-      ctx.lineWidth = r * 0.018;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 1.005, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255,255,255,0.15)";
-      ctx.lineWidth = r * 0.006;
-      ctx.stroke();
-
-      // ── Segment fills ──────────────────────────────
+      // Segments
       const zones = [
-        // [outerR, innerR, evenColor, oddColor]
-        [0.998, 0.924, "#c8181f", "#1a7535"],   // double ring
-        [0.924, 0.765, "#1c1c1a", "#e8dab8"],   // outer sisal
-        [0.765, 0.618, "#c8181f", "#1a7535"],   // treble ring
-        [0.618, 0.555, "#1c1c1a", "#e8dab8"],   // inner sisal top
-        [0.555, 0.162, "#1c1c1a", "#e8dab8"],   // inner sisal
+        [0.998, 0.92, "#c8181f", "#1a7535"],
+        [0.92,  0.76, "#1c1c1a", "#ede0b8"],
+        [0.76,  0.615,"#c8181f", "#1a7535"],
+        [0.615, 0.555,"#1c1c1a", "#ede0b8"],
+        [0.555, 0.16, "#1c1c1a", "#ede0b8"],
       ];
-
-      zones.forEach(([outer, inner, evenCol, oddCol]) => {
+      zones.forEach(([outer, inner, ec, oc]) => {
         for (let i = 0; i < 20; i++) {
-          const a1 = SA + (i / 20) * Math.PI * 2;
-          const a2 = SA + ((i + 1) / 20) * Math.PI * 2;
+          const a1 = SA + (i/20)*Math.PI*2;
+          const a2 = SA + ((i+1)/20)*Math.PI*2;
           ctx.beginPath();
-          ctx.arc(cx, cy, r * outer, a1, a2);
-          ctx.arc(cx, cy, r * inner, a2, a1, true);
+          ctx.arc(cx, cy, r*outer, a1, a2);
+          ctx.arc(cx, cy, r*inner, a2, a1, true);
           ctx.closePath();
-          ctx.fillStyle = i % 2 === 0 ? evenCol : oddCol;
+          ctx.fillStyle = i%2===0 ? ec : oc;
           ctx.fill();
         }
       });
 
-      // ── Sisal texture overlay ──────────────────────
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.998, 0, Math.PI * 2);
-      ctx.clip();
-      for (let i = 0; i < 300; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.random() * r;
-        const x = cx + Math.cos(angle) * dist;
-        const y = cy + Math.sin(angle) * dist;
+      // Wires
+      const wc = "rgba(180,180,180,0.9)";
+      [0.998,0.92,0.76,0.615,0.555,0.16].forEach(rad => {
         ctx.beginPath();
-        ctx.arc(x, y, 0.4, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0,0,0,0.06)";
-        ctx.fill();
+        ctx.arc(cx, cy, r*rad, 0, Math.PI*2);
+        ctx.strokeStyle = wc; ctx.lineWidth = 2.5; ctx.stroke();
+      });
+      for (let i = 0; i < 20; i++) {
+        const a = SA + (i/20)*Math.PI*2;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a)*r*0.16, cy + Math.sin(a)*r*0.16);
+        ctx.lineTo(cx + Math.cos(a)*r*0.998, cy + Math.sin(a)*r*0.998);
+        ctx.strokeStyle = wc; ctx.lineWidth = 2; ctx.stroke();
       }
-      ctx.restore();
 
-      // ── Wires ──────────────────────────────────────
-      const wire = "rgba(200,200,200,0.85)";
-      const wireW = r * 0.005;
+      // Numbers
+      ctx.font = `900 ${Math.round(r*0.11)}px Arial Black`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let i = 0; i < 20; i++) {
+        const na = SA + ((i+0.5)/20)*Math.PI*2;
+        ctx.fillStyle = "#fff";
+        ctx.shadowColor = "#000"; ctx.shadowBlur = 6;
+        ctx.fillText(SEG[i], cx+Math.cos(na)*r*1.07, cy+Math.sin(na)*r*1.07);
+      }
+      ctx.shadowBlur = 0;
 
-      // Ring wires
-      [0.998, 0.924, 0.765, 0.618, 0.555, 0.162].forEach(rad => {
-        ctx.beginPath();
-        ctx.arc(cx, cy, r * rad, 0, Math.PI * 2);
-        ctx.strokeStyle = wire;
-        ctx.lineWidth = wireW;
-        ctx.stroke();
-        // wire highlight
-        ctx.beginPath();
-        ctx.arc(cx, cy, r * rad, -Math.PI * 0.8, -Math.PI * 0.2);
-        ctx.strokeStyle = "rgba(255,255,255,0.4)";
-        ctx.lineWidth = wireW * 0.5;
-        ctx.stroke();
+      // Bull
+      ctx.beginPath();
+      ctx.arc(cx,cy,r*0.16,0,Math.PI*2);
+      ctx.fillStyle = "#1a7535"; ctx.fill();
+      ctx.strokeStyle = wc; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx,cy,r*0.076,0,Math.PI*2);
+      const bullGrad = ctx.createRadialGradient(cx-4,cy-4,0,cx,cy,r*0.076);
+      bullGrad.addColorStop(0,"#ff3030");
+      bullGrad.addColorStop(1,"#8a0808");
+      ctx.fillStyle = bullGrad; ctx.fill();
+      ctx.strokeStyle = wc; ctx.lineWidth = 2; ctx.stroke();
+
+      // Sheen
+      const sheen = ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,0,cx,cy,r);
+      sheen.addColorStop(0,"rgba(255,255,255,0.07)");
+      sheen.addColorStop(1,"rgba(0,0,0,0.2)");
+      ctx.beginPath();
+      ctx.arc(cx,cy,r*0.998,0,Math.PI*2);
+      ctx.fillStyle = sheen; ctx.fill();
+
+      const tex = new THREE.CanvasTexture(cv);
+      const faceGeo = new THREE.CircleGeometry(1.0, 128);
+      const faceMat = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.82,
+        metalness: 0.0,
+      });
+      const face = new THREE.Mesh(faceGeo, faceMat);
+      face.position.z = 0.065;
+      face.receiveShadow = true;
+      board.add(face);
+
+      // Metal edge ring
+      const edgeGeo = new THREE.TorusGeometry(1.01, 0.022, 16, 100);
+      const edgeMat = new THREE.MeshStandardMaterial({
+        color: 0xaaaaaa,
+        roughness: 0.3,
+        metalness: 0.9,
+      });
+      const edge = new THREE.Mesh(edgeGeo, edgeMat);
+      edge.position.z = 0.05;
+      board.add(edge);
+
+      // Idle gentle rotation
+      board.rotation.z = 0.04;
+      scene.add(board);
+    };
+
+    const buildDart = (THREE, scene) => {
+      dartGroup = new THREE.Group();
+
+      // Tip
+      const tipGeo = new THREE.ConeGeometry(0.008, 0.12, 8);
+      const tipMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.2, metalness: 0.95 });
+      const tip = new THREE.Mesh(tipGeo, tipMat);
+      tip.rotation.z = -Math.PI / 2;
+      tip.position.x = 0.22;
+      dartGroup.add(tip);
+
+      // Barrel
+      const barrelGeo = new THREE.CylinderGeometry(0.022, 0.016, 0.2, 16);
+      const barrelMat = new THREE.MeshStandardMaterial({
+        color: 0xd4a020,
+        roughness: 0.25,
+        metalness: 0.85,
+      });
+      const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+      barrel.rotation.z = Math.PI / 2;
+      barrel.position.x = 0.08;
+      dartGroup.add(barrel);
+
+      // Shaft
+      const shaftGeo = new THREE.CylinderGeometry(0.007, 0.007, 0.14, 8);
+      const shaftMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6, metalness: 0.4 });
+      const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+      shaft.rotation.z = Math.PI / 2;
+      shaft.position.x = -0.1;
+      dartGroup.add(shaft);
+
+      // Flights (two fins)
+      [-1, 1].forEach(side => {
+        const flightShape = new THREE.Shape();
+        flightShape.moveTo(0, 0);
+        flightShape.bezierCurveTo(-0.04, side*0.02, -0.1, side*0.09, -0.14, side*0.11);
+        flightShape.bezierCurveTo(-0.1, side*0.07, -0.04, side*0.01, 0, 0);
+
+        const flightGeo = new THREE.ShapeGeometry(flightShape);
+        const flightMat = new THREE.MeshStandardMaterial({
+          color: 0xcc1820,
+          roughness: 0.5,
+          metalness: 0.1,
+          side: THREE.DoubleSide,
+        });
+        const flight = new THREE.Mesh(flightGeo, flightMat);
+        flight.position.x = -0.17;
+        dartGroup.add(flight);
       });
 
-      // Divider wires
-      for (let i = 0; i < 20; i++) {
-        const a = SA + (i / 20) * Math.PI * 2;
-        ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(a) * r * 0.162, cy + Math.sin(a) * r * 0.162);
-        ctx.lineTo(cx + Math.cos(a) * r * 0.998, cy + Math.sin(a) * r * 0.998);
-        ctx.strokeStyle = wire;
-        ctx.lineWidth = wireW;
-        ctx.stroke();
-      }
+      // Start position — left side of screen
+      dartGroup.position.set(-3.5, -0.8, 1);
+      dartGroup.rotation.z = 0.08;
 
-      // ── Numbers ────────────────────────────────────
-      for (let i = 0; i < 20; i++) {
-        const na = SA + ((i + 0.5) / 20) * Math.PI * 2;
-        ctx.save();
-        ctx.translate(cx + Math.cos(na) * r * 1.072, cy + Math.sin(na) * r * 1.072);
-        ctx.fillStyle = "#fff";
-        ctx.font = `900 ${Math.round(r * 0.108)}px Arial Black, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.shadowColor = "#000";
-        ctx.shadowBlur = 5;
-        ctx.fillText(SEG[i], 0, 0);
-        ctx.restore();
-      }
-
-      // ── Bull outer (25) ────────────────────────────
-      const b25 = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.162);
-      b25.addColorStop(0, "#22a050");
-      b25.addColorStop(0.7, "#1a7535");
-      b25.addColorStop(1, "#0e4a20");
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.162, 0, Math.PI * 2);
-      ctx.fillStyle = b25;
-      ctx.fill();
-      ctx.strokeStyle = wire;
-      ctx.lineWidth = wireW;
-      ctx.stroke();
-
-      // ── Bullseye ───────────────────────────────────
-      const bull = ctx.createRadialGradient(cx - r*0.02, cy - r*0.02, 0, cx, cy, r * 0.078);
-      bull.addColorStop(0, "#ff3030");
-      bull.addColorStop(0.5, "#cc1818");
-      bull.addColorStop(1, "#7a0808");
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.078, 0, Math.PI * 2);
-      ctx.fillStyle = bull;
-      ctx.fill();
-      ctx.strokeStyle = wire;
-      ctx.lineWidth = wireW;
-      ctx.stroke();
-
-      // Bull highlight
-      ctx.beginPath();
-      ctx.arc(cx - r*0.02, cy - r*0.025, r * 0.03, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
-      ctx.fill();
-
-      // ── Board lighting sheen ───────────────────────
-      const sheen = ctx.createRadialGradient(cx - r*0.25, cy - r*0.35, 0, cx, cy, r);
-      sheen.addColorStop(0, "rgba(255,255,255,0.055)");
-      sheen.addColorStop(0.5, "rgba(255,255,255,0.01)");
-      sheen.addColorStop(1, "rgba(0,0,0,0.15)");
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.998, 0, Math.PI * 2);
-      ctx.fillStyle = sheen;
-      ctx.fill();
+      scene.add(dartGroup);
     };
 
-    const drawDart = (x, y, angle) => {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle);
+    let time = 0;
+    let flyFrom = new (null, null, null);
+    let flyTo = new (null, null, null);
+    let boardHit = { x: 0, y: 0 };
 
-      // Drop shadow
-      ctx.shadowColor = "rgba(0,0,0,0.75)";
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetX = 5;
-      ctx.shadowOffsetY = 5;
+    const animate = () => {
+      animId = requestAnimationFrame(animate);
+      time += 0.016;
 
-      // ── Steel point ────────────────────────────────
-      const ptG = ctx.createLinearGradient(10, -1.5, 10, 1.5);
-      ptG.addColorStop(0, "#d0d0d0");
-      ptG.addColorStop(0.4, "#ffffff");
-      ptG.addColorStop(1, "#707070");
-      ctx.beginPath();
-      ctx.moveTo(36, 0);
-      ctx.lineTo(11, -1.8);
-      ctx.lineTo(11, 1.8);
-      ctx.closePath();
-      ctx.fillStyle = ptG;
-      ctx.fill();
-
-      // Point ridges
-      for (let pr = 0; pr < 4; pr++) {
-        ctx.beginPath();
-        ctx.arc(11 + pr * 6, 0, 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(180,180,180,${0.3 - pr * 0.06})`;
-        ctx.fill();
+      if (phase === "idle") {
+        dartGroup.position.x = -3.5 + Math.sin(time * 0.8) * 0.06;
+        dartGroup.position.y = -0.8 + Math.sin(time * 1.1) * 0.04;
+        board.rotation.z = 0.04 + Math.sin(time * 0.4) * 0.008;
       }
 
-      // ── Barrel ─────────────────────────────────────
-      ctx.shadowBlur = 0;
-      const bG = ctx.createLinearGradient(-16, -7, -16, 7);
-      bG.addColorStop(0, "#9a7010");
-      bG.addColorStop(0.12, "#f0d458");
-      bG.addColorStop(0.28, "#ffe878");
-      bG.addColorStop(0.5, "#ffd040");
-      bG.addColorStop(0.72, "#c88a18");
-      bG.addColorStop(0.88, "#a06010");
-      bG.addColorStop(1, "#6a3c08");
-      ctx.beginPath();
-      ctx.roundRect(-16, -7, 30, 14, 4);
-      ctx.fillStyle = bG;
-      ctx.fill();
+      if (phase === "flying") {
+        flyProgress += 0.032;
+        const t = Math.min(flyProgress, 1);
+        const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
 
-      // Knurling
-      for (let k = -13; k <= 11; k += 2.2) {
-        const kg = ctx.createLinearGradient(k, -7, k + 1, -7);
-        kg.addColorStop(0, "rgba(0,0,0,0.28)");
-        kg.addColorStop(0.5, "rgba(0,0,0,0.08)");
-        kg.addColorStop(1, "rgba(0,0,0,0.28)");
-        ctx.beginPath();
-        ctx.rect(k, -7, 1.1, 14);
-        ctx.fillStyle = kg;
-        ctx.fill();
+        dartGroup.position.x = -3.5 + (boardHit.x - (-3.5)) * ease;
+        dartGroup.position.y = -0.8 + (boardHit.y - (-0.8)) * ease + Math.sin(t * Math.PI) * 0.3;
+        dartGroup.position.z = 1 + (0.08 - 1) * ease;
+        dartGroup.rotation.z = 0.08 * (1 - ease);
+
+        if (flyProgress >= 1) {
+          phase = "stuck";
+          setTimeout(() => { window.location.replace("/?from=splash"); }, 1000);
+        }
       }
 
-      // Barrel top highlight
-      ctx.beginPath();
-      ctx.roundRect(-16, -7, 30, 5, [4, 4, 0, 0]);
-      ctx.fillStyle = "rgba(255,255,255,0.22)";
-      ctx.fill();
-
-      // ── Shaft ──────────────────────────────────────
-      const shG = ctx.createLinearGradient(-42, -3, -42, 3);
-      shG.addColorStop(0, "#555");
-      shG.addColorStop(0.4, "#999");
-      shG.addColorStop(0.6, "#bbb");
-      shG.addColorStop(1, "#444");
-      ctx.beginPath();
-      ctx.rect(-40, -3, 24, 6);
-      ctx.fillStyle = shG;
-      ctx.fill();
-
-      // Shaft highlight
-      ctx.beginPath();
-      ctx.rect(-40, -3, 24, 2);
-      ctx.fillStyle = "rgba(255,255,255,0.2)";
-      ctx.fill();
-
-      // ── Flights ────────────────────────────────────
-      // Top flight
-      ctx.beginPath();
-      ctx.moveTo(-40, -2);
-      ctx.bezierCurveTo(-44, -5, -56, -22, -60, -28);
-      ctx.bezierCurveTo(-57, -24, -48, -12, -40, -2);
-      ctx.closePath();
-      const fG1 = ctx.createLinearGradient(-40, -2, -60, -28);
-      fG1.addColorStop(0, "#cc1010");
-      fG1.addColorStop(0.5, "#e51d2a");
-      fG1.addColorStop(1, "#ff4444");
-      ctx.fillStyle = fG1;
-      ctx.fill();
-      ctx.strokeStyle = "#8a0808";
-      ctx.lineWidth = 0.6;
-      ctx.stroke();
-
-      // Bottom flight
-      ctx.beginPath();
-      ctx.moveTo(-40, 2);
-      ctx.bezierCurveTo(-44, 5, -56, 22, -60, 28);
-      ctx.bezierCurveTo(-57, 24, -48, 12, -40, 2);
-      ctx.closePath();
-      ctx.fillStyle = fG1;
-      ctx.fill();
-      ctx.strokeStyle = "#8a0808";
-      ctx.lineWidth = 0.6;
-      ctx.stroke();
-
-      // Flight highlight
-      ctx.beginPath();
-      ctx.moveTo(-41, -3);
-      ctx.bezierCurveTo(-45, -7, -53, -17, -56, -22);
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(-41, 3);
-      ctx.bezierCurveTo(-45, 7, -53, 17, -56, 22);
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-
-      ctx.restore();
+      renderer.render(scene, camera);
     };
 
-    let phase = "idle";
-    let flyProgress = 0;
-    let flyFrom = { x: 0, y: 0 };
-    let flyTo = { x: 0, y: 0 };
-    let stuckX = 0, stuckY = 0;
+    const onResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    };
 
-    const throwDart = (tx, ty) => {
+    const onClick = (e) => {
       if (phase !== "idle") return;
       setThrown(true);
       phase = "flying";
       flyProgress = 0;
-      flyFrom = { x: cx - r - 160, y: cy + 55 };
-      const dx = tx - cx, dy = ty - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const maxDist = r * 0.92;
-      flyTo = dist > maxDist
-        ? { x: cx + (dx / dist) * maxDist, y: cy + (dy / dist) * maxDist }
-        : { x: tx, y: ty };
+
+      // Map click to board space
+      const nx = (e.clientX / window.innerWidth - 0.5) * 2;
+      const ny = -(e.clientY / window.innerHeight - 0.5) * 2;
+      boardHit.x = nx * 1.1;
+      boardHit.y = ny * 1.1;
     };
 
-    window.__throwDart = throwDart;
+    mount.addEventListener("click", onClick);
+    init();
 
-    const loop = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Room ambient light effect
-      const ambient = ctx.createRadialGradient(cx, cy - r * 0.5, 0, cx, cy, r * 2.2);
-      ambient.addColorStop(0, "rgba(40,20,10,0.3)");
-      ambient.addColorStop(0.4, "rgba(10,5,2,0.5)");
-      ambient.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = ambient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      drawBoard();
-
-      if (phase === "idle") {
-        const wb = Math.sin(Date.now() / 900) * 4;
-        drawDart(cx - r - 160 + wb, cy + 55, -0.07);
-      }
-
-      if (phase === "flying") {
-        flyProgress += 0.034;
-        const t = Math.min(flyProgress, 1);
-        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-        const px = flyFrom.x + (flyTo.x - flyFrom.x) * ease;
-        const py = flyFrom.y + (flyTo.y - flyFrom.y) * ease - Math.sin(t * Math.PI) * 60;
-        drawDart(px, py, Math.atan2(flyTo.y - flyFrom.y, flyTo.x - flyFrom.x));
-        if (flyProgress >= 1) {
-          phase = "stuck";
-          stuckX = flyTo.x; stuckY = flyTo.y;
-          for (let i = 0; i < 30; i++) {
-            const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 5.5;
-            particles.push({ x: stuckX, y: stuckY, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, color: Math.random() > 0.5 ? "#E51D2A" : "#F8EBC6", size: 1.5 + Math.random() * 3.5 });
-          }
-          setTimeout(() => { window.location.replace("/?from=splash"); }, 1100);
-        }
-      }
-
-      if (phase === "stuck") drawDart(stuckX, stuckY, -0.07);
-
-      particles = particles.filter(p => p.life > 0);
-      particles.forEach(p => {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.life;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        p.x += p.vx; p.y += p.vy; p.vy += 0.16; p.life -= 0.022;
-      });
-
-      animId = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", onResize);
+      mount.removeEventListener("click", onClick);
+      if (renderer) { renderer.dispose(); mount.removeChild(renderer.domElement); }
     };
-    loop();
-
-    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
   }, []);
 
   return (
-    <div
-      className="relative flex h-screen w-screen cursor-crosshair items-center justify-center overflow-hidden bg-black"
-      onClick={(e) => window.__throwDart?.(e.clientX, e.clientY)}
-    >
-      <canvas ref={canvasRef} className="absolute inset-0" />
+    <div className="relative w-screen h-screen bg-black overflow-hidden cursor-crosshair">
+      <div ref={mountRef} className="absolute inset-0" />
+
       <div className="pointer-events-none absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-        <img src="/odc-logo.png" alt="ODC" className="h-14 w-14 object-contain drop-shadow-[0_0_18px_rgba(229,29,42,0.4)]" />
+        <img src="/odc-logo.png" alt="ODC" className="h-14 w-14 object-contain drop-shadow-[0_0_18px_rgba(229,29,42,0.5)]" />
         <p className="text-xs font-black uppercase tracking-[0.35em] text-[#F8EBC6]/50">Online Darts Circuit</p>
       </div>
+
       <div className={`pointer-events-none absolute bottom-12 left-1/2 -translate-x-1/2 text-center transition-opacity duration-700 ${hint && !thrown ? "opacity-100" : "opacity-0"}`}>
         <p className="text-sm font-black uppercase tracking-[0.3em] text-[#E51D2A]">Click to throw</p>
         <p className="mt-1 text-xs text-[#F8EBC6]/40">Enter the ODC</p>
