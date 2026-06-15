@@ -511,14 +511,29 @@ function buildDuoLeagueData(rows) {
 }
 
 function buildEventsData(rows) {
-  // Row 0 = header, Row 1 = blank, data starts row 2
-  return rows.slice(2).map((row) => ({
-    name:   text(row[0]),
-    date:   text(row[1]),
-    format: text(row[2]),
-    prize:  text(row[3]),
-    signUp: text(row[4]),
-  })).filter((e) => e.name);
+  const events = [];
+
+  for (const row of rows) {
+    const name = text(row[0]);
+
+    // Skip headers and empty rows only
+    if (
+      !name ||
+      name.toLowerCase().includes("event")
+    ) {
+      continue;
+    }
+
+    events.push({
+      name,
+      date: text(row[1]),
+      format: text(row[2]),
+      prize: text(row[3]),
+      signUp: text(row[4]),
+    });
+  }
+
+  return events;
 }
 
 function buildKnockoutData(rows) {
