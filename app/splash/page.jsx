@@ -77,6 +77,8 @@ export default function Splash() {
       rimRed.position.set(0, 0.5, -2.5); scene.add(rimRed);
       const cool = new THREE.DirectionalLight(0x35527e, 0.5);
       cool.position.set(-7, 2, 5); scene.add(cool);
+      const frontFill = new THREE.DirectionalLight(0xffffff, 0.45);
+      frontFill.position.set(0, 1, 12); scene.add(frontFill);
 
       // ---- Wall / floor / glow column ----
       const wall = new THREE.Mesh(new THREE.PlaneGeometry(70, 46), new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.96 }));
@@ -109,11 +111,35 @@ export default function Splash() {
 
       // ---- Dart material factory (STL has no materials) ----
       function styleDart(obj) {
-        const steel = new THREE.MeshStandardMaterial({ color: 0xcfcfd4, roughness: 0.22, metalness: 1.0, envMapIntensity: 1.2 });
+        // Dart long axis is Z, tip at -Z, flights at +Z. Colour by vertex Z via material groups.
+        const steel = new THREE.MeshStandardMaterial({ color: 0xe2e2e6, roughness: 0.18, metalness: 1.0, envMapIntensity: 1.4 });
+        const tungsten = new THREE.MeshStandardMaterial({ color: 0x2e2e33, roughness: 0.32, metalness: 0.96, envMapIntensity: 1.0 });
+        const red = new THREE.MeshStandardMaterial({ color: 0xe51d2a, roughness: 0.4, metalness: 0.15, emissive: 0x3a0507, emissiveIntensity: 0.3 });
         obj.traverse((o) => {
-          if (o.isMesh) {
-            o.material = steel;
+          if (o.isMesh && o.geometry) {
             o.castShadow = true;
+            const geo = o.geometry;
+            geo.computeBoundingBox();
+            const zmin = geo.boundingBox.min.z, zmax = geo.boundingBox.max.z, span = zmax - zmin || 1;
+            const pos = geo.attributes.position;
+            // assign material index per triangle based on average Z
+            geo.clearGroups();
+            const idx = geo.index;
+            const triCount = idx ? idx.count / 3 : pos.count / 3;
+            // build a material array and groups
+            const getZ = (vi) => pos.getZ(vi);
+            for (let t = 0; t < triCount; t++) {
+              let a,b,c;
+              if (idx) { a=idx.getX(t*3); b=idx.getX(t*3+1); c=idx.getX(t*3+2); }
+              else { a=t*3; b=t*3+1; c=t*3+2; }
+              const az = (getZ(a)+getZ(b)+getZ(c))/3;
+              const frac = (az - zmin) / span; // 0 at tip(-Z) .. 1 at flights(+Z)
+              let mi = 1; // tungsten barrel default
+              if (frac < 0.28) mi = 0;        // tip = steel
+              else if (frac > 0.72) mi = 2;   // flights = red
+              geo.addGroup(t*3, 3, mi);
+            }
+            o.material = [steel, tungsten, red];
           }
         });
         return obj;
@@ -148,7 +174,7 @@ export default function Splash() {
           model.position.sub(center); // center at origin
 
           // Board lies flat (Y is thin). Stand it up so face points +Z toward camera.
-          model.rotation.x = -Math.PI / 2;
+          model.rotation.x = Math.PI / 2;
 
           // Scale so the board diameter == 2*BOARD_RADIUS
           const flatDiameter = Math.max(size.x, size.z);
@@ -187,7 +213,7 @@ export default function Splash() {
           // dart long axis is Z, tip at -Z. Scale to a sensible length (~0.95 world units)
           const size = new THREE.Vector3(); box.getSize(size);
           const len = Math.max(size.x, size.y, size.z);
-          model.scale.setScalar(0.95 / len);
+          model.scale.setScalar(1.3 / len);
           styleDart(model);
           dartTemplate = model;
           dartLoaded = true;
