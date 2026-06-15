@@ -418,7 +418,6 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             className="relative mx-auto flex w-full max-w-xl items-center justify-center"
           >
             <div className="absolute h-72 w-72 rounded-full bg-odcRed/10 blur-3xl md:h-96 md:w-96" />
-
             <img
               src="/odc-logo.png"
               alt="ODC logo"
@@ -451,13 +450,11 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
                 <p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
                   {r.division || "Match Result"}
                 </p>
-
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                   <p className="font-black">{r.home}</p>
                   <p className="rounded-xl bg-odcRed px-3 py-1 text-lg font-black text-white">{r.score}</p>
                   <p className="text-right font-black">{r.away}</p>
                 </div>
-
                 <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-odcCream/60">
                   <span>{r.home}: {r.p1Stats?.avg || "-"} avg</span>
                   <span className="text-right">{r.away}: {r.p2Stats?.avg || "-"} avg</span>
@@ -487,8 +484,7 @@ function FixturesPage({ data }) {
   }, [fixtures, selectedDivision, divisionNames]);
 
   const currentWeek = data.currentWeek || 1;
-  const targetWeek =
-    selectedWeek === "next" ? currentWeek + 1 : currentWeek;
+  const targetWeek = selectedWeek === "next" ? currentWeek + 1 : currentWeek;
 
   const rows = (fixtures[selectedDivision] || []).filter(
     (fixture) => Number(fixture.week) === Number(targetWeek)
@@ -497,14 +493,9 @@ function FixturesPage({ data }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <SectionTitle
-          kicker={`Week ${targetWeek}`}
-          title="Fixtures"
-          text="View fixtures by division and week."
-        />
+        <SectionTitle kicker={`Week ${targetWeek}`} title="Fixtures" text="View fixtures by division and week." />
 
         <div className="flex flex-col gap-3 md:flex-row">
-          {/* Division Dropdown */}
           <div className="relative">
             <select
               value={selectedDivision}
@@ -512,31 +503,21 @@ function FixturesPage({ data }) {
               className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
             >
               {divisionNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
+                <option key={name} value={name}>{name}</option>
               ))}
             </select>
-
             <ChevronDown className="pointer-events-none absolute right-4 top-4" />
           </div>
 
-          {/* Week Dropdown */}
           <div className="relative">
             <select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
               className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-56"
             >
-              <option value="current">
-                This Week (Week {currentWeek})
-              </option>
-
-              <option value="next">
-                Next Week (Week {currentWeek + 1})
-              </option>
+              <option value="current">This Week (Week {currentWeek})</option>
+              <option value="next">Next Week (Week {currentWeek + 1})</option>
             </select>
-
             <ChevronDown className="pointer-events-none absolute right-4 top-4" />
           </div>
         </div>
@@ -544,40 +525,23 @@ function FixturesPage({ data }) {
 
       {rows.length === 0 ? (
         <Card>
-          <p className="text-lg font-black">
-            No fixtures listed for Week {targetWeek}.
-          </p>
-
-          <p className="mt-2 text-odcCream/60">
-            Fixtures will appear here once they’ve been added.
-          </p>
+          <p className="text-lg font-black">No fixtures listed for Week {targetWeek}.</p>
+          <p className="mt-2 text-odcCream/60">Fixtures will appear here once they've been added.</p>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((fixture, index) => (
-            <Card
-              key={`${fixture.division}-${fixture.home}-${fixture.away}-${index}`}
-            >
+            <Card key={`${fixture.division}-${fixture.home}-${fixture.away}-${index}`}>
               <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
                 {fixture.division} • Week {fixture.week}
               </p>
-
               <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                 <p className="text-lg font-black">{fixture.home}</p>
-
-                <p className="rounded-xl bg-odcRed px-3 py-1 text-sm font-black text-white">
-                  VS
-                </p>
-
-                <p className="text-right text-lg font-black">
-                  {fixture.away}
-                </p>
+                <p className="rounded-xl bg-odcRed px-3 py-1 text-sm font-black text-white">VS</p>
+                <p className="text-right text-lg font-black">{fixture.away}</p>
               </div>
-
               <p className="mt-4 text-sm text-odcCream/60">
-                {fixture.date
-                  ? `Scheduled: ${fixture.date}`
-                  : "Date to be confirmed"}
+                {fixture.date ? `Scheduled: ${fixture.date}` : "Date to be confirmed"}
               </p>
             </Card>
           ))}
@@ -709,11 +673,7 @@ function DuoLeaguePage({ data }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <SectionTitle
-          kicker="Dynamic Duo League"
-          title="Group Tables"
-          text="Current ODC Dynamic Duo League standings by group."
-        />
+        <SectionTitle kicker="Dynamic Duo League" title="Group Tables" text="Current ODC Dynamic Duo League standings by group." />
 
         <div className="relative mb-7">
           <select
@@ -732,9 +692,7 @@ function DuoLeaguePage({ data }) {
       {rows.length === 0 ? (
         <Card>
           <p className="text-lg font-black">No Duo League table data found.</p>
-          <p className="mt-2 text-odcCream/60">
-            The standings table could not be read from the Duo League sheet.
-          </p>
+          <p className="mt-2 text-odcCream/60">The standings table could not be read from the Duo League sheet.</p>
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
@@ -790,7 +748,9 @@ function DuoLeaguePage({ data }) {
 
 function PlayersPage({ data, onSelectPlayer }) {
   const [query, setQuery] = useState("");
-  const filtered = data.players.filter((p) => `${p.name} ${p.team} ${p.division}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = data.players.filter((p) =>
+    `${p.name} ${p.team} ${p.division}`.toLowerCase().includes(query.toLowerCase())
+  );
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
@@ -909,17 +869,165 @@ function MvpsPage({ data }) {
   );
 }
 
-function EventsPage() {
+function KnockoutBracket({ knockout }) {
+  if (!knockout) return null;
+  const { quarterFinals = [], semiFinals = [], final = [], champion } = knockout;
+
+  const MatchCard = ({ match, label }) => {
+    const hasResult = match?.homeScore || match?.awayScore;
+    const winner = match?.winner;
+    return (
+      <div className="rounded-2xl border border-odcCream/10 bg-white/[0.055] p-4 shadow-cream backdrop-blur">
+        <p className="mb-3 text-[10px] font-black uppercase tracking-[0.25em] text-odcRed">{label}</p>
+        <div className="space-y-2">
+          {[
+            { name: match?.home, score: match?.homeScore },
+            { name: match?.away, score: match?.awayScore },
+          ].map((side, i) => (
+            <div
+              key={i}
+              className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${
+                winner && side.name === winner
+                  ? "border border-odcRed/40 bg-odcRed/20"
+                  : "bg-white/5"
+              }`}
+            >
+              <span
+                className={`truncate text-sm font-black ${
+                  winner && side.name === winner ? "text-odcCream" : "text-odcCream/70"
+                }`}
+              >
+                {side.name || "TBD"}
+              </span>
+              {hasResult && (
+                <span className="shrink-0 text-sm font-black text-odcCream">
+                  {side.score || "0"}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="mt-12">
+      <div className="mb-6 border-t border-odcCream/10 pt-10">
+        <p className="text-xs font-black uppercase tracking-[0.35em] text-odcRed">Knockout Bracket</p>
+        <h3 className="mt-2 text-2xl font-black">Duo League — Knockout Stage</h3>
+      </div>
+
+      {/* Quarter-finals */}
+      <div className="mb-8">
+        <p className="mb-4 text-sm font-black uppercase tracking-[0.2em] text-odcCream/50">Quarter-finals</p>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {quarterFinals.map((m) => (
+            <MatchCard key={m.id} match={m} label={m.id} />
+          ))}
+        </div>
+      </div>
+
+      {/* Semi-finals */}
+      <div className="mb-8">
+        <p className="mb-4 text-sm font-black uppercase tracking-[0.2em] text-odcCream/50">Semi-finals</p>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2 xl:max-w-2xl">
+          {semiFinals.map((m) => (
+            <MatchCard key={m.id} match={m} label={m.id} />
+          ))}
+        </div>
+      </div>
+
+      {/* Final */}
+      <div className="mb-8">
+        <p className="mb-4 text-sm font-black uppercase tracking-[0.2em] text-odcCream/50">Final</p>
+        <div className="max-w-sm">
+          {final.map((m) => (
+            <MatchCard key="Final" match={m} label="Final" />
+          ))}
+        </div>
+      </div>
+
+      {/* Champion */}
+      {champion && (
+        <Card className="max-w-sm border-odcRed/40 bg-odcRed/10">
+          <div className="flex items-center gap-4">
+            <Trophy className="shrink-0 text-odcRed" size={32} />
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-odcRed">Champion</p>
+              <p className="mt-1 text-2xl font-black">{champion}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function EventsPage({ data }) {
+  const events = data.events || [];
+  const knockout = data.knockout;
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
-      <SectionTitle kicker="Events" title="ODC Events" text="Tournament results, special events and community competitions will be shown here." />
-      <Card className="max-w-2xl">
-        <h3 className="text-2xl font-black">Events coming soon</h3>
-        <p className="mt-3 text-odcCream/65">This section will be used for ODC tournament winners, event results and community competition updates.</p>
-        <div className="mt-5">
-          <SocialButtons />
+      <SectionTitle
+        kicker="Events"
+        title="ODC Events"
+        text="Tournaments, special events and community competitions across the Online Darts Circuit."
+      />
+
+      {events.length === 0 ? (
+        <Card className="max-w-2xl">
+          <p className="text-lg font-black">No events listed yet.</p>
+          <p className="mt-2 text-odcCream/60">Events will appear here once added to the sheet.</p>
+          <div className="mt-5">
+            <SocialButtons />
+          </div>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {events.map((e) => (
+            <Card key={e.name} className="flex flex-col gap-3 transition hover:-translate-y-1 hover:border-odcRed/40">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.25em] text-odcRed">{e.date}</p>
+                  <h3 className="mt-1 text-xl font-black">{e.name}</h3>
+                </div>
+                <CalendarDays className="shrink-0 text-odcRed" size={22} />
+              </div>
+
+              {e.format && (
+                <p className="text-sm text-odcCream/60">
+                  <span className="font-black text-odcCream/80">Format: </span>{e.format}
+                </p>
+              )}
+
+              {e.prize && (
+                <p className="text-sm text-odcCream/60">
+                  <span className="font-black text-odcCream/80">Prize: </span>{e.prize}
+                </p>
+              )}
+
+              {e.signUp && e.signUp.startsWith("http") ? (
+                <a
+                  href={e.signUp}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-auto inline-flex w-fit items-center gap-2 rounded-2xl bg-odcRed px-4 py-2 text-sm font-black text-white shadow-glow"
+                >
+                  <ExternalLink size={15} /> Sign Up
+                </a>
+              ) : e.signUp ? (
+                <p className="text-sm text-odcCream/60">
+                  <span className="font-black text-odcCream/80">Sign Up: </span>{e.signUp}
+                </p>
+              ) : null}
+            </Card>
+          ))}
         </div>
-      </Card>
+      )}
+
+      <KnockoutBracket knockout={knockout} />
     </section>
   );
 }
@@ -949,19 +1057,21 @@ export default function App() {
       <Header active={active} setActive={setActive} />
 
       {status === "fallback" && (
-        <div className="bg-odcRed px-4 py-2 text-center text-sm font-black text-white">Google Sheets data could not be loaded. Showing demo data.</div>
+        <div className="bg-odcRed px-4 py-2 text-center text-sm font-black text-white">
+          Google Sheets data could not be loaded. Showing demo data.
+        </div>
       )}
 
       <motion.div key={active} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-        {active === "home" && <HomePage setActive={setActive} data={data} status={status} onSelectMatch={setSelectedMatch} />}
-        {active === "fixtures" && <FixturesPage data={data} />}
-        {active === "results" && <ResultsPage data={data} onSelectMatch={setSelectedMatch} />}
-        {active === "tables" && <TablesPage data={data} />}
-        {active === "duo" && <DuoLeaguePage data={data} />}
-        {active === "players" && <PlayersPage data={data} onSelectPlayer={setSelectedPlayer} />}
+        {active === "home"         && <HomePage setActive={setActive} data={data} status={status} onSelectMatch={setSelectedMatch} />}
+        {active === "fixtures"     && <FixturesPage data={data} />}
+        {active === "results"      && <ResultsPage data={data} onSelectMatch={setSelectedMatch} />}
+        {active === "tables"       && <TablesPage data={data} />}
+        {active === "duo"          && <DuoLeaguePage data={data} />}
+        {active === "players"      && <PlayersPage data={data} onSelectPlayer={setSelectedPlayer} />}
         {active === "leaderboards" && <LeaderboardsPage data={data} />}
-        {active === "mvps" && <MvpsPage data={data} />}
-        {active === "events" && <EventsPage />}
+        {active === "mvps"         && <MvpsPage data={data} />}
+        {active === "events"       && <EventsPage data={data} />}
       </motion.div>
 
       <footer className="border-t border-odcCream/10 px-4 py-8 text-center text-sm text-odcCream/45">
@@ -970,7 +1080,12 @@ export default function App() {
 
       <BottomNav active={active} setActive={setActive} />
       <MatchDetailsModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
-      <PlayerDetailsModal player={selectedPlayer} masterStats={data.masterStats || {}} matches={data.allResults || []} onClose={() => setSelectedPlayer(null)} />
+      <PlayerDetailsModal
+        player={selectedPlayer}
+        masterStats={data.masterStats || {}}
+        matches={data.allResults || []}
+        onClose={() => setSelectedPlayer(null)}
+      />
     </main>
   );
 }
