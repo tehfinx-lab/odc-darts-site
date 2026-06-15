@@ -2,9 +2,11 @@ const SHEET_ID = "12g5hf6mPmQDBiDb-kN8zozOJfddmU5utOaq7YCzGRLk";
 const MATCHES_GID = "257719632";
 const FIXTURES_GID = "573028301";
 const MASTER_STATS_GID = "1607751142";
+const EVENTS_GID = "1053162197";
 
 const DUO_SHEET_ID = "1nN_dbDGg482nZTB1ghwLgxvKJ5My-3PG";
 const DUO_GID = "1207445903";
+const KNOCKOUT_GID = "831104526";
 
 const CURRENT_WEEK = 11;
 const MVP_WEEK = CURRENT_WEEK - 1;
@@ -441,20 +443,6 @@ function buildDuoLeagueData(rows) {
     { group: "Group C", firstMatchId: "C1" },
   ];
 
-  // Exact standings columns from your sheet:
-  // J = Team
-  // K = Team Avg
-  // L = P
-  // M = W
-  // N = D
-  // O = L
-  // P = LF
-  // Q = LA
-  // R = LD
-  // S = Pts
-  // T = Sort Key
-  // U = Rank
-  // V = Status
   const DUO_COL = {
     matchId: 0,
     team: 9,
@@ -477,7 +465,6 @@ function buildDuoLeagueData(rows) {
 
     if (startRow === -1) continue;
 
-    // Each group has exactly 4 teams in the standings table.
     for (let r = startRow; r < startRow + 4; r++) {
       const row = rows[r] || [];
       const team = text(row[DUO_COL.team]);
@@ -523,12 +510,47 @@ function buildDuoLeagueData(rows) {
   };
 }
 
+function buildEventsData(rows) {
+  // Row 0 = header, Row 1 = blank, data starts row 2
+  return rows.slice(2).map((row) => ({
+    name:   text(row[0]),
+    date:   text(row[1]),
+    format: text(row[2]),
+    prize:  text(row[3]),
+    signUp: text(row[4]),
+  })).filter((e) => e.name);
+}
+
+function buildKnockoutData(rows) {
+  const getMatch = (row) => ({
+    home:      text(row?.[1] ?? ""),
+    away:      text(row?.[2] ?? ""),
+    homeScore: text(row?.[3] ?? ""),
+    awayScore: text(row?.[4] ?? ""),
+    winner:    text(row?.[5] ?? ""),
+  });
+
+  // Sheet layout (0-indexed rows):
+  // Row 6  = QF1, Row 7 = QF2, Row 8 = QF3, Row 9 = QF4
+  // Row 14 = SF1, Row 15 = SF2
+  // Row 20 = Final
+  // Row 24 = Champion (col B)
+  return {
+    quarterFinals: [6, 7, 8, 9].map((i) => ({ id: text(rows[i]?.[0] ?? ""), ...getMatch(rows[i]) })),
+    semiFinals:    [14, 15].map((i)    => ({ id: text(rows[i]?.[0] ?? ""), ...getMatch(rows[i]) })),
+    final:         [{ id: "Final",                                           ...getMatch(rows[20]) }],
+    champion:      text(rows[24]?.[1] ?? ""),
+  };
+}
+
 export async function GET() {
   try {
-    const [matchRows, fixtureRows, duoRows] = await Promise.all([
+    const [matchRows, fixtureRows, duoRows, knockoutRows, eventRows] = await Promise.all([
       fetchSheetRows(MATCHES_GID, "Matches"),
       fetchSheetRows(FIXTURES_GID, "Fixtures"),
       fetchCsvRows(DUO_SHEET_ID, DUO_GID, "Duo League"),
+      fetchCsvRows(DUO_SHEET_ID, KNOCKOUT_GID, "Knockout"),
+      fetchSheetRows(EVENTS_GID, "Events"),
     ]);
 
     let masterRows = [];
@@ -541,10 +563,12 @@ export async function GET() {
       console.error("Master Stats failed:", error);
     }
 
-    const matchData = buildMatchesData(matchRows);
-    const fixtures = buildFixturesData(fixtureRows);
+    const matchData  = buildMatchesData(matchRows);
+    const fixtures   = buildFixturesData(fixtureRows);
     const masterStats = buildMasterStats(masterRows);
-    const duoLeague = buildDuoLeagueData(duoRows);
+    const duoLeague  = buildDuoLeagueData(duoRows);
+    const events     = buildEventsData(eventRows);
+    const knockout   = buildKnockoutData(knockoutRows);
 
     return Response.json(
       {
@@ -555,7 +579,8 @@ export async function GET() {
         masterStatsError,
         currentWeek: CURRENT_WEEK,
         mvpWeek: MVP_WEEK,
-        events: [],
+        events,
+        knockout,
       },
       {
         headers: {
