@@ -57,7 +57,7 @@ export default function Splash() {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.05;
+      renderer.toneMappingExposure = 0.82;
       mount.appendChild(renderer.domElement);
 
       // ---------- Scene ----------
@@ -66,7 +66,7 @@ export default function Splash() {
       scene.fog = new THREE.FogExp2(0x040404, 0.022);
 
       const camera = new THREE.PerspectiveCamera(36, W() / H(), 0.1, 100);
-      camera.position.set(0, 0.2, 15); // dolly target is z=11
+      camera.position.set(0, 0.2, 16); // dolly target is z=13
 
       // ---------- Environment (reflections) ----------
       const pmrem = new THREE.PMREMGenerator(renderer);
@@ -76,7 +76,7 @@ export default function Splash() {
       // ---------- Lighting rig ----------
       scene.add(new THREE.AmbientLight(0x20232c, 0.5));
 
-      const key = new THREE.SpotLight(0xfff4e6, 900, 44, Math.PI / 6.5, 0.45, 1.5);
+      const key = new THREE.SpotLight(0xfff4e6, 650, 44, Math.PI / 6.5, 0.45, 1.5);
       key.position.set(2.5, 11, 9);
       key.castShadow = true;
       key.shadow.mapSize.set(2048, 2048);
@@ -84,7 +84,7 @@ export default function Splash() {
       key.shadow.radius = 6;
       scene.add(key, key.target);
 
-      const rimRed = new THREE.PointLight(RED, 600, 26, 2);
+      const rimRed = new THREE.PointLight(RED, 280, 26, 2);
       rimRed.position.set(0, 0.5, -3.5);
       scene.add(rimRed);
 
@@ -256,15 +256,15 @@ export default function Splash() {
       scene.add(wall);
 
       // ---------- Volumetric red light column ----------
-      const colMat = new THREE.MeshBasicMaterial({ color: RED, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
+      const colMat = new THREE.MeshBasicMaterial({ color: RED, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
       const column = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 30), colMat);
-      column.position.set(0, 0, -1.0);
+      column.position.set(0, 0, -2.2);
       scene.add(column);
       const colCore = new THREE.Mesh(
         new THREE.PlaneGeometry(0.5, 30),
-        new THREE.MeshBasicMaterial({ color: 0xffe9e0, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false })
+        new THREE.MeshBasicMaterial({ color: 0xffe9e0, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false })
       );
-      colCore.position.set(0, 0, -0.95);
+      colCore.position.set(0, 0, -2.15);
       scene.add(colCore);
 
       // ---------- Reflective floor ----------
@@ -327,7 +327,7 @@ export default function Splash() {
       const composer = new EffectComposer(renderer);
       composer.addPass(new RenderPass(scene, camera));
 
-      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.55, 0.7, 0.85);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.22, 0.5, 0.95);
       composer.addPass(bloom);
 
       // Vignette + grain + chromatic aberration
@@ -429,9 +429,9 @@ export default function Splash() {
         board.rotation.y = mx * 0.35;
 
         // light + glow pulse
-        colMat.opacity = 0.34 + Math.sin(t * 1.5) * 0.1;
-        rimRed.intensity = 520 + Math.sin(t * 1.5) * 120 + hitPulse * 700;
-        bloom.strength = 0.55 + hitPulse * 0.5;
+        colMat.opacity = 0.14 + Math.sin(t * 1.5) * 0.05;
+        rimRed.intensity = 260 + Math.sin(t * 1.5) * 70 + hitPulse * 400;
+        bloom.strength = 0.22 + hitPulse * 0.25;
         movingLight.position.x = Math.sin(t * 0.6) * 5;
         movingLight.position.y = 2.5 + Math.cos(t * 0.5) * 1.5;
 
@@ -477,7 +477,7 @@ export default function Splash() {
         hitPulse = Math.max(0, hitPulse - 0.04);
 
         // camera dolly-in + parallax
-        camera.position.z += (11 - camera.position.z) * 0.02;
+        camera.position.z += (13 - camera.position.z) * 0.02;
         camera.position.x += (mx * 0.7 - camera.position.x) * 0.035;
         camera.position.y += (0.2 - my * 0.4 - camera.position.y) * 0.035;
         camera.lookAt(0, 0, 0);
