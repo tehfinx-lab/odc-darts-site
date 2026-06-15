@@ -19,12 +19,12 @@ export default function Splash() {
         const script = document.createElement("script");
         script.type = "module";
         script.textContent = `
-          import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-          import { EffectComposer } from "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js";
-          import { RenderPass } from "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/RenderPass.js";
-          import { UnrealBloomPass } from "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js";
-          import { ShaderPass } from "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/ShaderPass.js";
-          import { RoomEnvironment } from "https://unpkg.com/three@0.160.0/examples/jsm/environments/RoomEnvironment.js";
+          import * as THREE from "https://esm.sh/three@0.160.0";
+          import { EffectComposer } from "https://esm.sh/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js";
+          import { RenderPass } from "https://esm.sh/three@0.160.0/examples/jsm/postprocessing/RenderPass.js";
+          import { UnrealBloomPass } from "https://esm.sh/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js";
+          import { ShaderPass } from "https://esm.sh/three@0.160.0/examples/jsm/postprocessing/ShaderPass.js";
+          import { RoomEnvironment } from "https://esm.sh/three@0.160.0/examples/jsm/environments/RoomEnvironment.js";
           window.__THREE_BUNDLE__ = { THREE, EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, RoomEnvironment };
           window.dispatchEvent(new Event("three-bundle-ready"));
         `;
@@ -33,9 +33,16 @@ export default function Splash() {
         document.head.appendChild(script);
       });
 
+    // Safety: never trap the user on the loader. If 3D isn't up within 8s, reveal anyway.
+    const failSafe = setTimeout(() => { if (!disposed) setReady(true); }, 8000);
+
     loadLibs()
-      .then((bundle) => { if (!disposed && mountRef.current) init(bundle); })
-      .catch((e) => console.error("3D libraries failed to load", e));
+      .then((bundle) => {
+        if (disposed || !mountRef.current) return;
+        try { init(bundle); }
+        catch (err) { console.error("3D init failed", err); setReady(true); }
+      })
+      .catch((e) => { console.error("3D libraries failed to load", e); setReady(true); });
 
     function init({ THREE, EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, RoomEnvironment }) {
       const RED = 0xe51d2a;
@@ -59,7 +66,7 @@ export default function Splash() {
       scene.fog = new THREE.FogExp2(0x040404, 0.022);
 
       const camera = new THREE.PerspectiveCamera(36, W() / H(), 0.1, 100);
-      camera.position.set(0, 0.2, 11);
+      camera.position.set(0, 0.2, 15); // dolly target is z=11
 
       // ---------- Environment (reflections) ----------
       const pmrem = new THREE.PMREMGenerator(renderer);
@@ -283,11 +290,38 @@ export default function Splash() {
       const motes = new THREE.Points(mg, new THREE.PointsMaterial({ color: 0xff8a7a, size: 0.035, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
       scene.add(motes);
 
-      // ---------- Flying dart ----------
-      const dart = buildDart(THREE);
-      dart.visible = false;
-      dart.scale.setScalar(0.5);
-      scene.add(dart);
+      // ---------- Three flying darts (grouping into treble 20) ----------
+      const darts = [];
+      const dartTargets = [
+        new THREE.Vector3(-0.12, 1.46, DEPTH + 0.18),
+        new THREE.Vector3( 0.10, 1.52, DEPTH + 0.18),
+        new THREE.Vector3(-0.01, 1.38, DEPTH + 0.18),
+      ];
+      for (let i = 0; i < 3; i++) {
+        const d = buildDart(THREE);
+        d.visible = false;
+        d.scale.setScalar(0.42);
+        scene.add(d);
+        darts.push({ obj: d, phase: "idle", t: 0, target: dartTargets[i] });
+      }
+      const dartFrom = new THREE.Vector3(-7.5, -1.0, 9);
+
+      // impact flash sprites
+      function makeFlash() {
+        const c = document.createElement("canvas"); c.width = c.height = 128;
+        const x = c.getContext("2d");
+        const g = x.createRadialGradient(64,64,0,64,64,64);
+        g.addColorStop(0,"rgba(255,240,200,1)"); g.addColorStop(0.4,"rgba(229,29,42,0.6)"); g.addColorStop(1,"rgba(229,29,42,0)");
+        x.fillStyle=g; x.fillRect(0,0,128,128);
+        const t = new THREE.CanvasTexture(c);
+        const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map:t, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+        spr.visible = false; spr.scale.setScalar(0.6);
+        return spr;
+      }
+      const flashes = [makeFlash(), makeFlash(), makeFlash()];
+      flashes.forEach(f => scene.add(f));
+      let flashLife = [0,0,0];
+      let hitPulse = 0;
 
       // ---------- Post-processing ----------
       const composer = new EffectComposer(renderer);
@@ -357,21 +391,19 @@ export default function Splash() {
       window.addEventListener("resize", onResize);
 
       apiRef.current.burst = () => { velocity = 0.55; };
-      apiRef.current.throwDart = () => fireDart();
 
-      // dart flight state
-      let dartPhase = "idle";
-      let dartT = 0;
-      const dartFrom = new THREE.Vector3(-7, -1.5, 9);
-      const dartTo = new THREE.Vector3(0.55, 0.7, DEPTH + 0.2);
-      function fireDart() {
-        if (dartPhase !== "idle") return;
-        dartPhase = "flying";
-        dartT = 0;
-        dart.visible = true;
+      // launch the 3 darts one-by-one
+      function launchDart(i) {
+        if (!darts[i] || darts[i].phase !== "idle") return;
+        darts[i].phase = "flying";
+        darts[i].t = 0;
+        darts[i].obj.visible = true;
       }
-      // auto-throw a dart shortly after load for life
-      const autoThrow = setTimeout(fireDart, 2600);
+      const dartTimers = [
+        setTimeout(() => launchDart(0), 2400),
+        setTimeout(() => launchDart(1), 3100),
+        setTimeout(() => launchDart(2), 3800),
+      ];
 
       // ---------- Animate ----------
       let intro = 0;
@@ -398,33 +430,54 @@ export default function Splash() {
 
         // light + glow pulse
         colMat.opacity = 0.34 + Math.sin(t * 1.5) * 0.1;
-        rimRed.intensity = 520 + Math.sin(t * 1.5) * 120;
+        rimRed.intensity = 520 + Math.sin(t * 1.5) * 120 + hitPulse * 700;
+        bloom.strength = 0.55 + hitPulse * 0.5;
         movingLight.position.x = Math.sin(t * 0.6) * 5;
         movingLight.position.y = 2.5 + Math.cos(t * 0.5) * 1.5;
 
         motes.rotation.y = t * 0.015;
         motes.position.y = Math.sin(t * 0.2) * 0.3;
 
-        // dart flight
-        if (dartPhase === "flying") {
-          dartT += 0.022;
-          const tt = Math.min(dartT, 1);
-          const ease = tt * tt * (3 - 2 * tt);
-          tmpV.lerpVectors(dartFrom, dartTo, ease);
-          tmpV.y += Math.sin(tt * Math.PI) * 1.2; // arc
-          dart.position.copy(tmpV);
-          dart.scale.setScalar(0.5 + ease * 0.5);
-          // point toward target
-          dart.lookAt(dartTo.x, dartTo.y + 0.0001, dartTo.z + 1);
-          dart.rotateY(Math.PI / 2);
-          if (dartT >= 1) { dartPhase = "stuck"; dart.position.copy(dartTo); }
-        } else if (dartPhase === "stuck") {
-          // ride along with board rotation (slightly)
-          dart.position.x = dartTo.x;
-          dart.position.y = dartTo.y + board.position.y;
+        // dart flights
+        for (let i = 0; i < darts.length; i++) {
+          const d = darts[i];
+          if (d.phase === "flying") {
+            d.t += 0.026;
+            const tt = Math.min(d.t, 1);
+            const ease = tt * tt * (3 - 2 * tt);
+            tmpV.lerpVectors(dartFrom, d.target, ease);
+            tmpV.y += Math.sin(tt * Math.PI) * 1.1; // arc
+            d.obj.position.copy(tmpV);
+            d.obj.scale.setScalar(0.42 + ease * 0.32);
+            d.obj.lookAt(d.target.x, d.target.y + 0.0001, d.target.z + 1);
+            d.obj.rotateY(Math.PI / 2);
+            if (d.t >= 1) {
+              d.phase = "stuck";
+              d.obj.position.copy(d.target);
+              // trigger impact flash + glow pulse
+              flashes[i].position.copy(d.target);
+              flashes[i].visible = true;
+              flashLife[i] = 1;
+              hitPulse = 1;
+            }
+          } else if (d.phase === "stuck") {
+            d.obj.position.y = d.target.y + board.position.y;
+          }
         }
 
-        // camera parallax
+        // impact flashes fade
+        for (let i = 0; i < flashes.length; i++) {
+          if (flashLife[i] > 0) {
+            flashLife[i] -= 0.06;
+            flashes[i].material.opacity = Math.max(0, flashLife[i]);
+            flashes[i].scale.setScalar(0.6 + (1 - flashLife[i]) * 1.2);
+            if (flashLife[i] <= 0) flashes[i].visible = false;
+          }
+        }
+        hitPulse = Math.max(0, hitPulse - 0.04);
+
+        // camera dolly-in + parallax
+        camera.position.z += (11 - camera.position.z) * 0.02;
         camera.position.x += (mx * 0.7 - camera.position.x) * 0.035;
         camera.position.y += (0.2 - my * 0.4 - camera.position.y) * 0.035;
         camera.lookAt(0, 0, 0);
@@ -438,7 +491,7 @@ export default function Splash() {
 
       cleanupFns.push(() => {
         cancelAnimationFrame(animId);
-        clearTimeout(autoThrow);
+        dartTimers.forEach(clearTimeout);
         dom.removeEventListener("mousedown", onMD);
         window.removeEventListener("mousemove", onMM);
         window.removeEventListener("mouseup", onMU);
@@ -492,7 +545,7 @@ export default function Splash() {
       return g;
     }
 
-    return () => { disposed = true; cleanupFns.forEach((fn) => fn()); };
+    return () => { disposed = true; clearTimeout(failSafe); cleanupFns.forEach((fn) => fn()); };
   }, []);
 
   const enter = () => {
