@@ -48,7 +48,7 @@ export default function Splash() {
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
       renderer.setSize(W(), H());
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -71,7 +71,7 @@ export default function Splash() {
       scene.add(new THREE.AmbientLight(0x1c1f27, 0.5));
       const key = new THREE.SpotLight(0xfff2e2, 320, 50, Math.PI / 6, 0.5, 1.3);
       key.position.set(3, 10, 9); key.castShadow = true;
-      key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.0002; key.shadow.radius = 7;
+      key.shadow.mapSize.set(512, 512); key.shadow.bias = -0.0002; key.shadow.radius = 7;
       scene.add(key, key.target);
       const rimRed = new THREE.PointLight(RED, 160, 26, 2);
       rimRed.position.set(0, 0.5, -2.5); scene.add(rimRed);
@@ -103,7 +103,7 @@ export default function Splash() {
 
       // Board target geometry constants (filled after load)
       const BOARD_RADIUS = 2.6;          // visual radius after we scale it
-      let T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.86, 0.0); // treble 20 world pos (approx, refined after load)
+      let T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.60, 0.30); // treble 20 world pos
       const board = new THREE.Group();
       board.position.set(0, 0.2, 0);
       board.scale.setScalar(0.001);
@@ -195,7 +195,7 @@ export default function Splash() {
 
           board.add(model);
           // refine T20 in board-local space: top of board face, ~86% out
-          T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.62, 0.18).add(board.position);
+          T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.60, 0.30).add(board.position);
           boardLoaded = true;
           checkReady();
         },
@@ -227,8 +227,8 @@ export default function Splash() {
       // ---- Darts state ----
       // 2 auto darts + 1 user dart. Targets cluster in treble 20.
       const groupTargets = [
-        () => new THREE.Vector3(-0.18, 0.05, 0.0).add(T20),
-        () => new THREE.Vector3(0.16, -0.02, 0.0).add(T20),
+        () => new THREE.Vector3(-0.16, 0.04, 0.0).add(T20),
+        () => new THREE.Vector3(0.14, -0.03, 0.0).add(T20),
       ];
       const autoDarts = [];
       const fromL = new THREE.Vector3(-8, -1.2, 10);
@@ -251,7 +251,7 @@ export default function Splash() {
       // ---- Post ----
       const composer = new EffectComposer(renderer);
       composer.addPass(new RenderPass(scene, camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.12, 0.4, 0.98);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(W()*0.5, H()*0.5), 0.12, 0.4, 0.98);
       composer.addPass(bloom);
       const grain = {
         uniforms: { tDiffuse:{value:null}, uTime:{value:0}, uAmt:{value:0.045}, uVig:{value:1.1}, uAb:{value:0.0013}, uFlash:{value:0} },
@@ -316,16 +316,40 @@ export default function Splash() {
       const clock = new THREE.Clock();
       const tmp = new THREE.Vector3();
       let animId;
+      // --- adaptive performance ---
+      let fpsSamples = [], lastT = performance.now(), perfDropped = false;
+      function checkPerf(now) {
+        const dt = now - lastT; lastT = now;
+        const fps = 1000 / dt;
+        fpsSamples.push(fps);
+        if (fpsSamples.length > 60) fpsSamples.shift();
+        if (!perfDropped && fpsSamples.length >= 60) {
+          const avg = fpsSamples.reduce((a,b)=>a+b,0) / fpsSamples.length;
+          if (avg < 40) {
+            perfDropped = true;
+            renderer.shadowMap.enabled = false;
+            key.castShadow = false;
+            bloom.strength = 0.06;
+            renderer.setPixelRatio(1);
+          }
+        }
+      }
 
-      // helper: aim a dart object so tip (-Z) points at target
+      // helper: orient dart so its TIP (local -Z) leads toward the board.
+      // lookAt points the object's +Z at the given point. We want the tip(-Z) to point at the
+      // board, so we aim +Z at a point BEHIND the dart (mirror), i.e. look away from board surface.
+      const _look = new THREE.Vector3();
       function aimDart(obj, target) {
-        obj.lookAt(target);   // -Z faces target by default for lookAt? No: +Z faces target.
-        // Our dart tip is at -Z, so rotate 180° around Y so tip leads.
-        obj.rotateY(Math.PI);
+        // direction from dart to target (the way it should travel/point tip)
+        _look.copy(target).sub(obj.position).normalize();
+        // we want -Z to align with _look, so make +Z look the opposite way:
+        const behind = new THREE.Vector3().copy(obj.position).sub(_look);
+        obj.lookAt(behind);
       }
 
       const tick = () => {
         animId = requestAnimationFrame(tick);
+        checkPerf(performance.now());
         const t = clock.getElapsedTime();
 
         // intro scale-up
@@ -362,7 +386,7 @@ export default function Splash() {
             tmp.lerpVectors(fromL, d.tg, e); tmp.y += Math.sin(tt*Math.PI)*1.0;
             d.obj.position.copy(tmp);
             aimDart(d.obj, d.tg);
-            if (d.t>=1){ d.phase="stuck"; d.obj.position.copy(d.tg); const fi=d.idx; flashes[fi].position.copy(d.tg); flashes[fi].visible=true; flashLife[fi]=1; shake=0.1; hitGlow=1; }
+            if (d.t>=1){ d.phase="stuck"; d.obj.position.copy(d.tg); d.obj.rotation.set(0.35, -0.5, 0); const fi=d.idx; flashes[fi].position.copy(d.tg); flashes[fi].visible=true; flashLife[fi]=1; shake=0.1; hitGlow=1; }
           }
         }
 
@@ -377,7 +401,7 @@ export default function Splash() {
           userDart.scale.setScalar(userDart.userData.baseScale * (0.5 + e*0.5));
           aimDart(userDart, target);
           if (finalT>=1){
-            finalPhase="done"; userDart.position.copy(target);
+            finalPhase="done"; userDart.position.copy(target); userDart.rotation.set(0.3, -0.45, 0);
             flashes[2].position.copy(target); flashes[2].visible=true; flashLife[2]=1; shake=0.22; hitGlow=1.4;
             let f=0; const fv=setInterval(()=>{ f+=0.08; grainPass.uniforms.uFlash.value=Math.min(f,1); if(f>=1){ clearInterval(fv); window.location.replace("/?from=splash"); } }, 16);
           }
