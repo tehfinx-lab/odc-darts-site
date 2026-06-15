@@ -48,11 +48,11 @@ export default function Splash() {
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
       renderer.setSize(W(), H());
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.0;
+      renderer.toneMappingExposure = 0.72;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       mount.appendChild(renderer.domElement);
 
@@ -69,15 +69,15 @@ export default function Splash() {
 
       // ---- Lights ----
       scene.add(new THREE.AmbientLight(0x1c1f27, 0.5));
-      const key = new THREE.SpotLight(0xfff2e2, 600, 50, Math.PI / 6, 0.5, 1.3);
+      const key = new THREE.SpotLight(0xfff2e2, 320, 50, Math.PI / 6, 0.5, 1.3);
       key.position.set(3, 10, 9); key.castShadow = true;
-      key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0002; key.shadow.radius = 7;
+      key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.0002; key.shadow.radius = 7;
       scene.add(key, key.target);
       const rimRed = new THREE.PointLight(RED, 160, 26, 2);
       rimRed.position.set(0, 0.5, -2.5); scene.add(rimRed);
       const cool = new THREE.DirectionalLight(0x35527e, 0.5);
       cool.position.set(-7, 2, 5); scene.add(cool);
-      const frontFill = new THREE.DirectionalLight(0xffffff, 0.45);
+      const frontFill = new THREE.DirectionalLight(0xffffff, 0.25);
       frontFill.position.set(0, 1, 12); scene.add(frontFill);
 
       // ---- Wall / floor / glow column ----
@@ -89,7 +89,7 @@ export default function Splash() {
       floor.rotation.x = -Math.PI / 2; floor.position.y = -3.6; floor.receiveShadow = true; scene.add(floor);
 
       // dust
-      const dN = 200, dg = new THREE.BufferGeometry(), dp = new Float32Array(dN * 3);
+      const dN = 90, dg = new THREE.BufferGeometry(), dp = new Float32Array(dN * 3);
       for (let i = 0; i < dN; i++) { dp[i*3]=(Math.random()-0.5)*18; dp[i*3+1]=(Math.random()-0.5)*12; dp[i*3+2]=(Math.random()-0.5)*8+1; }
       dg.setAttribute("position", new THREE.BufferAttribute(dp, 3));
       const dust = new THREE.Points(dg, new THREE.PointsMaterial({ color: 0xff8a7a, size: 0.03, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -112,9 +112,9 @@ export default function Splash() {
       // ---- Dart material factory (STL has no materials) ----
       function styleDart(obj) {
         // Dart long axis is Z, tip at -Z, flights at +Z. Colour by vertex Z via material groups.
-        const steel = new THREE.MeshStandardMaterial({ color: 0xe2e2e6, roughness: 0.18, metalness: 1.0, envMapIntensity: 1.4 });
-        const tungsten = new THREE.MeshStandardMaterial({ color: 0x2e2e33, roughness: 0.32, metalness: 0.96, envMapIntensity: 1.0 });
-        const red = new THREE.MeshStandardMaterial({ color: 0xe51d2a, roughness: 0.4, metalness: 0.15, emissive: 0x3a0507, emissiveIntensity: 0.3 });
+        const steel = new THREE.MeshStandardMaterial({ color: 0xb8b8be, roughness: 0.25, metalness: 1.0, envMapIntensity: 0.9 });
+        const tungsten = new THREE.MeshStandardMaterial({ color: 0x35353a, roughness: 0.4, metalness: 0.9, envMapIntensity: 0.7 });
+        const red = new THREE.MeshStandardMaterial({ color: 0xc1262a, roughness: 0.55, metalness: 0.1 });
         obj.traverse((o) => {
           if (o.isMesh && o.geometry) {
             o.castShadow = true;
@@ -149,6 +149,7 @@ export default function Splash() {
       function makeDart(template) {
         const d = template.clone(true);
         styleDart(d);
+        d.userData.baseScale = d.scale.x || 1;
         return d;
       }
 
@@ -186,7 +187,7 @@ export default function Splash() {
               o.castShadow = true;
               o.receiveShadow = true;
               if (o.material) {
-                o.material.envMapIntensity = 0.8;
+                o.material.envMapIntensity = 0.45;
                 o.material.roughness = Math.min(1, (o.material.roughness ?? 1) * 1.0);
               }
             }
@@ -194,7 +195,7 @@ export default function Splash() {
 
           board.add(model);
           // refine T20 in board-local space: top of board face, ~86% out
-          T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.84, 0.12).add(board.position);
+          T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.62, 0.18).add(board.position);
           boardLoaded = true;
           checkReady();
         },
@@ -213,7 +214,7 @@ export default function Splash() {
           // dart long axis is Z, tip at -Z. Scale to a sensible length (~0.95 world units)
           const size = new THREE.Vector3(); box.getSize(size);
           const len = Math.max(size.x, size.y, size.z);
-          model.scale.setScalar(1.3 / len);
+          model.scale.setScalar(0.85 / len);
           styleDart(model);
           dartTemplate = model;
           dartLoaded = true;
@@ -226,14 +227,14 @@ export default function Splash() {
       // ---- Darts state ----
       // 2 auto darts + 1 user dart. Targets cluster in treble 20.
       const groupTargets = [
-        () => new THREE.Vector3(-0.12, 0, 0.05).add(T20),
-        () => new THREE.Vector3(0.10, -0.04, 0.05).add(T20),
+        () => new THREE.Vector3(-0.18, 0.05, 0.0).add(T20),
+        () => new THREE.Vector3(0.16, -0.02, 0.0).add(T20),
       ];
       const autoDarts = [];
       const fromL = new THREE.Vector3(-8, -1.2, 10);
 
       let userDart = null;
-      const finalTargetFn = () => new THREE.Vector3(0.0, 0.02, 0.06).add(T20);
+      const finalTargetFn = () => new THREE.Vector3(0.0, 0.0, 0.0).add(T20);
 
       // impact flashes
       function flashSprite() {
@@ -250,7 +251,7 @@ export default function Splash() {
       // ---- Post ----
       const composer = new EffectComposer(renderer);
       composer.addPass(new RenderPass(scene, camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.3, 0.55, 0.92);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.12, 0.4, 0.98);
       composer.addPass(bloom);
       const grain = {
         uniforms: { tDiffuse:{value:null}, uTime:{value:0}, uAmt:{value:0.045}, uVig:{value:1.1}, uAb:{value:0.0013}, uFlash:{value:0} },
@@ -348,7 +349,7 @@ export default function Splash() {
         // glow / light life
         colMat.opacity = 0.1 + Math.sin(t*1.4)*0.035 + hitGlow*0.22;
         rimRed.intensity = 150 + Math.sin(t*1.4)*35 + hitGlow*380;
-        bloom.strength = 0.3 + hitGlow*0.3;
+        bloom.strength = 0.12 + hitGlow*0.18;
         hitGlow = Math.max(0, hitGlow - 0.04);
         dust.rotation.y = t*0.012;
 
@@ -370,9 +371,10 @@ export default function Splash() {
           finalT += 0.04;
           const tt=Math.min(finalT,1), e=tt*tt*(3-2*tt);
           const target = finalTargetFn();
-          const start = new THREE.Vector3(camera.position.x*0.3, camera.position.y-0.25, camera.position.z-1.4);
+          const start = new THREE.Vector3(camera.position.x*0.2, camera.position.y-0.6, camera.position.z-3.5);
           tmp.lerpVectors(start, target, e);
           userDart.position.copy(tmp);
+          userDart.scale.setScalar(userDart.userData.baseScale * (0.5 + e*0.5));
           aimDart(userDart, target);
           if (finalT>=1){
             finalPhase="done"; userDart.position.copy(target);
