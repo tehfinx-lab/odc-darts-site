@@ -657,9 +657,16 @@ function TablesPage({ data }) {
 }
 
 function DuoLeaguePage({ data }) {
+  const [view, setView] = useState("tables");
+
   const duo = data.duoLeague || {};
+  const knockout = data.knockout || {};
+
   const groups = duo.groups || {};
-  const groupNames = Object.keys(groups).filter((name) => (groups[name] || []).length > 0);
+  const groupNames = Object.keys(groups).filter(
+    (name) => (groups[name] || []).length > 0
+  );
+
   const [selected, setSelected] = useState(groupNames[0] || "Group A");
 
   useEffect(() => {
@@ -669,27 +676,47 @@ function DuoLeaguePage({ data }) {
   }, [groupNames, selected]);
 
   const rows = groups[selected] || [];
-
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <SectionTitle kicker="Dynamic Duo League" title="Group Tables" text="Current ODC Dynamic Duo League standings by group." />
+        <SectionTitle
+  kicker="Dynamic Duo League"
+  title="Duo Championship"
+  text="View group standings and the knockout bracket."
+/>
+        <div className="relative mb-7">
+  <select
+    value={view}
+    onChange={(e) => setView(e.target.value)}
+    className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
+  >
+    <option value="tables">Group Tables</option>
+    <option value="knockout">Knockout Bracket</option>
+  </select>
 
+  <ChevronDown className="pointer-events-none absolute right-4 top-4" />
+</div>
+        
         <div className="relative mb-7">
           <select
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
             className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
           >
-            {["Group A", "Group B", "Group C"].map((name) => (
-              <option key={name}>{name}</option>
-            ))}
+            {groupNames.map((name) => (
+  <option key={name} value={name}>
+    {name}
+  </option>
+))}
           </select>
           <ChevronDown className="pointer-events-none absolute right-4 top-4" />
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {view === "tables" && (
+<>
+{rows.length === 0 ? (
+  
         <Card>
           <p className="text-lg font-black">No Duo League table data found.</p>
           <p className="mt-2 text-odcCream/60">The standings table could not be read from the Duo League sheet.</p>
@@ -741,7 +768,10 @@ function DuoLeaguePage({ data }) {
             </tbody>
           </table>
         </Card>
-      )}
+)}
+</>
+)}
+      
     </section>
   );
 }
@@ -871,96 +901,104 @@ function MvpsPage({ data }) {
 
 function KnockoutBracket({ knockout }) {
   if (!knockout) return null;
-  const { quarterFinals = [], semiFinals = [], final = [], champion } = knockout;
 
-  const MatchCard = ({ match, label }) => {
-    const hasResult = match?.homeScore || match?.awayScore;
-    const winner = match?.winner;
-    return (
-      <div className="rounded-2xl border border-odcCream/10 bg-white/[0.055] p-4 shadow-cream backdrop-blur">
-        <p className="mb-3 text-[10px] font-black uppercase tracking-[0.25em] text-odcRed">{label}</p>
-        <div className="space-y-2">
-          {[
-            { name: match?.home, score: match?.homeScore },
-            { name: match?.away, score: match?.awayScore },
-          ].map((side, i) => (
-            <div
-              key={i}
-              className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${
-                winner && side.name === winner
-                  ? "border border-odcRed/40 bg-odcRed/20"
-                  : "bg-white/5"
-              }`}
-            >
-              <span
-                className={`truncate text-sm font-black ${
-                  winner && side.name === winner ? "text-odcCream" : "text-odcCream/70"
-                }`}
-              >
-                {side.name || "TBD"}
-              </span>
-              {hasResult && (
-                <span className="shrink-0 text-sm font-black text-odcCream">
-                  {side.score || "0"}
-                </span>
-              )}
-            </div>
-          ))}
+  const Match = ({ match }) => (
+    <Card className="min-w-[240px]">
+      <div className="space-y-2">
+
+        <div className={`flex justify-between rounded-xl p-3 ${
+          match.winner === match.home
+            ? "bg-odcRed/25 border border-odcRed"
+            : "bg-white/5"
+        }`}>
+          <span className="font-black">
+            {match.home || "TBD"}
+          </span>
+
+          <span>
+            {match.homeScore}
+          </span>
         </div>
+
+
+        <div className={`flex justify-between rounded-xl p-3 ${
+          match.winner === match.away
+            ? "bg-odcRed/25 border border-odcRed"
+            : "bg-white/5"
+        }`}>
+          <span className="font-black">
+            {match.away || "TBD"}
+          </span>
+
+          <span>
+            {match.awayScore}
+          </span>
+        </div>
+
       </div>
-    );
-  };
+    </Card>
+  );
+
 
   return (
-    <div className="mt-12">
-      <div className="mb-6 border-t border-odcCream/10 pt-10">
-        <p className="text-xs font-black uppercase tracking-[0.35em] text-odcRed">Knockout Bracket</p>
-        <h3 className="mt-2 text-2xl font-black">Duo League — Knockout Stage</h3>
-      </div>
+    <section className="mt-10 overflow-x-auto">
 
-      {/* Quarter-finals */}
-      <div className="mb-8">
-        <p className="mb-4 text-sm font-black uppercase tracking-[0.2em] text-odcCream/50">Quarter-finals</p>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {quarterFinals.map((m) => (
-            <MatchCard key={m.id} match={m} label={m.id} />
+      <h2 className="mb-8 text-center text-3xl font-black">
+        🏆 Dynamic Duo Knockout
+      </h2>
+
+
+      <div className="flex min-w-[1000px] items-center gap-12">
+
+        <div className="space-y-6">
+          <h3 className="text-center font-black text-odcRed">
+            Quarter Finals
+          </h3>
+
+          {knockout.quarterFinals.map((match) => (
+            <Match key={match.id} match={match}/>
           ))}
         </div>
-      </div>
 
-      {/* Semi-finals */}
-      <div className="mb-8">
-        <p className="mb-4 text-sm font-black uppercase tracking-[0.2em] text-odcCream/50">Semi-finals</p>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2 xl:max-w-2xl">
-          {semiFinals.map((m) => (
-            <MatchCard key={m.id} match={m} label={m.id} />
+
+        <div className="space-y-20">
+          <h3 className="text-center font-black text-odcRed">
+            Semi Finals
+          </h3>
+
+          {knockout.semiFinals.map((match) => (
+            <Match key={match.id} match={match}/>
           ))}
         </div>
-      </div>
 
-      {/* Final */}
-      <div className="mb-8">
-        <p className="mb-4 text-sm font-black uppercase tracking-[0.2em] text-odcCream/50">Final</p>
-        <div className="max-w-sm">
-          {final.map((m) => (
-            <MatchCard key="Final" match={m} label="Final" />
-          ))}
+
+        <div>
+          <h3 className="text-center font-black text-odcRed mb-6">
+            Final
+          </h3>
+
+          <Match match={knockout.final[0]} />
         </div>
-      </div>
 
-      {/* Champion */}
-      {champion && (
-        <Card className="max-w-sm border-odcRed/40 bg-odcRed/10">
-          <div className="flex items-center gap-4">
-            <Trophy className="shrink-0 text-odcRed" size={32} />
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-odcRed">Champion</p>
-              <p className="mt-1 text-2xl font-black">{champion}</p>
-            </div>
-          </div>
+
+        <Card className="text-center border-odcRed bg-odcRed/10">
+          <Trophy
+            size={48}
+            className="mx-auto text-odcRed mb-3"
+          />
+
+          <p className="text-xs uppercase tracking-widest text-odcRed">
+            Champion
+          </p>
+
+          <h2 className="text-2xl font-black mt-2">
+            {knockout.champion || "TBD"}
+          </h2>
         </Card>
-      )}
-    </div>
+
+      </div>
+
+    </section>
   );
 }
 
