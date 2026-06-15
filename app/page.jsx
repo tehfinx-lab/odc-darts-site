@@ -771,7 +771,9 @@ function DuoLeaguePage({ data }) {
 )}
 </>
 )}
-      
+
+      {view === "knockout" && <KnockoutBracket knockout={knockout} />}
+
     </section>
   );
 }
@@ -1004,7 +1006,7 @@ function KnockoutBracket({ knockout }) {
 
 function EventsPage({ data }) {
   const events = data.events || [];
-  const knockout = data.knockout;
+  
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
@@ -1064,8 +1066,6 @@ function EventsPage({ data }) {
           ))}
         </div>
       )}
-
-      <KnockoutBracket knockout={knockout} />
     </section>
   );
 }
