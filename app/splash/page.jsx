@@ -6,7 +6,7 @@ export default function Splash() {
   const mountRef = useRef(null);
   const api = useRef({ throwFinal: null });
   const [ready, setReady] = useState(false);
-  const [phase, setPhase] = useState("intro"); // intro -> grouping -> aim -> thrown -> leaving
+  const [phase, setPhase] = useState("loading"); // loading -> intro -> grouping -> aim -> thrown
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
@@ -20,12 +20,14 @@ export default function Splash() {
         sc.type = "module";
         sc.textContent = `
           import * as THREE from "https://esm.sh/three@0.160.0";
+          import { GLTFLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+          import { DRACOLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/DRACOLoader.js";
           import { EffectComposer } from "https://esm.sh/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js";
           import { RenderPass } from "https://esm.sh/three@0.160.0/examples/jsm/postprocessing/RenderPass.js";
           import { UnrealBloomPass } from "https://esm.sh/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js";
           import { ShaderPass } from "https://esm.sh/three@0.160.0/examples/jsm/postprocessing/ShaderPass.js";
           import { RoomEnvironment } from "https://esm.sh/three@0.160.0/examples/jsm/environments/RoomEnvironment.js";
-          window.__ODC_THREE__ = { THREE, EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, RoomEnvironment };
+          window.__ODC_THREE__ = { THREE, GLTFLoader, DRACOLoader, EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, RoomEnvironment };
           window.dispatchEvent(new Event("odc-three-ready"));
         `;
         window.addEventListener("odc-three-ready", () => resolve(window.__ODC_THREE__), { once: true });
@@ -33,15 +35,14 @@ export default function Splash() {
         document.head.appendChild(sc);
       });
 
-    const failSafe = setTimeout(() => { if (!disposed) setReady(true); }, 9000);
+    const failSafe = setTimeout(() => { if (!disposed) setReady(true); }, 15000);
 
     loadLibs()
-      .then((b) => { if (disposed || !mountRef.current) return; try { init(b); } catch (e) { console.error("init failed", e); setReady(true); } })
+      .then((b) => { if (disposed || !mountRef.current) return; init(b); })
       .catch((e) => { console.error("libs failed", e); setReady(true); });
 
-    function init({ THREE, EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, RoomEnvironment }) {
+    function init({ THREE, GLTFLoader, DRACOLoader, EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, RoomEnvironment }) {
       const RED = 0xe51d2a;
-      const CREAM = 0xf3ecd9;
       const mount = mountRef.current;
       const W = () => window.innerWidth, H = () => window.innerHeight;
 
@@ -51,122 +52,38 @@ export default function Splash() {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 0.95;
+      renderer.toneMappingExposure = 1.0;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
       mount.appendChild(renderer.domElement);
 
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x050506);
-      scene.fog = new THREE.FogExp2(0x050506, 0.03);
+      scene.fog = new THREE.FogExp2(0x050506, 0.025);
 
       const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 100);
       camera.position.set(0, 0.15, 14);
 
-      // env reflections
       const pmrem = new THREE.PMREMGenerator(renderer);
       const envTex = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
       scene.environment = envTex;
 
-      // ---- Lights (controlled, not blown out) ----
-      scene.add(new THREE.AmbientLight(0x1c1f27, 0.55));
-      const key = new THREE.SpotLight(0xfff2e2, 520, 46, Math.PI / 6.5, 0.5, 1.4);
+      // ---- Lights ----
+      scene.add(new THREE.AmbientLight(0x1c1f27, 0.5));
+      const key = new THREE.SpotLight(0xfff2e2, 600, 50, Math.PI / 6, 0.5, 1.3);
       key.position.set(3, 10, 9); key.castShadow = true;
       key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0002; key.shadow.radius = 7;
       scene.add(key, key.target);
-      const rimRed = new THREE.PointLight(RED, 180, 24, 2);
+      const rimRed = new THREE.PointLight(RED, 160, 26, 2);
       rimRed.position.set(0, 0.5, -2.5); scene.add(rimRed);
-      const cool = new THREE.DirectionalLight(0x35527e, 0.55);
+      const cool = new THREE.DirectionalLight(0x35527e, 0.5);
       cool.position.set(-7, 2, 5); scene.add(cool);
 
-      // ---- Procedural sisal bump ----
-      function sisal() {
-        const s = 1024, c = document.createElement("canvas"); c.width = c.height = s;
-        const x = c.getContext("2d"); x.fillStyle = "#0c0c0c"; x.fillRect(0, 0, s, s);
-        for (let i = 0; i < 55000; i++) {
-          const px = Math.random() * s, py = Math.random() * s, a = Math.random() * Math.PI, l = 3 + Math.random() * 6, g = 25 + Math.random() * 55;
-          x.strokeStyle = `rgba(${g},${g},${g},${0.12 + Math.random() * 0.22})`; x.lineWidth = 0.6 + Math.random() * 0.7;
-          x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke();
-        }
-        const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3);
-        t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
-      }
-      const bump = sisal();
-
-      // ---- Board ----
-      const board = new THREE.Group();
-      board.position.set(0, 0.2, 0);
-      scene.add(board);
-
-      const NUMS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
-      const SEG = Math.PI / 10;
-      const R_OUT = 2.6, R_DBL_O = 2.42, R_DBL_I = 2.3, R_TRP_O = 1.56, R_TRP_I = 1.44, R_BULL_O = 0.34, R_BULL_I = 0.16;
-      const DEPTH = 0.18;
-      // T20 is the FIRST segment (index 0), centred at top (+Y). Its mid radius:
-      const T20R = (R_TRP_O + R_TRP_I) / 2;
-      const T20 = new THREE.Vector3(0, T20R, DEPTH + 0.02).add(board.position);
-
-      const mCream = new THREE.MeshStandardMaterial({ color: 0xe9dcb6, roughness: 0.82, metalness: 0.04, bumpMap: bump, bumpScale: 0.05 });
-      const mBlack = new THREE.MeshStandardMaterial({ color: 0x0e0e0e, roughness: 0.88, metalness: 0.03, bumpMap: bump, bumpScale: 0.05 });
-      const mRed = new THREE.MeshStandardMaterial({ color: 0xbe2429, roughness: 0.5, metalness: 0.05, bumpMap: bump, bumpScale: 0.04 });
-      const mGreen = new THREE.MeshStandardMaterial({ color: 0x1c7a44, roughness: 0.5, metalness: 0.05, bumpMap: bump, bumpScale: 0.04 });
-      const mWire = new THREE.MeshStandardMaterial({ color: 0xd7d7db, roughness: 0.18, metalness: 1.0, envMapIntensity: 1.3 });
-      const mRim = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.4, metalness: 0.85 });
-
-      const backing = new THREE.Mesh(new THREE.CylinderGeometry(R_OUT + 0.16, R_OUT + 0.16, DEPTH + 0.06, 96), mRim);
-      backing.rotation.x = Math.PI / 2; backing.position.z = -DEPTH / 2; backing.castShadow = backing.receiveShadow = true;
-      board.add(backing);
-
-      function sector(rIn, rOut, a0, a1, mat, depth) {
-        const sh = new THREE.Shape();
-        sh.absarc(0, 0, rOut, a0, a1, false); sh.absarc(0, 0, rIn, a1, a0, true);
-        const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.008, bevelSegments: 1, curveSegments: 12 });
-        const m = new THREE.Mesh(g, mat); m.castShadow = m.receiveShadow = true; return m;
-      }
-      for (let i = 0; i < 20; i++) {
-        const a0 = i * SEG - SEG / 2 + Math.PI / 2, a1 = a0 + SEG, ev = i % 2 === 0;
-        board.add(sector(R_BULL_O, R_TRP_I, a0, a1, ev ? mBlack : mCream, DEPTH * 0.7));
-        board.add(sector(R_TRP_I, R_TRP_O, a0, a1, ev ? mGreen : mRed, DEPTH));
-        board.add(sector(R_TRP_O, R_DBL_I, a0, a1, ev ? mBlack : mCream, DEPTH * 0.7));
-        board.add(sector(R_DBL_I, R_DBL_O, a0, a1, ev ? mGreen : mRed, DEPTH));
-      }
-      const cyl = (r, h, mat, z) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 48), mat); m.rotation.x = Math.PI / 2; m.position.z = z; m.castShadow = true; return m; };
-      board.add(cyl(R_BULL_O, DEPTH * 0.9, mGreen, DEPTH * 0.45));
-      board.add(cyl(R_BULL_I, DEPTH, mRed, DEPTH * 0.5));
-
-      const wz = DEPTH + 0.015;
-      for (let i = 0; i < 20; i++) {
-        const a = i * SEG - SEG / 2 + Math.PI / 2, len = R_OUT - R_BULL_O;
-        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, len, 8), mWire);
-        w.position.set(Math.cos(a) * ((R_OUT + R_BULL_O) / 2), Math.sin(a) * ((R_OUT + R_BULL_O) / 2), wz);
-        w.rotation.z = a - Math.PI / 2; w.rotation.x = Math.PI / 2; board.add(w);
-      }
-      [R_DBL_O, R_DBL_I, R_TRP_O, R_TRP_I, R_BULL_O].forEach((r) => { const g = new THREE.Mesh(new THREE.TorusGeometry(r, 0.015, 12, 120), mWire); g.position.z = wz; board.add(g); });
-      const outer = new THREE.Mesh(new THREE.TorusGeometry(R_OUT, 0.05, 16, 128), mRim); outer.position.z = wz; board.add(outer);
-
-      // number band
-      function band() {
-        const s = 2048, c = document.createElement("canvas"); c.width = s; c.height = 256;
-        const x = c.getContext("2d");
-        const g = x.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, "#191919"); g.addColorStop(0.5, "#070707"); g.addColorStop(1, "#191919");
-        x.fillStyle = g; x.fillRect(0, 0, s, 256);
-        x.font = "900 150px Arial, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
-        x.shadowColor = "rgba(0,0,0,0.9)"; x.shadowBlur = 8;
-        for (let i = 0; i < 20; i++) { x.fillStyle = "#f3ecd9"; x.fillText(String(NUMS[i]), (i + 0.5) * (s / 20), 132); }
-        const t = new THREE.CanvasTexture(c); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
-      }
-      const bMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(R_OUT + 0.34, R_OUT + 0.34, 0.5, 128, 1, true),
-        new THREE.MeshStandardMaterial({ map: band(), roughness: 0.6, metalness: 0.2, side: THREE.DoubleSide })
-      );
-      bMesh.rotation.x = Math.PI / 2; bMesh.rotation.y = Math.PI / 2; bMesh.position.z = wz - 0.02; board.add(bMesh);
-
-      board.scale.setScalar(0.001);
-
-      // wall + floor + glow column
+      // ---- Wall / floor / glow column ----
       const wall = new THREE.Mesh(new THREE.PlaneGeometry(70, 46), new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.96 }));
-      wall.position.z = -1.4; wall.receiveShadow = true; scene.add(wall);
-      const colMat = new THREE.MeshBasicMaterial({ color: RED, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
-      const column = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 34), colMat); column.position.set(0, 0, -2.4); scene.add(column);
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshStandardMaterial({ color: 0x070708, roughness: 0.14, metalness: 0.92, envMapIntensity: 0.55 }));
+      wall.position.z = -1.6; wall.receiveShadow = true; scene.add(wall);
+      const colMat = new THREE.MeshBasicMaterial({ color: RED, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
+      const column = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 34), colMat); column.position.set(0, 0, -2.5); scene.add(column);
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshStandardMaterial({ color: 0x070708, roughness: 0.15, metalness: 0.9, envMapIntensity: 0.5 }));
       floor.rotation.x = -Math.PI / 2; floor.position.y = -3.6; floor.receiveShadow = true; scene.add(floor);
 
       // dust
@@ -176,36 +93,123 @@ export default function Splash() {
       const dust = new THREE.Points(dg, new THREE.PointsMaterial({ color: 0xff8a7a, size: 0.03, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
       scene.add(dust);
 
-      // ---- Dart factory ----
-      function makeDart() {
-        const g = new THREE.Group();
-        const steel = new THREE.MeshStandardMaterial({ color: 0xcfcfd4, roughness: 0.2, metalness: 1 });
-        const tung = new THREE.MeshStandardMaterial({ color: 0x37373b, roughness: 0.35, metalness: 0.95 });
-        const carbon = new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.5, metalness: 0.3 });
-        const fl = new THREE.MeshStandardMaterial({ color: 0xbe2429, roughness: 0.45, metalness: 0.1, side: THREE.DoubleSide });
-        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.3, 16), steel); tip.rotation.z = -Math.PI/2; tip.position.x = 0.45; g.add(tip);
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.043, 0.5, 20), tung); barrel.rotation.z = Math.PI/2; barrel.position.x = 0.12; g.add(barrel);
-        for (let i=0;i<9;i++){ const r=new THREE.Mesh(new THREE.TorusGeometry(0.049,0.0035,6,18),steel); r.rotation.y=Math.PI/2; r.position.x=-0.05+i*0.05; g.add(r); }
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.4,12),carbon); shaft.rotation.z=Math.PI/2; shaft.position.x=-0.28; g.add(shaft);
-        for (let i=0;i<4;i++){ const v=new THREE.Mesh(new THREE.PlaneGeometry(0.32,0.24),fl); v.position.x=-0.6; const grp=new THREE.Group(); grp.add(v); grp.rotation.x=(i*Math.PI)/2; grp.position.x=-0.6; g.add(grp); }
-        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
-        return g;
+      // ---- Loaders (Draco) ----
+      const draco = new DRACOLoader();
+      draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
+      const gltf = new GLTFLoader();
+      gltf.setDRACOLoader(draco);
+
+      // Board target geometry constants (filled after load)
+      const BOARD_RADIUS = 2.6;          // visual radius after we scale it
+      let T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.86, 0.0); // treble 20 world pos (approx, refined after load)
+      const board = new THREE.Group();
+      board.position.set(0, 0.2, 0);
+      board.scale.setScalar(0.001);
+      scene.add(board);
+
+      // ---- Dart material factory (STL has no materials) ----
+      function styleDart(obj) {
+        const steel = new THREE.MeshStandardMaterial({ color: 0xcfcfd4, roughness: 0.22, metalness: 1.0, envMapIntensity: 1.2 });
+        obj.traverse((o) => {
+          if (o.isMesh) {
+            o.material = steel;
+            o.castShadow = true;
+          }
+        });
+        return obj;
+      }
+      // We only have ONE dart mesh; clone it. It's a single STL so the whole thing is steel —
+      // to add colour we tint via a second material pass on the rear third (flights) using vertex Z.
+      function makeDart(template) {
+        const d = template.clone(true);
+        styleDart(d);
+        return d;
       }
 
-      // three darts that auto-fly into T20 grouping
+      let dartTemplate = null;
+      let boardLoaded = false, dartLoaded = false;
+      const checkReady = () => {
+        if (boardLoaded && dartLoaded) {
+          setReady(true);
+          setPhase("intro");
+          startSequence();
+        }
+      };
+
+      // ---- Load BOARD ----
+      gltf.load(
+        "/models/board.glb",
+        (g) => {
+          const model = g.scene;
+          // Compute bbox to normalise size + stand upright
+          const box = new THREE.Box3().setFromObject(model);
+          const size = new THREE.Vector3(); box.getSize(size);
+          const center = new THREE.Vector3(); box.getCenter(center);
+          model.position.sub(center); // center at origin
+
+          // Board lies flat (Y is thin). Stand it up so face points +Z toward camera.
+          model.rotation.x = -Math.PI / 2;
+
+          // Scale so the board diameter == 2*BOARD_RADIUS
+          const flatDiameter = Math.max(size.x, size.z);
+          const s = (BOARD_RADIUS * 2) / flatDiameter;
+          model.scale.setScalar(s);
+
+          model.traverse((o) => {
+            if (o.isMesh) {
+              o.castShadow = true;
+              o.receiveShadow = true;
+              if (o.material) {
+                o.material.envMapIntensity = 0.8;
+                o.material.roughness = Math.min(1, (o.material.roughness ?? 1) * 1.0);
+              }
+            }
+          });
+
+          board.add(model);
+          // refine T20 in board-local space: top of board face, ~86% out
+          T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.84, 0.12).add(board.position);
+          boardLoaded = true;
+          checkReady();
+        },
+        undefined,
+        (err) => { console.error("board load failed", err); boardLoaded = true; checkReady(); }
+      );
+
+      // ---- Load DART ----
+      gltf.load(
+        "/models/dart.glb",
+        (g) => {
+          const model = g.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          const center = new THREE.Vector3(); box.getCenter(center);
+          model.position.sub(center);
+          // dart long axis is Z, tip at -Z. Scale to a sensible length (~0.95 world units)
+          const size = new THREE.Vector3(); box.getSize(size);
+          const len = Math.max(size.x, size.y, size.z);
+          model.scale.setScalar(0.95 / len);
+          styleDart(model);
+          dartTemplate = model;
+          dartLoaded = true;
+          checkReady();
+        },
+        undefined,
+        (err) => { console.error("dart load failed", err); dartLoaded = true; checkReady(); }
+      );
+
+      // ---- Darts state ----
+      // 2 auto darts + 1 user dart. Targets cluster in treble 20.
       const groupTargets = [
-        new THREE.Vector3(-0.1, T20R + 0.04, DEPTH + 0.18).add(new THREE.Vector3(0,0.2,0)),
-        new THREE.Vector3(0.08, T20R - 0.02, DEPTH + 0.18).add(new THREE.Vector3(0,0.2,0)),
-        new THREE.Vector3(0.0, T20R - 0.08, DEPTH + 0.18).add(new THREE.Vector3(0,0.2,0)),
+        () => new THREE.Vector3(-0.12, 0, 0.05).add(T20),
+        () => new THREE.Vector3(0.10, -0.04, 0.05).add(T20),
       ];
-      const darts = groupTargets.map((tg) => { const o = makeDart(); o.visible = false; o.scale.setScalar(0.4); scene.add(o); return { o, tg, phase: "idle", t: 0 }; });
+      const autoDarts = [];
       const fromL = new THREE.Vector3(-8, -1.2, 10);
 
-      // final user dart (flies from camera POV)
-      const finalDart = makeDart(); finalDart.visible = false; finalDart.scale.setScalar(0.4); scene.add(finalDart);
-      const finalTarget = new THREE.Vector3(0.02, T20R + 0.0, DEPTH + 0.2).add(new THREE.Vector3(0,0.2,0));
+      let userDart = null;
+      const finalTargetFn = () => new THREE.Vector3(0.0, 0.02, 0.06).add(T20);
 
-      // impact flash sprites
+      // impact flashes
       function flashSprite() {
         const c = document.createElement("canvas"); c.width=c.height=128; const x=c.getContext("2d");
         const g=x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,"rgba(255,245,210,1)"); g.addColorStop(0.4,"rgba(229,29,42,0.55)"); g.addColorStop(1,"rgba(229,29,42,0)");
@@ -213,17 +217,17 @@ export default function Splash() {
         const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
         s.visible=false; s.scale.setScalar(0.5); scene.add(s); return s;
       }
-      const flashes = [flashSprite(), flashSprite(), flashSprite(), flashSprite()];
-      const flashLife = [0,0,0,0];
+      const flashes = [flashSprite(), flashSprite(), flashSprite()];
+      const flashLife = [0,0,0];
       let shake = 0, hitGlow = 0;
 
       // ---- Post ----
       const composer = new EffectComposer(renderer);
       composer.addPass(new RenderPass(scene, camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.32, 0.55, 0.9);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.3, 0.55, 0.92);
       composer.addPass(bloom);
       const grain = {
-        uniforms: { tDiffuse:{value:null}, uTime:{value:0}, uAmt:{value:0.05}, uVig:{value:1.1}, uAb:{value:0.0014}, uFlash:{value:0} },
+        uniforms: { tDiffuse:{value:null}, uTime:{value:0}, uAmt:{value:0.045}, uVig:{value:1.1}, uAb:{value:0.0013}, uFlash:{value:0} },
         vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
         fragmentShader: `
           uniform sampler2D tDiffuse; uniform float uTime,uAmt,uVig,uAb,uFlash; varying vec2 vUv;
@@ -234,7 +238,7 @@ export default function Splash() {
             vec3 col=vec3(r,g,b);
             col*=smoothstep(uVig,0.32,length(d));
             col+=(rand(uv+fract(uTime))-0.5)*uAmt;
-            col=mix(col, vec3(1.0), uFlash); // white flash on entry
+            col=mix(col, vec3(1.0), uFlash);
             gl_FragColor=vec4(col,1.0);
           }`,
       };
@@ -248,90 +252,106 @@ export default function Splash() {
       const onResize=()=>{ camera.aspect=W()/H(); camera.updateProjectionMatrix(); renderer.setSize(W(),H()); composer.setSize(W(),H()); };
       window.addEventListener("resize", onResize);
 
-      // sequence state machine
-      let seq = "intro"; // intro -> grouping -> aim -> thrown -> done
-      let introT = 0;
-      const dartTimers = [];
-
-      function startGrouping() {
-        seq = "grouping"; setPhase("grouping");
-        dartTimers.push(setTimeout(()=>launch(0), 200));
-        dartTimers.push(setTimeout(()=>launch(1), 900));
-        dartTimers.push(setTimeout(()=>launch(2), 1600));
-        // after 3rd lands, go to aim
-        dartTimers.push(setTimeout(()=>{ seq="aim"; setPhase("aim"); }, 2600));
+      // ---- Sequence ----
+      let seq = "intro", introT = 0;
+      const timers = [];
+      function startSequence() {
+        if (seq === "running") return;
+        seq = "running";
       }
-      function launch(i){ if(darts[i].phase!=="idle")return; darts[i].phase="flying"; darts[i].t=0; darts[i].o.visible=true; }
+      function spawnAuto(i) {
+        if (!dartTemplate) return;
+        const d = makeDart(dartTemplate);
+        d.visible = true;
+        scene.add(d);
+        autoDarts.push({ obj: d, tg: groupTargets[i](), t: 0, phase: "flying", idx: i });
+      }
+      // schedule after intro completes (handled in tick when introT done)
+      let scheduled = false;
+      function scheduleDarts() {
+        if (scheduled) return; scheduled = true;
+        timers.push(setTimeout(() => spawnAuto(0), 300));
+        timers.push(setTimeout(() => spawnAuto(1), 1100));
+        timers.push(setTimeout(() => { seq = "aim"; setPhase("aim"); }, 2100));
+      }
 
       let finalPhase = "idle", finalT = 0;
       function throwFinal() {
-        if (seq !== "aim" || finalPhase !== "idle") return;
+        if (seq !== "aim" || finalPhase !== "idle" || !dartTemplate) return;
         seq = "thrown"; setPhase("thrown");
-        finalPhase = "flying"; finalT = 0; finalDart.visible = true;
+        userDart = makeDart(dartTemplate);
+        userDart.visible = true;
+        scene.add(userDart);
+        finalPhase = "flying"; finalT = 0;
       }
       api.current.throwFinal = throwFinal;
 
       const clock = new THREE.Clock();
       const tmp = new THREE.Vector3();
       let animId;
+
+      // helper: aim a dart object so tip (-Z) points at target
+      function aimDart(obj, target) {
+        obj.lookAt(target);   // -Z faces target by default for lookAt? No: +Z faces target.
+        // Our dart tip is at -Z, so rotate 180° around Y so tip leads.
+        obj.rotateY(Math.PI);
+      }
+
       const tick = () => {
         animId = requestAnimationFrame(tick);
         const t = clock.getElapsedTime();
 
-        // intro: board scales up + camera pushes in, then start grouping
-        if (seq === "intro") {
+        // intro scale-up
+        if (seq === "running") {
           introT += 0.012;
           const e = 1 - Math.pow(1 - Math.min(introT,1), 4);
           board.scale.setScalar(0.001 + e * 0.999);
-          if (introT >= 1) startGrouping();
+          if (introT >= 1) scheduleDarts();
         }
 
-        // camera push-in to 12, with handheld sway + parallax
-        const baseZ = 12;
+        // camera push-in + sway + parallax
+        const baseZ = 11.5;
         camera.position.z += (baseZ - camera.position.z) * 0.02;
-        const swayX = Math.sin(t*0.6)*0.06 + mx*0.6;
-        const swayY = Math.cos(t*0.5)*0.04 - my*0.4 + 0.15;
+        const swayX = Math.sin(t*0.6)*0.05 + mx*0.6;
+        const swayY = Math.cos(t*0.5)*0.035 - my*0.4 + 0.15;
         camera.position.x += (swayX - camera.position.x) * 0.05;
         camera.position.y += (swayY - camera.position.y) * 0.05;
-        // screen shake
         if (shake > 0) { camera.position.x += (Math.random()-0.5)*shake; camera.position.y += (Math.random()-0.5)*shake; shake *= 0.85; }
         camera.lookAt(0, 0.2, 0);
 
         // glow / light life
-        colMat.opacity = 0.12 + Math.sin(t*1.4)*0.04 + hitGlow*0.25;
-        rimRed.intensity = 170 + Math.sin(t*1.4)*40 + hitGlow*400;
-        bloom.strength = 0.32 + hitGlow*0.35;
+        colMat.opacity = 0.1 + Math.sin(t*1.4)*0.035 + hitGlow*0.22;
+        rimRed.intensity = 150 + Math.sin(t*1.4)*35 + hitGlow*380;
+        bloom.strength = 0.3 + hitGlow*0.3;
         hitGlow = Math.max(0, hitGlow - 0.04);
         dust.rotation.y = t*0.012;
 
-        // grouping darts
-        for (let i=0;i<darts.length;i++){
-          const d=darts[i];
+        // auto darts flight
+        for (let i=0;i<autoDarts.length;i++){
+          const d=autoDarts[i];
           if (d.phase==="flying"){
             d.t += 0.03;
             const tt=Math.min(d.t,1), e=tt*tt*(3-2*tt);
             tmp.lerpVectors(fromL, d.tg, e); tmp.y += Math.sin(tt*Math.PI)*1.0;
-            d.o.position.copy(tmp); d.o.scale.setScalar(0.4+e*0.28);
-            d.o.lookAt(d.tg.x, d.tg.y+0.0001, d.tg.z+1); d.o.rotateY(Math.PI/2);
-            if (d.t>=1){ d.phase="stuck"; d.o.position.copy(d.tg); flashes[i].position.copy(d.tg); flashes[i].visible=true; flashLife[i]=1; shake=0.12; hitGlow=1; }
+            d.obj.position.copy(tmp);
+            aimDart(d.obj, d.tg);
+            if (d.t>=1){ d.phase="stuck"; d.obj.position.copy(d.tg); const fi=d.idx; flashes[fi].position.copy(d.tg); flashes[fi].visible=true; flashLife[fi]=1; shake=0.1; hitGlow=1; }
           }
         }
 
-        // final dart from camera POV
-        if (finalPhase==="flying"){
-          finalT += 0.045;
+        // user dart flight (from camera POV)
+        if (finalPhase==="flying" && userDart){
+          finalT += 0.04;
           const tt=Math.min(finalT,1), e=tt*tt*(3-2*tt);
-          // start near camera
-          const start = new THREE.Vector3(camera.position.x*0.3, camera.position.y-0.3, camera.position.z-1.5);
-          tmp.lerpVectors(start, finalTarget, e);
-          finalDart.position.copy(tmp);
-          finalDart.scale.setScalar(0.6 - e*0.2);
-          finalDart.lookAt(finalTarget.x, finalTarget.y+0.0001, finalTarget.z+1); finalDart.rotateY(Math.PI/2);
+          const target = finalTargetFn();
+          const start = new THREE.Vector3(camera.position.x*0.3, camera.position.y-0.25, camera.position.z-1.4);
+          tmp.lerpVectors(start, target, e);
+          userDart.position.copy(tmp);
+          aimDart(userDart, target);
           if (finalT>=1){
-            finalPhase="done"; finalDart.position.copy(finalTarget);
-            flashes[3].position.copy(finalTarget); flashes[3].visible=true; flashLife[3]=1; shake=0.25; hitGlow=1.4;
-            // white flash + redirect
-            let f=0; const flashIv=setInterval(()=>{ f+=0.08; grainPass.uniforms.uFlash.value=Math.min(f,1); if(f>=1){ clearInterval(flashIv); window.location.replace("/?from=splash"); } }, 16);
+            finalPhase="done"; userDart.position.copy(target);
+            flashes[2].position.copy(target); flashes[2].visible=true; flashLife[2]=1; shake=0.22; hitGlow=1.4;
+            let f=0; const fv=setInterval(()=>{ f+=0.08; grainPass.uniforms.uFlash.value=Math.min(f,1); if(f>=1){ clearInterval(fv); window.location.replace("/?from=splash"); } }, 16);
           }
         }
 
@@ -344,14 +364,13 @@ export default function Splash() {
         composer.render();
       };
       tick();
-      setReady(true);
 
       cleanups.push(() => {
         cancelAnimationFrame(animId);
-        dartTimers.forEach(clearTimeout);
+        timers.forEach(clearTimeout);
         window.removeEventListener("mousemove", onMM);
         window.removeEventListener("resize", onResize);
-        pmrem.dispose(); composer.dispose?.(); renderer.dispose();
+        draco.dispose?.(); pmrem.dispose(); composer.dispose?.(); renderer.dispose();
         if (dom.parentNode) dom.parentNode.removeChild(dom);
       });
     }
@@ -380,7 +399,7 @@ export default function Splash() {
         </div>
       </div>
 
-      {/* Brand top-left */}
+      {/* Brand */}
       <div className="pointer-events-none absolute left-6 top-6 z-20 flex items-center gap-3 md:left-12 md:top-12">
         <img src="/odc-logo.png" alt="ODC" className="h-12 w-12 object-contain drop-shadow-[0_0_18px_rgba(229,29,42,0.5)]" />
         <div>
@@ -389,15 +408,15 @@ export default function Splash() {
         </div>
       </div>
 
-      {/* Headline — fades out once aiming begins */}
-      <div className={`pointer-events-none absolute left-1/2 top-[18%] z-20 w-full -translate-x-1/2 text-center transition-opacity duration-700 ${phase === "intro" || phase === "grouping" ? "opacity-100" : "opacity-0"}`}>
+      {/* Headline */}
+      <div className={`pointer-events-none absolute left-1/2 top-[16%] z-20 w-full -translate-x-1/2 text-center transition-opacity duration-700 ${phase === "intro" || phase === "grouping" || phase === "running" ? "opacity-100" : "opacity-0"}`}>
         <p className="text-[11px] font-black uppercase tracking-[0.5em] text-[#E51D2A] md:text-[13px]">Competitive Online Darts</p>
         <h1 className="mt-2 text-4xl font-black leading-[0.9] tracking-tight md:text-7xl" style={{ textShadow: "0 8px 60px rgba(0,0,0,0.8)" }}>
           Welcome to the <span className="text-[#E51D2A]">ODC.</span>
         </h1>
       </div>
 
-      {/* AIM prompt — appears after the 3 darts land */}
+      {/* Aim prompt */}
       <div className={`pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-end pb-16 transition-opacity duration-500 ${phase === "aim" ? "opacity-100" : "opacity-0"}`}>
         <div className="flex flex-col items-center gap-3">
           <div className="relative h-16 w-16">
