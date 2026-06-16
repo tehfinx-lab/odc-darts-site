@@ -545,16 +545,21 @@ function buildKnockoutData(rows) {
     winner:    text(row?.[5] ?? ""),
   });
 
-  // Sheet layout (0-indexed rows):
-  // Row 6  = QF1, Row 7 = QF2, Row 8 = QF3, Row 9 = QF4
-  // Row 14 = SF1, Row 15 = SF2
-  // Row 20 = Final
-  // Row 24 = Champion (col B)
+  const find = (id) => rows.find((r) => text(r[0]).toLowerCase() === id.toLowerCase());
+
+  // Champion: look for a row with "Winner" in col A, value in col B
+  const winnerRow = rows.find((r) => text(r[0]).toLowerCase() === "winner");
+  let champion = text(winnerRow?.[1] ?? "");
+  if (!champion) {
+    const champIdx = rows.findIndex((r) => text(r[0]).toLowerCase().includes("champion"));
+    if (champIdx >= 0) champion = text(rows[champIdx + 1]?.[1] ?? "");
+  }
+
   return {
-    quarterFinals: [6, 7, 8, 9].map((i) => ({ id: text(rows[i]?.[0] ?? ""), ...getMatch(rows[i]) })),
-    semiFinals:    [14, 15].map((i)    => ({ id: text(rows[i]?.[0] ?? ""), ...getMatch(rows[i]) })),
-    final:         [{ id: "Final",                                           ...getMatch(rows[20]) }],
-    champion:      text(rows[24]?.[1] ?? ""),
+    quarterFinals: ["QF1", "QF2", "QF3", "QF4"].map((id) => ({ id, ...getMatch(find(id)) })),
+    semiFinals:    ["SF1", "SF2"].map((id)       => ({ id, ...getMatch(find(id)) })),
+    final:         [{ id: "Final",                    ...getMatch(find("final")) }],
+    champion,
   };
 }
 
