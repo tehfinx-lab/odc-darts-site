@@ -771,7 +771,8 @@ function DuoLeaguePage({ data }) {
 )}
 </>
 )}
-      
+
+      {view === "knockout" && <KnockoutBracket knockout={data.knockout} />}
     </section>
   );
 }
