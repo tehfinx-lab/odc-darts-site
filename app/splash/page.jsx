@@ -112,9 +112,9 @@ export default function Splash() {
       // ---- Dart material factory (STL has no materials) ----
       function styleDart(obj) {
         // Dart long axis is Z, tip at -Z, flights at +Z. Colour by vertex Z via material groups.
-        const steel = new THREE.MeshStandardMaterial({ color: 0xb8b8be, roughness: 0.25, metalness: 1.0, envMapIntensity: 0.9 });
-        const tungsten = new THREE.MeshStandardMaterial({ color: 0x35353a, roughness: 0.4, metalness: 0.9, envMapIntensity: 0.7 });
-        const red = new THREE.MeshStandardMaterial({ color: 0xc1262a, roughness: 0.55, metalness: 0.1 });
+        const steel = new THREE.MeshStandardMaterial({ color: 0xd0d0d6, roughness: 0.22, metalness: 1.0, envMapIntensity: 1.1 });
+        const tungsten = new THREE.MeshStandardMaterial({ color: 0x2a2a2f, roughness: 0.45, metalness: 0.92, envMapIntensity: 0.8 });
+        const red = new THREE.MeshStandardMaterial({ color: 0xe51d2a, roughness: 0.5, metalness: 0.1, emissive: 0x2a0305, emissiveIntensity: 0.25 });
         obj.traverse((o) => {
           if (o.isMesh && o.geometry) {
             o.castShadow = true;
@@ -214,7 +214,7 @@ export default function Splash() {
           // dart long axis is Z, tip at -Z. Scale to a sensible length (~0.95 world units)
           const size = new THREE.Vector3(); box.getSize(size);
           const len = Math.max(size.x, size.y, size.z);
-          model.scale.setScalar(0.85 / len);
+          model.scale.setScalar(1.6 / len);
           styleDart(model);
           dartTemplate = model;
           dartLoaded = true;
@@ -231,7 +231,7 @@ export default function Splash() {
         () => new THREE.Vector3(0.14, -0.03, 0.0).add(T20),
       ];
       const autoDarts = [];
-      const fromL = new THREE.Vector3(-8, -1.2, 10);
+      const fromL = new THREE.Vector3(-6, -2.5, 9);
 
       let userDart = null;
       const finalTargetFn = () => new THREE.Vector3(0.0, 0.0, 0.0).add(T20);
@@ -338,13 +338,24 @@ export default function Splash() {
       // helper: orient dart so its TIP (local -Z) leads toward the board.
       // lookAt points the object's +Z at the given point. We want the tip(-Z) to point at the
       // board, so we aim +Z at a point BEHIND the dart (mirror), i.e. look away from board surface.
-      const _look = new THREE.Vector3();
+      const _dir = new THREE.Vector3();
+      const _tipAxis = new THREE.Vector3(0, 0, -1); // dart tip points along local -Z
+      const _q = new THREE.Quaternion();
       function aimDart(obj, target) {
-        // direction from dart to target (the way it should travel/point tip)
-        _look.copy(target).sub(obj.position).normalize();
-        // we want -Z to align with _look, so make +Z look the opposite way:
-        const behind = new THREE.Vector3().copy(obj.position).sub(_look);
-        obj.lookAt(behind);
+        // align the dart's tip axis (-Z) with the travel direction so the TIP leads.
+        _dir.copy(target).sub(obj.position).normalize();
+        _q.setFromUnitVectors(_tipAxis, _dir);
+        obj.quaternion.copy(_q);
+      }
+      const _stickDir = new THREE.Vector3();
+      const _stickQ = new THREE.Quaternion();
+      function stickDart(obj, idx) {
+        // tip points INTO the board (toward -Z world) and slightly up; tail sticks out toward camera.
+        // tiny per-dart yaw variation so the 3 darts don't perfectly overlap.
+        const yaw = idx === 0 ? -0.1 : idx === 1 ? 0.1 : 0.0;
+        _stickDir.set(yaw, 0.22, -1).normalize();
+        _stickQ.setFromUnitVectors(_tipAxis, _stickDir);
+        obj.quaternion.copy(_stickQ);
       }
 
       const tick = () => {
@@ -386,7 +397,7 @@ export default function Splash() {
             tmp.lerpVectors(fromL, d.tg, e); tmp.y += Math.sin(tt*Math.PI)*1.0;
             d.obj.position.copy(tmp);
             aimDart(d.obj, d.tg);
-            if (d.t>=1){ d.phase="stuck"; d.obj.position.copy(d.tg); d.obj.rotation.set(0.35, -0.5, 0); const fi=d.idx; flashes[fi].position.copy(d.tg); flashes[fi].visible=true; flashLife[fi]=1; shake=0.1; hitGlow=1; }
+            if (d.t>=1){ d.phase="stuck"; d.obj.position.copy(d.tg); stickDart(d.obj, d.idx); const fi=d.idx; flashes[fi].position.copy(d.tg); flashes[fi].visible=true; flashLife[fi]=1; shake=0.1; hitGlow=1; }
           }
         }
 
@@ -401,7 +412,7 @@ export default function Splash() {
           userDart.scale.setScalar(userDart.userData.baseScale * (0.5 + e*0.5));
           aimDart(userDart, target);
           if (finalT>=1){
-            finalPhase="done"; userDart.position.copy(target); userDart.rotation.set(0.3, -0.45, 0);
+            finalPhase="done"; userDart.position.copy(target); stickDart(userDart, 2);
             flashes[2].position.copy(target); flashes[2].visible=true; flashLife[2]=1; shake=0.22; hitGlow=1.4;
             let f=0; const fv=setInterval(()=>{ f+=0.08; grainPass.uniforms.uFlash.value=Math.min(f,1); if(f>=1){ clearInterval(fv); window.location.replace("/?from=splash"); } }, 16);
           }
