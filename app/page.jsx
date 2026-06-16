@@ -714,64 +714,63 @@ function DuoLeaguePage({ data }) {
       </div>
 
       {view === "tables" && (
-        <>
-          {rows.length === 0 ? (
-            <Card>
-              <p className="text-lg font-black">No Duo League table data found.</p>
-              <p className="mt-2 text-odcCream/60">The standings table could not be read from the Duo League sheet.</p>
-            </Card>
-          ) : (
-            <Card className="overflow-x-auto p-0">
-              <table className="w-full min-w-[900px] border-collapse">
-                <thead className="bg-odcNavy">
-                  <tr className="text-left text-xs uppercase tracking-[0.22em] text-odcCream/55">
-                    <th className="p-4">#</th>
-                    <th className="p-4">Team</th>
-                    <th className="p-4">Avg</th>
-                    <th className="p-4">P</th>
-                    <th className="p-4">W</th>
-                    <th className="p-4">D</th>
-                    <th className="p-4">L</th>
-                    <th className="p-4">LF</th>
-                    <th className="p-4">LA</th>
-                    <th className="p-4">LD</th>
-                    <th className="p-4">Pts</th>
-                    <th className="p-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={`${selected}-${row.team}`} className="border-t border-odcCream/10">
-                      <td className="p-4 font-black text-odcRed">{row.rank}</td>
-                      <td className="p-4 font-black">{row.team}</td>
-                      <td className="p-4">{row.teamAvg || "-"}</td>
-                      <td className="p-4">{row.played}</td>
-                      <td className="p-4">{row.wins}</td>
-                      <td className="p-4">{row.draws}</td>
-                      <td className="p-4">{row.losses}</td>
-                      <td className="p-4">{row.legsFor}</td>
-                      <td className="p-4">{row.legsAgainst}</td>
-                      <td className="p-4">{row.legDiff}</td>
-                      <td className="p-4 text-xl font-black">{row.points}</td>
-                      <td className="p-4">
-                        {row.status ? (
-                          <span className="rounded-xl bg-odcRed/15 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-odcRed">
-                            {row.status}
-                          </span>
-                        ) : (
-                          <span className="text-odcCream/35">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card>
-          )}
-        </>
-      )}
-
-      {view === "knockout" && <KnockoutBracket knockout={data.knockout} />}
+<>
+{rows.length === 0 ? (
+  
+        <Card>
+          <p className="text-lg font-black">No Duo League table data found.</p>
+          <p className="mt-2 text-odcCream/60">The standings table could not be read from the Duo League sheet.</p>
+        </Card>
+      ) : (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full min-w-[900px] border-collapse">
+            <thead className="bg-odcNavy">
+              <tr className="text-left text-xs uppercase tracking-[0.22em] text-odcCream/55">
+                <th className="p-4">#</th>
+                <th className="p-4">Team</th>
+                <th className="p-4">Avg</th>
+                <th className="p-4">P</th>
+                <th className="p-4">W</th>
+                <th className="p-4">D</th>
+                <th className="p-4">L</th>
+                <th className="p-4">LF</th>
+                <th className="p-4">LA</th>
+                <th className="p-4">LD</th>
+                <th className="p-4">Pts</th>
+                <th className="p-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={`${selected}-${row.team}`} className="border-t border-odcCream/10">
+                  <td className="p-4 font-black text-odcRed">{row.rank}</td>
+                  <td className="p-4 font-black">{row.team}</td>
+                  <td className="p-4">{row.teamAvg || "-"}</td>
+                  <td className="p-4">{row.played}</td>
+                  <td className="p-4">{row.wins}</td>
+                  <td className="p-4">{row.draws}</td>
+                  <td className="p-4">{row.losses}</td>
+                  <td className="p-4">{row.legsFor}</td>
+                  <td className="p-4">{row.legsAgainst}</td>
+                  <td className="p-4">{row.legDiff}</td>
+                  <td className="p-4 text-xl font-black">{row.points}</td>
+                  <td className="p-4">
+                    {row.status ? (
+                      <span className="rounded-xl bg-odcRed/15 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-odcRed">
+                        {row.status}
+                      </span>
+                    ) : (
+                      <span className="text-odcCream/35">-</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+)}
+</>
+)}
       
     </section>
   );
@@ -1005,7 +1004,7 @@ function KnockoutBracket({ knockout }) {
 
 function EventsPage({ data }) {
   const events = data.events || [];
-  const knockout = data.knockout;
+  
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
@@ -1065,8 +1064,6 @@ function EventsPage({ data }) {
           ))}
         </div>
       )}
-
-      <KnockoutBracket knockout={knockout} />
     </section>
   );
 }

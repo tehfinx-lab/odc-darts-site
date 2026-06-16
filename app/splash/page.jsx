@@ -48,12 +48,11 @@ export default function Splash() {
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
       renderer.setSize(W(), H());
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.0;
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMappingExposure = 0.95;
       mount.appendChild(renderer.domElement);
 
       const scene = new THREE.Scene();
@@ -67,20 +66,102 @@ export default function Splash() {
       const envTex = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
       scene.environment = envTex;
 
-      // ---- Lights ----
-      scene.add(new THREE.AmbientLight(0x1c1f27, 0.5));
-      const key = new THREE.SpotLight(0xfff2e2, 600, 50, Math.PI / 6, 0.5, 1.3);
+      // ---- Lights (controlled, not blown out) ----
+      scene.add(new THREE.AmbientLight(0x1c1f27, 0.55));
+      const key = new THREE.SpotLight(0xfff2e2, 520, 46, Math.PI / 6.5, 0.5, 1.4);
       key.position.set(3, 10, 9); key.castShadow = true;
-      key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0002; key.shadow.radius = 7;
+      key.shadow.mapSize.set(512, 512); key.shadow.bias = -0.0002; key.shadow.radius = 7;
       scene.add(key, key.target);
       const rimRed = new THREE.PointLight(RED, 160, 26, 2);
       rimRed.position.set(0, 0.5, -2.5); scene.add(rimRed);
       const cool = new THREE.DirectionalLight(0x35527e, 0.5);
       cool.position.set(-7, 2, 5); scene.add(cool);
-      const frontFill = new THREE.DirectionalLight(0xffffff, 0.45);
-      frontFill.position.set(0, 1, 12); scene.add(frontFill);
 
-      // ---- Wall / floor / glow column ----
+      // ---- Procedural sisal bump ----
+      function sisal() {
+        const s = 1024, c = document.createElement("canvas"); c.width = c.height = s;
+        const x = c.getContext("2d"); x.fillStyle = "#0c0c0c"; x.fillRect(0, 0, s, s);
+        for (let i = 0; i < 55000; i++) {
+          const px = Math.random() * s, py = Math.random() * s, a = Math.random() * Math.PI, l = 3 + Math.random() * 6, g = 25 + Math.random() * 55;
+          x.strokeStyle = `rgba(${g},${g},${g},${0.12 + Math.random() * 0.22})`; x.lineWidth = 0.6 + Math.random() * 0.7;
+          x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke();
+        }
+        const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3);
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
+      }
+      const bump = sisal();
+
+      // ---- Board ----
+      const board = new THREE.Group();
+      board.position.set(0, 0.2, 0);
+      scene.add(board);
+
+      const NUMS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+      const SEG = Math.PI / 10;
+      const R_OUT = 2.6, R_DBL_O = 2.42, R_DBL_I = 2.3, R_TRP_O = 1.56, R_TRP_I = 1.44, R_BULL_O = 0.34, R_BULL_I = 0.16;
+      const DEPTH = 0.18;
+      // T20 is the FIRST segment (index 0), centred at top (+Y). Its mid radius:
+      const T20R = (R_TRP_O + R_TRP_I) / 2;
+      const T20 = new THREE.Vector3(0, T20R, DEPTH + 0.02).add(board.position);
+
+      const mCream = new THREE.MeshStandardMaterial({ color: 0xe9dcb6, roughness: 0.82, metalness: 0.04, bumpMap: bump, bumpScale: 0.05 });
+      const mBlack = new THREE.MeshStandardMaterial({ color: 0x0e0e0e, roughness: 0.88, metalness: 0.03, bumpMap: bump, bumpScale: 0.05 });
+      const mRed = new THREE.MeshStandardMaterial({ color: 0xbe2429, roughness: 0.5, metalness: 0.05, bumpMap: bump, bumpScale: 0.04 });
+      const mGreen = new THREE.MeshStandardMaterial({ color: 0x1c7a44, roughness: 0.5, metalness: 0.05, bumpMap: bump, bumpScale: 0.04 });
+      const mWire = new THREE.MeshStandardMaterial({ color: 0xd7d7db, roughness: 0.18, metalness: 1.0, envMapIntensity: 1.3 });
+      const mRim = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.4, metalness: 0.85 });
+
+      const backing = new THREE.Mesh(new THREE.CylinderGeometry(R_OUT + 0.16, R_OUT + 0.16, DEPTH + 0.06, 96), mRim);
+      backing.rotation.x = Math.PI / 2; backing.position.z = -DEPTH / 2; backing.castShadow = backing.receiveShadow = true;
+      board.add(backing);
+
+      function sector(rIn, rOut, a0, a1, mat, depth) {
+        const sh = new THREE.Shape();
+        sh.absarc(0, 0, rOut, a0, a1, false); sh.absarc(0, 0, rIn, a1, a0, true);
+        const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.008, bevelSegments: 1, curveSegments: 12 });
+        const m = new THREE.Mesh(g, mat); m.castShadow = m.receiveShadow = true; return m;
+      }
+      for (let i = 0; i < 20; i++) {
+        const a0 = i * SEG - SEG / 2 + Math.PI / 2, a1 = a0 + SEG, ev = i % 2 === 0;
+        board.add(sector(R_BULL_O, R_TRP_I, a0, a1, ev ? mBlack : mCream, DEPTH * 0.7));
+        board.add(sector(R_TRP_I, R_TRP_O, a0, a1, ev ? mGreen : mRed, DEPTH));
+        board.add(sector(R_TRP_O, R_DBL_I, a0, a1, ev ? mBlack : mCream, DEPTH * 0.7));
+        board.add(sector(R_DBL_I, R_DBL_O, a0, a1, ev ? mGreen : mRed, DEPTH));
+      }
+      const cyl = (r, h, mat, z) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 48), mat); m.rotation.x = Math.PI / 2; m.position.z = z; m.castShadow = true; return m; };
+      board.add(cyl(R_BULL_O, DEPTH * 0.9, mGreen, DEPTH * 0.45));
+      board.add(cyl(R_BULL_I, DEPTH, mRed, DEPTH * 0.5));
+
+      const wz = DEPTH + 0.015;
+      for (let i = 0; i < 20; i++) {
+        const a = i * SEG - SEG / 2 + Math.PI / 2, len = R_OUT - R_BULL_O;
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, len, 8), mWire);
+        w.position.set(Math.cos(a) * ((R_OUT + R_BULL_O) / 2), Math.sin(a) * ((R_OUT + R_BULL_O) / 2), wz);
+        w.rotation.z = a - Math.PI / 2; w.rotation.x = Math.PI / 2; board.add(w);
+      }
+      [R_DBL_O, R_DBL_I, R_TRP_O, R_TRP_I, R_BULL_O].forEach((r) => { const g = new THREE.Mesh(new THREE.TorusGeometry(r, 0.015, 12, 120), mWire); g.position.z = wz; board.add(g); });
+      const outer = new THREE.Mesh(new THREE.TorusGeometry(R_OUT, 0.05, 16, 128), mRim); outer.position.z = wz; board.add(outer);
+
+      // number band
+      function band() {
+        const s = 2048, c = document.createElement("canvas"); c.width = s; c.height = 256;
+        const x = c.getContext("2d");
+        const g = x.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, "#191919"); g.addColorStop(0.5, "#070707"); g.addColorStop(1, "#191919");
+        x.fillStyle = g; x.fillRect(0, 0, s, 256);
+        x.font = "900 150px Arial, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
+        x.shadowColor = "rgba(0,0,0,0.9)"; x.shadowBlur = 8;
+        for (let i = 0; i < 20; i++) { x.fillStyle = "#f3ecd9"; x.fillText(String(NUMS[i]), (i + 0.5) * (s / 20), 132); }
+        const t = new THREE.CanvasTexture(c); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
+      }
+      const bMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(R_OUT + 0.34, R_OUT + 0.34, 0.5, 128, 1, true),
+        new THREE.MeshStandardMaterial({ map: band(), roughness: 0.6, metalness: 0.2, side: THREE.DoubleSide })
+      );
+      bMesh.rotation.x = Math.PI / 2; bMesh.rotation.y = Math.PI / 2; bMesh.position.z = wz - 0.02; board.add(bMesh);
+
+      board.scale.setScalar(0.001);
+
+      // wall + floor + glow column
       const wall = new THREE.Mesh(new THREE.PlaneGeometry(70, 46), new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.96 }));
       wall.position.z = -1.6; wall.receiveShadow = true; scene.add(wall);
       const colMat = new THREE.MeshBasicMaterial({ color: RED, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
@@ -89,151 +170,40 @@ export default function Splash() {
       floor.rotation.x = -Math.PI / 2; floor.position.y = -3.6; floor.receiveShadow = true; scene.add(floor);
 
       // dust
-      const dN = 200, dg = new THREE.BufferGeometry(), dp = new Float32Array(dN * 3);
+      const dN = 90, dg = new THREE.BufferGeometry(), dp = new Float32Array(dN * 3);
       for (let i = 0; i < dN; i++) { dp[i*3]=(Math.random()-0.5)*18; dp[i*3+1]=(Math.random()-0.5)*12; dp[i*3+2]=(Math.random()-0.5)*8+1; }
       dg.setAttribute("position", new THREE.BufferAttribute(dp, 3));
       const dust = new THREE.Points(dg, new THREE.PointsMaterial({ color: 0xff8a7a, size: 0.03, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
       scene.add(dust);
 
-      // ---- Loaders (Draco) ----
-      const draco = new DRACOLoader();
-      draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
-      const gltf = new GLTFLoader();
-      gltf.setDRACOLoader(draco);
-
-      // Board target geometry constants (filled after load)
-      const BOARD_RADIUS = 2.6;          // visual radius after we scale it
-      let T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.86, 0.0); // treble 20 world pos (approx, refined after load)
-      const board = new THREE.Group();
-      board.position.set(0, 0.2, 0);
-      board.scale.setScalar(0.001);
-      scene.add(board);
-
-      // ---- Dart material factory (STL has no materials) ----
-      function styleDart(obj) {
-        // Dart long axis is Z, tip at -Z, flights at +Z. Colour by vertex Z via material groups.
-        const steel = new THREE.MeshStandardMaterial({ color: 0xe2e2e6, roughness: 0.18, metalness: 1.0, envMapIntensity: 1.4 });
-        const tungsten = new THREE.MeshStandardMaterial({ color: 0x2e2e33, roughness: 0.32, metalness: 0.96, envMapIntensity: 1.0 });
-        const red = new THREE.MeshStandardMaterial({ color: 0xe51d2a, roughness: 0.4, metalness: 0.15, emissive: 0x3a0507, emissiveIntensity: 0.3 });
-        obj.traverse((o) => {
-          if (o.isMesh && o.geometry) {
-            o.castShadow = true;
-            const geo = o.geometry;
-            geo.computeBoundingBox();
-            const zmin = geo.boundingBox.min.z, zmax = geo.boundingBox.max.z, span = zmax - zmin || 1;
-            const pos = geo.attributes.position;
-            // assign material index per triangle based on average Z
-            geo.clearGroups();
-            const idx = geo.index;
-            const triCount = idx ? idx.count / 3 : pos.count / 3;
-            // build a material array and groups
-            const getZ = (vi) => pos.getZ(vi);
-            for (let t = 0; t < triCount; t++) {
-              let a,b,c;
-              if (idx) { a=idx.getX(t*3); b=idx.getX(t*3+1); c=idx.getX(t*3+2); }
-              else { a=t*3; b=t*3+1; c=t*3+2; }
-              const az = (getZ(a)+getZ(b)+getZ(c))/3;
-              const frac = (az - zmin) / span; // 0 at tip(-Z) .. 1 at flights(+Z)
-              let mi = 1; // tungsten barrel default
-              if (frac < 0.28) mi = 0;        // tip = steel
-              else if (frac > 0.72) mi = 2;   // flights = red
-              geo.addGroup(t*3, 3, mi);
-            }
-            o.material = [steel, tungsten, red];
-          }
-        });
-        return obj;
-      }
-      // We only have ONE dart mesh; clone it. It's a single STL so the whole thing is steel —
-      // to add colour we tint via a second material pass on the rear third (flights) using vertex Z.
-      function makeDart(template) {
-        const d = template.clone(true);
-        styleDart(d);
-        return d;
+      // ---- Dart factory ----
+      function makeDart() {
+        const g = new THREE.Group();
+        const steel = new THREE.MeshStandardMaterial({ color: 0xcfcfd4, roughness: 0.2, metalness: 1 });
+        const tung = new THREE.MeshStandardMaterial({ color: 0x37373b, roughness: 0.35, metalness: 0.95 });
+        const carbon = new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.5, metalness: 0.3 });
+        const fl = new THREE.MeshStandardMaterial({ color: 0xbe2429, roughness: 0.45, metalness: 0.1, side: THREE.DoubleSide });
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.3, 16), steel); tip.rotation.z = -Math.PI/2; tip.position.x = 0.45; g.add(tip);
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.043, 0.5, 20), tung); barrel.rotation.z = Math.PI/2; barrel.position.x = 0.12; g.add(barrel);
+        for (let i=0;i<9;i++){ const r=new THREE.Mesh(new THREE.TorusGeometry(0.049,0.0035,6,18),steel); r.rotation.y=Math.PI/2; r.position.x=-0.05+i*0.05; g.add(r); }
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.4,12),carbon); shaft.rotation.z=Math.PI/2; shaft.position.x=-0.28; g.add(shaft);
+        for (let i=0;i<4;i++){ const v=new THREE.Mesh(new THREE.PlaneGeometry(0.32,0.24),fl); v.position.x=-0.6; const grp=new THREE.Group(); grp.add(v); grp.rotation.x=(i*Math.PI)/2; grp.position.x=-0.6; g.add(grp); }
+        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        return g;
       }
 
-      let dartTemplate = null;
-      let boardLoaded = false, dartLoaded = false;
-      const checkReady = () => {
-        if (boardLoaded && dartLoaded) {
-          setReady(true);
-          setPhase("intro");
-          startSequence();
-        }
-      };
-
-      // ---- Load BOARD ----
-      gltf.load(
-        "/models/board.glb",
-        (g) => {
-          const model = g.scene;
-          // Compute bbox to normalise size + stand upright
-          const box = new THREE.Box3().setFromObject(model);
-          const size = new THREE.Vector3(); box.getSize(size);
-          const center = new THREE.Vector3(); box.getCenter(center);
-          model.position.sub(center); // center at origin
-
-          // Board lies flat (Y is thin). Stand it up so face points +Z toward camera.
-          model.rotation.x = Math.PI / 2;
-
-          // Scale so the board diameter == 2*BOARD_RADIUS
-          const flatDiameter = Math.max(size.x, size.z);
-          const s = (BOARD_RADIUS * 2) / flatDiameter;
-          model.scale.setScalar(s);
-
-          model.traverse((o) => {
-            if (o.isMesh) {
-              o.castShadow = true;
-              o.receiveShadow = true;
-              if (o.material) {
-                o.material.envMapIntensity = 0.8;
-                o.material.roughness = Math.min(1, (o.material.roughness ?? 1) * 1.0);
-              }
-            }
-          });
-
-          board.add(model);
-          // refine T20 in board-local space: top of board face, ~86% out
-          T20 = new THREE.Vector3(0, BOARD_RADIUS * 0.84, 0.12).add(board.position);
-          boardLoaded = true;
-          checkReady();
-        },
-        undefined,
-        (err) => { console.error("board load failed", err); boardLoaded = true; checkReady(); }
-      );
-
-      // ---- Load DART ----
-      gltf.load(
-        "/models/dart.glb",
-        (g) => {
-          const model = g.scene;
-          const box = new THREE.Box3().setFromObject(model);
-          const center = new THREE.Vector3(); box.getCenter(center);
-          model.position.sub(center);
-          // dart long axis is Z, tip at -Z. Scale to a sensible length (~0.95 world units)
-          const size = new THREE.Vector3(); box.getSize(size);
-          const len = Math.max(size.x, size.y, size.z);
-          model.scale.setScalar(1.3 / len);
-          styleDart(model);
-          dartTemplate = model;
-          dartLoaded = true;
-          checkReady();
-        },
-        undefined,
-        (err) => { console.error("dart load failed", err); dartLoaded = true; checkReady(); }
-      );
-
-      // ---- Darts state ----
-      // 2 auto darts + 1 user dart. Targets cluster in treble 20.
+      // three darts that auto-fly into T20 grouping
       const groupTargets = [
-        () => new THREE.Vector3(-0.12, 0, 0.05).add(T20),
-        () => new THREE.Vector3(0.10, -0.04, 0.05).add(T20),
+        new THREE.Vector3(-0.1, T20R + 0.04, DEPTH + 0.18).add(new THREE.Vector3(0,0.2,0)),
+        new THREE.Vector3(0.08, T20R - 0.02, DEPTH + 0.18).add(new THREE.Vector3(0,0.2,0)),
+        new THREE.Vector3(0.0, T20R - 0.08, DEPTH + 0.18).add(new THREE.Vector3(0,0.2,0)),
       ];
-      const autoDarts = [];
+      const darts = groupTargets.map((tg) => { const o = makeDart(); o.visible = false; o.scale.setScalar(0.4); scene.add(o); return { o, tg, phase: "idle", t: 0 }; });
       const fromL = new THREE.Vector3(-8, -1.2, 10);
 
-      let userDart = null;
-      const finalTargetFn = () => new THREE.Vector3(0.0, 0.02, 0.06).add(T20);
+      // final user dart (flies from camera POV)
+      const finalDart = makeDart(); finalDart.visible = false; finalDart.scale.setScalar(0.4); scene.add(finalDart);
+      const finalTarget = new THREE.Vector3(0.02, T20R + 0.0, DEPTH + 0.2).add(new THREE.Vector3(0,0.2,0));
 
       // impact flashes
       function flashSprite() {
@@ -250,7 +220,7 @@ export default function Splash() {
       // ---- Post ----
       const composer = new EffectComposer(renderer);
       composer.addPass(new RenderPass(scene, camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.3, 0.55, 0.92);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.32, 0.55, 0.9);
       composer.addPass(bloom);
       const grain = {
         uniforms: { tDiffuse:{value:null}, uTime:{value:0}, uAmt:{value:0.045}, uVig:{value:1.1}, uAb:{value:0.0013}, uFlash:{value:0} },
@@ -315,16 +285,9 @@ export default function Splash() {
       const clock = new THREE.Clock();
       const tmp = new THREE.Vector3();
       let animId;
-
-      // helper: aim a dart object so tip (-Z) points at target
-      function aimDart(obj, target) {
-        obj.lookAt(target);   // -Z faces target by default for lookAt? No: +Z faces target.
-        // Our dart tip is at -Z, so rotate 180° around Y so tip leads.
-        obj.rotateY(Math.PI);
-      }
-
       const tick = () => {
         animId = requestAnimationFrame(tick);
+        checkPerf(performance.now());
         const t = clock.getElapsedTime();
 
         // intro scale-up
@@ -346,9 +309,9 @@ export default function Splash() {
         camera.lookAt(0, 0.2, 0);
 
         // glow / light life
-        colMat.opacity = 0.1 + Math.sin(t*1.4)*0.035 + hitGlow*0.22;
-        rimRed.intensity = 150 + Math.sin(t*1.4)*35 + hitGlow*380;
-        bloom.strength = 0.3 + hitGlow*0.3;
+        colMat.opacity = 0.12 + Math.sin(t*1.4)*0.04 + hitGlow*0.25;
+        rimRed.intensity = 170 + Math.sin(t*1.4)*40 + hitGlow*400;
+        bloom.strength = 0.32 + hitGlow*0.35;
         hitGlow = Math.max(0, hitGlow - 0.04);
         dust.rotation.y = t*0.012;
 
@@ -359,9 +322,9 @@ export default function Splash() {
             d.t += 0.03;
             const tt=Math.min(d.t,1), e=tt*tt*(3-2*tt);
             tmp.lerpVectors(fromL, d.tg, e); tmp.y += Math.sin(tt*Math.PI)*1.0;
-            d.obj.position.copy(tmp);
-            aimDart(d.obj, d.tg);
-            if (d.t>=1){ d.phase="stuck"; d.obj.position.copy(d.tg); const fi=d.idx; flashes[fi].position.copy(d.tg); flashes[fi].visible=true; flashLife[fi]=1; shake=0.1; hitGlow=1; }
+            d.o.position.copy(tmp); d.o.scale.setScalar(0.4+e*0.28);
+            d.o.lookAt(d.tg.x, d.tg.y+0.0001, d.tg.z+1); d.o.rotateY(Math.PI/2);
+            if (d.t>=1){ d.phase="stuck"; d.o.position.copy(d.tg); flashes[i].position.copy(d.tg); flashes[i].visible=true; flashLife[i]=1; shake=0.12; hitGlow=1; }
           }
         }
 
@@ -369,15 +332,17 @@ export default function Splash() {
         if (finalPhase==="flying" && userDart){
           finalT += 0.04;
           const tt=Math.min(finalT,1), e=tt*tt*(3-2*tt);
-          const target = finalTargetFn();
-          const start = new THREE.Vector3(camera.position.x*0.3, camera.position.y-0.25, camera.position.z-1.4);
-          tmp.lerpVectors(start, target, e);
-          userDart.position.copy(tmp);
-          aimDart(userDart, target);
+          // start near camera
+          const start = new THREE.Vector3(camera.position.x*0.3, camera.position.y-0.3, camera.position.z-1.5);
+          tmp.lerpVectors(start, finalTarget, e);
+          finalDart.position.copy(tmp);
+          finalDart.scale.setScalar(0.6 - e*0.2);
+          finalDart.lookAt(finalTarget.x, finalTarget.y+0.0001, finalTarget.z+1); finalDart.rotateY(Math.PI/2);
           if (finalT>=1){
-            finalPhase="done"; userDart.position.copy(target);
-            flashes[2].position.copy(target); flashes[2].visible=true; flashLife[2]=1; shake=0.22; hitGlow=1.4;
-            let f=0; const fv=setInterval(()=>{ f+=0.08; grainPass.uniforms.uFlash.value=Math.min(f,1); if(f>=1){ clearInterval(fv); window.location.replace("/?from=splash"); } }, 16);
+            finalPhase="done"; finalDart.position.copy(finalTarget);
+            flashes[3].position.copy(finalTarget); flashes[3].visible=true; flashLife[3]=1; shake=0.25; hitGlow=1.4;
+            // white flash + redirect
+            let f=0; const flashIv=setInterval(()=>{ f+=0.08; grainPass.uniforms.uFlash.value=Math.min(f,1); if(f>=1){ clearInterval(flashIv); window.location.replace("/?from=splash"); } }, 16);
           }
         }
 
