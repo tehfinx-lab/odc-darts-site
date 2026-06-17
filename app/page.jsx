@@ -26,6 +26,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { fallbackData, getLiveLeagueData } from "../lib/sheetData";
+import { CountUp, AnimatedStatValue, Reveal, StaggerRows, Row } from "./motion";
 
 const pages = [
   { id: "home", label: "Home", icon: Home },
@@ -65,7 +66,7 @@ function SmallStat({ label, value, icon: Icon }) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-odcCream/45">{label}</p>
-          <p className="mt-1 text-2xl font-black">{value}</p>
+          <p className="mt-1 text-2xl font-black"><AnimatedStatValue value={value} /></p>
         </div>
         {Icon && <Icon className="text-odcRed" size={24} />}
       </div>
@@ -635,9 +636,9 @@ function TablesPage({ data }) {
               <th className="p-4">Pts</th>
             </tr>
           </thead>
-          <tbody>
+          <StaggerRows>
             {rows.map((row) => (
-              <tr key={row.name} className="border-t border-odcCream/10">
+              <Row key={row.name} className="border-t border-odcCream/10">
                 <td className="p-4 font-black text-odcRed">{row.pos}</td>
                 <td className="p-4 font-black">{row.name}</td>
                 <td className="p-4">{row.played}</td>
@@ -647,9 +648,9 @@ function TablesPage({ data }) {
                 <td className="p-4">{row.legs}</td>
                 <td className="p-4 text-sm text-odcCream/60">{row.form}</td>
                 <td className="p-4 text-xl font-black">{row.points}</td>
-              </tr>
+              </Row>
             ))}
-          </tbody>
+          </StaggerRows>
         </table>
       </Card>
     </section>
