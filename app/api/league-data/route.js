@@ -537,42 +537,69 @@ function buildEventsData(rows) {
 }
 
 function buildKnockoutData(rows) {
-  const getMatch = (row) => ({
-    home:      text(row?.[1] ?? ""),
-    away:      text(row?.[2] ?? ""),
-    homeScore: text(row?.[3] ?? ""),
-    awayScore: text(row?.[4] ?? ""),
-    winner:    text(row?.[5] ?? ""),
-  });
+  // Google Sheets CSV merges the entire title/header section into the first row alongside QF1,
+  // so we can't rely on row offsets. Instead find matches by their ID in col A.
+  const qfEntries = [];
+  const sfEntries = [];
+  let finalRow = null;
+  let champion = "";
+  let matchHeaderCount = 0;
 
-  // Each section (QF, SF, Final) has a column-header row with "Match" in col A.
-  // Collect those header row indices in order, then slice data rows after each one.
-  const headerIdxs = rows.reduce((acc, r, i) => {
-    if (text(r[0]).toLowerCase() === "match") acc.push(i);
-    return acc;
-  }, []);
+  for (const row of rows) {
+    const colA = text(row[0]);
 
-  const slice = (startIdx, count) =>
-    startIdx >= 0
-      ? rows.slice(startIdx + 1, startIdx + 1 + count)
-      : Array(count).fill(null);
-
-  const qfRows  = slice(headerIdxs[0] ?? -1, 4);
-  const sfRows  = slice(headerIdxs[1] ?? -1, 2);
-  const finRows = slice(headerIdxs[2] ?? -1, 1);
-
-  // Champion row: "Winner" label in col A, value in col B
-  const winnerRow = rows.find((r) => text(r[0]).toLowerCase() === "winner");
-  let champion = text(winnerRow?.[1] ?? "");
-  if (!champion) {
-    const champIdx = rows.findIndex((r) => /champion/i.test(text(r[0])));
-    if (champIdx >= 0) champion = text(rows[champIdx + 1]?.[1] ?? "");
+    if (/^QF\d+$/i.test(colA)) {
+      // Clean QF row (QF2, QF3, QF4)
+      qfEntries.push({ id: colA.toUpperCase(), row, special: false });
+    } else if (/QF\d+$/i.test(colA)) {
+      // QF1 is merged into the big header blob — col B/C have "Home Team X" / "Away Team X" prefixes
+      const m = colA.match(/QF(\d+)$/i);
+      qfEntries.push({ id: `QF${m[1]}`, row, special: true });
+    } else if (/^SF\d+$/i.test(colA)) {
+      sfEntries.push({ id: colA.toUpperCase(), row, special: false });
+    } else if (/^Final$/i.test(colA) && matchHeaderCount >= 2) {
+      // Only accept "Final" as a match row after the second "Match" column-header row
+      finalRow = row;
+    } else if (/^Match$/i.test(colA)) {
+      matchHeaderCount++;
+    } else if (/^Winner$/i.test(colA)) {
+      champion = text(row[1] ?? "");
+    }
   }
 
+  qfEntries.sort((a, b) => a.id.localeCompare(b.id));
+
+  const stripPrefix = (val, prefix) => {
+    const s = text(val);
+    return s.startsWith(prefix) ? s.slice(prefix.length).trim() : s;
+  };
+
+  const makeMatch = (id, row, special) => {
+    if (!row) return { id, home: "", away: "", homeScore: "", awayScore: "", winner: "" };
+    return {
+      id,
+      home:      special ? stripPrefix(row[1], "Home Team")                              : text(row[1] ?? ""),
+      away:      special ? stripPrefix(row[2], "Away Team")                              : text(row[2] ?? ""),
+      homeScore: special ? text(row[3] ?? "").replace(/^Home Score\s*/i, "").trim()      : text(row[3] ?? ""),
+      awayScore: special ? text(row[4] ?? "").replace(/^Away Score\s*/i, "").trim()      : text(row[4] ?? ""),
+      winner:    special ? text(row[5] ?? "").replace(/^Winner\s*/i, "").trim()          : text(row[5] ?? ""),
+    };
+  };
+
+  const quarterFinals = Array.from({ length: 4 }, (_, i) => {
+    const e = qfEntries[i];
+    return e ? makeMatch(e.id, e.row, e.special) : { id: `QF${i + 1}`, home: "", away: "", homeScore: "", awayScore: "", winner: "" };
+  });
+
+  const semiFinals = Array.from({ length: 2 }, (_, i) => {
+    const e = sfEntries[i];
+    return e ? makeMatch(e.id, e.row, false) : { id: `SF${i + 1}`, home: "", away: "", homeScore: "", awayScore: "", winner: "" };
+  });
+
   return {
-    quarterFinals: qfRows.map((row, i) => ({ id: `QF${i + 1}`, ...getMatch(row) })),
-    semiFinals:    sfRows.map((row, i) => ({ id: `SF${i + 1}`, ...getMatch(row) })),
-    final:         [{ id: "Final",              ...getMatch(finRows[0]) }],
+    quarterFinals,
+    semiFinals,
+    final: [makeMatch("Final", finalRow, false)],
     champion,
   };
 }
