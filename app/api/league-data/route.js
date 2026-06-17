@@ -545,20 +545,34 @@ function buildKnockoutData(rows) {
     winner:    text(row?.[5] ?? ""),
   });
 
-  const find = (id) => rows.find((r) => text(r[0]).toLowerCase() === id.toLowerCase());
+  // Each section (QF, SF, Final) has a column-header row with "Match" in col A.
+  // Collect those header row indices in order, then slice data rows after each one.
+  const headerIdxs = rows.reduce((acc, r, i) => {
+    if (text(r[0]).toLowerCase() === "match") acc.push(i);
+    return acc;
+  }, []);
 
-  // Champion: look for a row with "Winner" in col A, value in col B
+  const slice = (startIdx, count) =>
+    startIdx >= 0
+      ? rows.slice(startIdx + 1, startIdx + 1 + count)
+      : Array(count).fill(null);
+
+  const qfRows  = slice(headerIdxs[0] ?? -1, 4);
+  const sfRows  = slice(headerIdxs[1] ?? -1, 2);
+  const finRows = slice(headerIdxs[2] ?? -1, 1);
+
+  // Champion row: "Winner" label in col A, value in col B
   const winnerRow = rows.find((r) => text(r[0]).toLowerCase() === "winner");
   let champion = text(winnerRow?.[1] ?? "");
   if (!champion) {
-    const champIdx = rows.findIndex((r) => text(r[0]).toLowerCase().includes("champion"));
+    const champIdx = rows.findIndex((r) => /champion/i.test(text(r[0])));
     if (champIdx >= 0) champion = text(rows[champIdx + 1]?.[1] ?? "");
   }
 
   return {
-    quarterFinals: ["QF1", "QF2", "QF3", "QF4"].map((id) => ({ id, ...getMatch(find(id)) })),
-    semiFinals:    ["SF1", "SF2"].map((id)       => ({ id, ...getMatch(find(id)) })),
-    final:         [{ id: "Final",                    ...getMatch(find("final")) }],
+    quarterFinals: qfRows.map((row, i) => ({ id: `QF${i + 1}`, ...getMatch(row) })),
+    semiFinals:    sfRows.map((row, i) => ({ id: `SF${i + 1}`, ...getMatch(row) })),
+    final:         [{ id: "Final",              ...getMatch(finRows[0]) }],
     champion,
   };
 }
