@@ -404,31 +404,38 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 md:grid-cols-[1.05fr_0.95fr] md:py-20">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-odcRed/35 bg-odcRed/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-odcCream/85">
-              <Target size={15} /> {status === "live" ? "Live league data" : "Loading league data"}
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-odcGreen/45 bg-odcGreen/15 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-odcCream shadow-green">
+              <span className="h-2 w-2 rounded-full bg-odcGreen shadow-[0_0_10px_#16C46C]" /> Season 4 Registration
             </div>
 
-            <h1 className="text-4xl font-black tracking-tight md:text-7xl">
-              Welcome to the <span className="text-odcRed">ODC.</span>
+            <h1 className="text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
+              Welcome to the <span className="bg-gradient-to-br from-odcGreenBright to-odcGold bg-clip-text text-transparent">Online Darts Circuit</span>, join today
             </h1>
 
-            <p className="mt-5 max-w-2xl text-base leading-8 text-odcCream/70 md:text-lg">
-              The home of competitive online darts. Follow live standings, weekly fixtures, match results, player statistics and season leaderboards across the Online Darts Circuit.
+            <p className="mt-5 max-w-2xl text-base leading-7 text-odcCream/70 md:text-lg">
+              Compete in one of the UK's most competitive online darts leagues. Real fixtures, live stats and weekly glory.
             </p>
 
-            <div className="mt-7 flex flex-wrap gap-3">
-              <button onClick={() => setActive("fixtures")} className="rounded-2xl bg-odcRed px-5 py-3 font-black text-white shadow-glow">
-                Current Fixtures
-              </button>
-              <button onClick={() => setActive("tables")} className="rounded-2xl border border-odcCream/20 px-5 py-3 font-black">
-                View Tables
-              </button>
-              <button onClick={() => setActive("duo")} className="rounded-2xl border border-odcRed/35 bg-odcRed/10 px-5 py-3 font-black text-odcCream">
-                Duo League
+            <p className="mt-3 text-sm font-black tracking-wide text-odcGold">
+              ⭐ {data.players?.length || 56}+ players • {Object.keys(data.tables || {}).length || 7} divisions • Free to join
+            </p>
+
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <a
+                href="https://discord.gg/s4GdKykCe9"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-black text-white shadow-[0_12px_30px_-6px_rgba(88,101,242,0.6)] transition hover:-translate-y-0.5"
+                style={{ background: "linear-gradient(135deg,#5865F2,#4752c4)" }}
+              >
+                <MessageCircle size={20} /> Join the Discord to Sign Up
+              </a>
+              <button onClick={() => setActive("tables")} className="rounded-2xl bg-odcRed px-6 py-4 font-black text-white shadow-glow">
+                View Live Tables
               </button>
             </div>
 
-            <div className="mt-5">
+            <div className="mt-6">
               <SocialButtons />
             </div>
           </motion.div>
@@ -438,13 +445,34 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             animate={{ opacity: 1, scale: 1 }}
             className="relative mx-auto flex w-full max-w-xl items-center justify-center"
           >
-            <div className="absolute h-72 w-72 rounded-full bg-odcRed/10 blur-3xl md:h-96 md:w-96" />
+            <div className="absolute h-72 w-72 rounded-full bg-odcGreen/15 blur-3xl md:h-96 md:w-96" />
             <img
               src="/odc-logo.png"
               alt="ODC logo"
-              className="relative z-10 w-full max-w-[460px] object-contain drop-shadow-[0_0_45px_rgba(229,29,42,0.35)]"
+              className="relative z-10 w-full max-w-[460px] object-contain drop-shadow-[0_0_45px_rgba(22,196,108,0.4)]"
             />
           </motion.div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pt-4">
+        <p className="mb-5 text-center text-xs font-black uppercase tracking-[0.3em] text-odcGreen">◆ How It Works</p>
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            { n: "1", t: "Join our Discord", d: "Tap the button, hop in, say hello" },
+            { n: "2", t: "Get placed in a division", d: "Matched to your skill level" },
+            { n: "3", t: "Play weekly & climb", d: "Fixtures, stats, leaderboards" },
+          ].map((step) => (
+            <div key={step.n} className="flex items-center gap-4 rounded-3xl border border-odcCream/10 bg-white/[0.04] p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-odcGreenBright to-odcGreenDeep text-lg font-black text-odcBlack">
+                {step.n}
+              </div>
+              <div>
+                <p className="font-black">{step.t}</p>
+                <p className="text-sm text-odcCream/55">{step.d}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
