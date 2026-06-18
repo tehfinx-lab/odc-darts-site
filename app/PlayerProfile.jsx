@@ -93,24 +93,24 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
     [matches, player.name]
   );
 
-  const formData = useMemo(() => {
-    // helper: pull a week/date sort key from whatever field the data uses
+  // Sort matches chronologically (oldest -> newest) ONCE, used everywhere.
+  // The API may send newest-first; we don't rely on its order.
+  const chronoMatches = useMemo(() => {
     const weekOf = (m) => {
       const w = m.week ?? m.Week ?? m.round ?? null;
       if (w != null && w !== "") {
         const n = parseFloat(String(w).replace(/[^0-9.]/g, ""));
         if (!isNaN(n)) return n;
       }
-      // fallback to date
       const d = m.date ?? m.Date ?? null;
       if (d) { const t = new Date(d).getTime(); if (!isNaN(t)) return t; }
       return 0;
     };
+    return [...playerMatches].sort((a, b) => weekOf(a) - weekOf(b));
+  }, [playerMatches]);
 
-    // sort a COPY chronologically (oldest -> newest) so the line always reads left=earliest
-    const ordered = [...playerMatches].sort((a, b) => weekOf(a) - weekOf(b));
-
-    return ordered.map((m, i) => {
+  const formData = useMemo(() => {
+    return chronoMatches.map((m, i) => {
       const isHome = m.home === player.name;
       const stats = isHome ? m.p1Stats : m.p2Stats;
       const raw = stats?.avg;
@@ -120,17 +120,17 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
       const wk = m.week ?? m.Week ?? (i + 1);
       return { game: `W${wk}`, avg };
     });
-  }, [playerMatches, player.name]);
+  }, [chronoMatches, player.name]);
 
   const formResults = useMemo(() => {
     const arr = [];
-    playerMatches.forEach((m) => {
+    chronoMatches.forEach((m) => {
       const isHome = m.home === player.name;
       const sc = parseScore(m.score, isHome);
       if (sc) arr.push(sc.for > sc.against ? "W" : sc.for < sc.against ? "L" : "D");
     });
     return arr;
-  }, [playerMatches, player.name]);
+  }, [chronoMatches, player.name]);
 
   const recentForm = formResults.slice(-6);
   const streak = useMemo(() => {
@@ -276,7 +276,7 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
             <div className="mt-8">
               <h4 className="mb-4 text-xl font-black">Recent Matches</h4>
               <div className="grid gap-3 md:grid-cols-2">
-                {playerMatches.slice(-8).reverse().map((m, i) => {
+                {chronoMatches.slice(-8).reverse().map((m, i) => {
                   const isHome = m.home === player.name;
                   const sc = parseScore(m.score, isHome);
                   const won = sc && sc.for > sc.against;
