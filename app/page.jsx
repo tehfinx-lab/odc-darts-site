@@ -397,8 +397,9 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
     <div>
       <NextEventBanner events={data.events} onViewEvents={() => setActive("events")} />
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#123047_0%,#071723_36%,#050505_74%)]" />
-        <div className="absolute -right-20 top-16 h-72 w-72 rounded-full bg-odcRed/20 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_10%,rgba(16,138,80,0.22)_0%,transparent_50%),radial-gradient(circle_at_75%_20%,rgba(229,29,42,0.18)_0%,transparent_55%),radial-gradient(ellipse_at_top,#103048_0%,#0a2030_40%,#040d15_80%)]" />
+        <div className="absolute -right-20 top-16 h-96 w-96 rounded-full bg-odcRed/25 blur-3xl" />
+        <div className="absolute -left-20 top-40 h-80 w-80 rounded-full bg-odcGreen/20 blur-3xl" />
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 md:grid-cols-[1.05fr_0.95fr] md:py-20">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
@@ -1109,7 +1110,7 @@ export default function App() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#102131_0%,#050505_42%,#000_100%)] pb-24 text-odcCream xl:pb-0">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_15%_-5%,rgba(16,138,80,0.18)_0%,transparent_42%),radial-gradient(circle_at_90%_8%,rgba(229,29,42,0.16)_0%,transparent_45%),radial-gradient(circle_at_50%_120%,rgba(232,199,102,0.08)_0%,transparent_50%),linear-gradient(180deg,#0c2435_0%,#071723_36%,#040d15_72%,#020609_100%)] pb-24 text-odcCream xl:pb-0">
       <Header active={active} setActive={setActive} />
 
       {status === "fallback" && (
