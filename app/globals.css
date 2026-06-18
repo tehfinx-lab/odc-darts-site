@@ -12,11 +12,11 @@ html {
 
 body {
   margin: 0;
-  /* layered luxe background: deep navy radial + faint dartboard-tone glows */
+  /* Emerald Lux: rich green radial with gold glow */
   background:
-    radial-gradient(circle at 50% -10%, rgba(16, 138, 80, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 85% 15%, rgba(229, 29, 42, 0.1) 0%, transparent 45%),
-    radial-gradient(circle at 50% 0%, #0c2435 0%, #071723 38%, #040d15 72%, #020609 100%);
+    radial-gradient(circle at 20% 0%, rgba(22, 196, 108, 0.2) 0%, transparent 42%),
+    radial-gradient(circle at 90% 12%, rgba(232, 199, 102, 0.1) 0%, transparent 45%),
+    linear-gradient(175deg, #0a3320 0%, #072818 30%, #04190f 65%, #020d08 100%);
   background-attachment: fixed;
   color: #f8ebc6;
   min-height: 100vh;
@@ -32,7 +32,6 @@ select {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -40,53 +39,31 @@ select {
 
 /* ---------- ANIMATIONS ---------- */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
-.animate-fadeIn {
-  animation: fadeIn 0.6s ease forwards;
-}
+.animate-fadeIn { animation: fadeIn 0.6s ease forwards; }
 
 @keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @keyframes floatY {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
+.animate-float { animation: floatY 5s ease-in-out infinite; }
 
-.animate-float {
-  animation: floatY 5s ease-in-out infinite;
-}
+/* ---------- 3D / LUXURY DEPTH LAYER ---------- */
 
-/* ---------- 3D / LUXURY DEPTH LAYER ----------
-   These enhance existing components WITHOUT needing markup changes.
-   We target the rounded panels (.rounded-3xl) and cards already in the app. */
-
-/* Glassy raised panels — applies to the Card component and modals */
+/* Glassy raised panels */
 .rounded-3xl {
   position: relative;
   background-image: linear-gradient(
     160deg,
-    rgba(248, 235, 198, 0.06) 0%,
-    rgba(248, 235, 198, 0.015) 22%,
+    rgba(22, 196, 108, 0.08) 0%,
+    rgba(248, 235, 198, 0.015) 24%,
     rgba(255, 255, 255, 0) 55%
   );
   box-shadow:
@@ -99,17 +76,16 @@ select {
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
-/* hover lift for interactive panels */
 .rounded-3xl:hover {
   box-shadow:
     0 1px 0 rgba(248, 235, 198, 0.12) inset,
     0 -1px 0 rgba(0, 0, 0, 0.45) inset,
     0 28px 55px -14px rgba(0, 0, 0, 0.75),
     0 8px 20px -6px rgba(0, 0, 0, 0.55),
-    0 0 40px -10px rgba(229, 29, 42, 0.25);
+    0 0 40px -10px rgba(22, 196, 108, 0.3);
 }
 
-/* thin gold top accent line on big panels */
+/* gold top accent line on panels */
 .rounded-3xl::before {
   content: "";
   position: absolute;
@@ -117,72 +93,57 @@ select {
   left: 12%;
   right: 12%;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(232, 199, 102, 0.45),
-    transparent
-  );
-  opacity: 0.7;
+  background: linear-gradient(90deg, transparent, rgba(232, 199, 102, 0.5), transparent);
+  opacity: 0.75;
   pointer-events: none;
 }
 
-/* Red elements get a richer gradient + depth (score pills, buttons, active nav) */
+/* Green elements get a rich gradient + depth (buttons, score pills, active nav) */
 .bg-odcRed {
-  background-image: linear-gradient(180deg, #f23643 0%, #e51d2a 45%, #b01420 100%) !important;
+  background-image: linear-gradient(180deg, #22d97a 0%, #16c46c 50%, #0c8f4c 100%) !important;
+  color: #04190f !important;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.25) inset,
-    0 -2px 6px rgba(0, 0, 0, 0.3) inset,
-    0 8px 22px -8px rgba(229, 29, 42, 0.6);
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 -2px 6px rgba(0, 0, 0, 0.2) inset,
+    0 8px 22px -8px rgba(22, 196, 108, 0.6);
 }
 
-/* Navy surfaces (table headers, selects) get subtle 3D */
+/* keep text white where needed on green buttons */
+.bg-odcRed.text-white { color: #04190f !important; }
+
+/* Navy surfaces -> deep emerald */
 .bg-odcNavy {
-  background-image: linear-gradient(180deg, #0e2839 0%, #071723 100%) !important;
+  background-image: linear-gradient(180deg, #0a3320 0%, #063d24 100%) !important;
   box-shadow: 0 1px 0 rgba(248, 235, 198, 0.05) inset, 0 -1px 0 rgba(0, 0, 0, 0.4) inset;
 }
 
-/* Shimmer utility for loading/accents */
+/* Green accent surfaces */
+.bg-odcGreen {
+  background-image: linear-gradient(180deg, #22d97a 0%, #0c8f4c 100%) !important;
+}
+
+/* Shimmer utility */
 .shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(248, 235, 198, 0) 0%,
-    rgba(248, 235, 198, 0.12) 50%,
-    rgba(248, 235, 198, 0) 100%
-  );
+  background: linear-gradient(90deg, rgba(248, 235, 198, 0) 0%, rgba(248, 235, 198, 0.12) 50%, rgba(248, 235, 198, 0) 100%);
   background-size: 200% 100%;
   animation: shimmer 2.5s infinite;
 }
 
-/* Cream / gold text accent helper */
-.text-gold {
-  color: #e8c766;
-}
+.text-gold { color: #e8c766; }
 
-/* Richer divider */
 .lux-divider {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(232, 199, 102, 0.4), transparent);
 }
 
-/* Make headings feel premium with a subtle cream gradient */
-h1, h2 {
-  background-clip: border-box;
-}
-
-/* Scrollbar (desktop) themed */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: #040d15;
-}
+/* Scrollbar themed */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #020d08; }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #0e2839, #071723);
+  background: linear-gradient(180deg, #0a3320, #063d24);
   border-radius: 6px;
-  border: 2px solid #040d15;
+  border: 2px solid #020d08;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #e51d2a, #b01420);
+  background: linear-gradient(180deg, #22d97a, #0c8f4c);
 }
