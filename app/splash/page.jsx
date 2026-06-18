@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * SPLASH — "CINEMATIC STAGE" (Adidas x Foot Locker "Chile 20" style)
- * Dark spotlit stage, glowing red light column behind the ODC logo,
+ * Dark spotlit stage, glowing emerald light column behind the ODC logo,
  * reflective floor, slow dramatic reveal. Logo is the centrepiece;
  * "Online Darts Circuit" rises in below. Pure CSS/Canvas — fast, robust.
  *
@@ -50,7 +50,7 @@ export default function Splash() {
         const alpha = 0.15 + m.z * 0.35;
         ctx.beginPath();
         ctx.arc(m.x, m.y, size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(229,29,42,${alpha * (0.6 + Math.sin(t * 1.5 + m.x) * 0.4)})`;
+        ctx.fillStyle = `rgba(22,196,108,${alpha * (0.6 + Math.sin(t * 1.5 + m.x) * 0.4)})`;
         ctx.fill();
       });
     };
@@ -76,9 +76,9 @@ export default function Splash() {
       onClick={ready ? enter : undefined}
     >
       {/* deep radial stage background */}
-      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 38%, #1a0608 0%, #0a0203 42%, #000 78%)" }} />
+      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 38%, #06281a 0%, #031309 42%, #010604 78%)" }} />
 
-      {/* glowing red light column behind logo */}
+      {/* glowing emerald light column behind logo */}
       <div className={`column absolute left-1/2 top-0 h-full w-[clamp(140px,18vw,340px)] -translate-x-1/2 transition-opacity duration-1000 ${leaving ? "opacity-0" : ""}`} />
       <div className={`column-core absolute left-1/2 top-0 h-full w-[clamp(40px,5vw,90px)] -translate-x-1/2 transition-opacity duration-1000 ${leaving ? "opacity-0" : ""}`} />
 
@@ -118,13 +118,13 @@ export default function Splash() {
         </div>
 
         {/* thin red underline sweep */}
-        <div className="underline-sweep mt-5 h-[2px] bg-gradient-to-r from-transparent via-[#e51d2a] to-transparent" />
+        <div className="underline-sweep mt-5 h-[2px] bg-gradient-to-r from-transparent via-[#16C46C] to-transparent" />
 
         {/* enter prompt */}
         {ready && !leaving && (
           <button
             onClick={enter}
-            className="enter-btn mt-[clamp(28px,5vh,56px)] rounded-full border border-[#e51d2a]/60 bg-[#e51d2a]/10 px-10 py-4 text-[12px] font-black uppercase tracking-[0.3em] text-odcCream backdrop-blur-sm transition hover:bg-[#e51d2a] hover:text-white"
+            className="enter-btn mt-[clamp(28px,5vh,56px)] rounded-full border border-[#16C46C]/60 bg-[#16C46C]/10 px-10 py-4 text-[12px] font-black uppercase tracking-[0.3em] text-odcCream backdrop-blur-sm transition hover:bg-[#16C46C] hover:text-odcBlack"
           >
             Enter the Circuit
           </button>
@@ -137,13 +137,13 @@ export default function Splash() {
 
         /* Red glow column behind logo */
         .column {
-          background: linear-gradient(to bottom, transparent 0%, rgba(229,29,42,0.0) 8%, rgba(229,29,42,0.45) 35%, rgba(229,29,42,0.55) 50%, rgba(229,29,42,0.45) 65%, transparent 95%);
+          background: linear-gradient(to bottom, transparent 0%, rgba(22,196,108,0.0) 8%, rgba(22,196,108,0.45) 35%, rgba(22,196,108,0.55) 50%, rgba(22,196,108,0.45) 65%, transparent 95%);
           filter: blur(28px);
           opacity: 0;
           animation: columnIn 1.6s 0.2s forwards, columnPulse 4s 1.8s ease-in-out infinite;
         }
         .column-core {
-          background: linear-gradient(to bottom, transparent 10%, rgba(255,200,190,0.5) 45%, rgba(255,220,210,0.6) 50%, rgba(255,200,190,0.5) 55%, transparent 90%);
+          background: linear-gradient(to bottom, transparent 10%, rgba(232,199,102,0.5) 45%, rgba(245,225,160,0.65) 50%, rgba(232,199,102,0.5) 55%, transparent 90%);
           filter: blur(12px);
           opacity: 0;
           animation: columnIn 1.6s 0.3s forwards, columnPulse 4s 1.8s ease-in-out infinite;
@@ -155,7 +155,7 @@ export default function Splash() {
         /* Spotlight cone */
         .spotlight {
           width: 70vw; height: 75vh;
-          background: radial-gradient(ellipse 50% 60% at 50% 0%, rgba(255,240,225,0.18), transparent 70%);
+          background: radial-gradient(ellipse 50% 60% at 50% 0%, rgba(220,245,225,0.18), transparent 70%);
           opacity: 0;
           animation: spotIn 1.4s 0.1s forwards;
         }
@@ -164,7 +164,7 @@ export default function Splash() {
         /* Logo reveal: rise + scale + glow */
         .logo {
           opacity: 0;
-          filter: drop-shadow(0 0 0px rgba(229,29,42,0));
+          filter: drop-shadow(0 0 0px rgba(22,196,108,0));
           animation: logoIn 1.4s 0.5s cubic-bezier(.2,.8,.2,1) forwards, logoFloat 6s 1.9s ease-in-out infinite, logoGlow 4s 1.9s ease-in-out infinite;
         }
         @keyframes logoIn {
@@ -173,8 +173,8 @@ export default function Splash() {
         }
         @keyframes logoFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
         @keyframes logoGlow {
-          0%,100% { filter: drop-shadow(0 0 30px rgba(229,29,42,0.35)); }
-          50% { filter: drop-shadow(0 0 55px rgba(229,29,42,0.55)); }
+          0%,100% { filter: drop-shadow(0 0 30px rgba(22,196,108,0.4)); }
+          50% { filter: drop-shadow(0 0 55px rgba(22,196,108,0.6)); }
         }
 
         /* Floor reflection */
@@ -204,7 +204,7 @@ export default function Splash() {
         /* enter button */
         .enter-btn { opacity: 0; animation: btnIn 0.6s forwards, btnPulse 2.5s 0.6s ease-in-out infinite; }
         @keyframes btnIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes btnPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(229,29,42,0.4); } 50% { box-shadow: 0 0 34px 2px rgba(229,29,42,0.3); } }
+        @keyframes btnPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(22,196,108,0.4); } 50% { box-shadow: 0 0 34px 2px rgba(22,196,108,0.3); } }
 
         @media (prefers-reduced-motion: reduce) {
           * { animation-duration: 0.01ms !important; }
