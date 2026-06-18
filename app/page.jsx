@@ -397,9 +397,10 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
     <div>
       <NextEventBanner events={data.events} onViewEvents={() => setActive("events")} />
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_10%,rgba(16,138,80,0.22)_0%,transparent_50%),radial-gradient(circle_at_75%_20%,rgba(229,29,42,0.18)_0%,transparent_55%),radial-gradient(ellipse_at_top,#103048_0%,#0a2030_40%,#040d15_80%)]" />
-        <div className="absolute -right-20 top-16 h-96 w-96 rounded-full bg-odcRed/25 blur-3xl" />
-        <div className="absolute -left-20 top-40 h-80 w-80 rounded-full bg-odcGreen/20 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_8%,rgba(22,196,108,0.25)_0%,transparent_50%),radial-gradient(circle_at_80%_18%,rgba(232,199,102,0.14)_0%,transparent_55%),radial-gradient(ellipse_at_top,#0a3a23_0%,#072818_45%,#04190f_85%)]" />
+        <img src="/odc-logo.png" alt="" aria-hidden="true" className="pointer-events-none absolute -right-16 -top-8 w-[340px] opacity-[0.06] select-none" />
+        <div className="absolute -left-20 top-16 h-96 w-96 rounded-full bg-odcGreen/30 blur-3xl" />
+        <div className="absolute -right-20 top-40 h-80 w-80 rounded-full bg-odcGold/15 blur-3xl" />
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 md:grid-cols-[1.05fr_0.95fr] md:py-20">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
@@ -455,6 +456,28 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
           <SmallStat label="Updates" value={status === "live" ? "Live" : "Demo"} icon={Zap} />
         </div>
       </section>
+
+      {data.results && data.results.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 pt-2">
+          <p className="mb-3 text-xs font-black uppercase tracking-[0.3em] text-odcGold">◆ Match of the Week</p>
+          <button onClick={() => onSelectMatch(data.results[0])} className="block w-full text-left">
+            <div className="relative overflow-hidden rounded-3xl border border-odcGreen/30 bg-gradient-to-br from-odcGreen/15 to-odcNavy/40 p-6 shadow-glow transition hover:-translate-y-1">
+              <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-odcGold">
+                {data.results[0].division || "Featured"}{data.results[0].week ? ` • Week ${data.results[0].week}` : ""}
+              </p>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                <p className="text-xl font-black md:text-2xl">{data.results[0].home}</p>
+                <p className="rounded-2xl bg-odcGreen px-5 py-2 text-2xl font-black text-odcBlack shadow-green">{data.results[0].score}</p>
+                <p className="text-right text-xl font-black md:text-2xl">{data.results[0].away}</p>
+              </div>
+              <div className="mt-4 flex justify-between border-t border-odcCream/10 pt-4 text-sm text-odcCream/60">
+                <span>{data.results[0].p1Stats?.avg || "-"} avg{data.results[0].p1Stats?.tons ? ` • ${data.results[0].p1Stats.tons}×180` : ""}</span>
+                <span>{data.results[0].p2Stats?.avg || "-"} avg</span>
+              </div>
+            </div>
+          </button>
+        </section>
+      )}
 
       <section className="mx-auto max-w-7xl px-4 py-10">
         <SectionTitle
@@ -1110,7 +1133,7 @@ export default function App() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_15%_-5%,rgba(16,138,80,0.18)_0%,transparent_42%),radial-gradient(circle_at_90%_8%,rgba(229,29,42,0.16)_0%,transparent_45%),radial-gradient(circle_at_50%_120%,rgba(232,199,102,0.08)_0%,transparent_50%),linear-gradient(180deg,#0c2435_0%,#071723_36%,#040d15_72%,#020609_100%)] pb-24 text-odcCream xl:pb-0">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(22,196,108,0.2)_0%,transparent_42%),radial-gradient(circle_at_90%_12%,rgba(232,199,102,0.1)_0%,transparent_45%),linear-gradient(175deg,#0a3320_0%,#072818_30%,#04190f_65%,#020d08_100%)] pb-24 text-odcCream xl:pb-0">
       <Header active={active} setActive={setActive} />
 
       {status === "fallback" && (
