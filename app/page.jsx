@@ -27,6 +27,9 @@ import {
 } from "lucide-react";
 import { fallbackData, getLiveLeagueData } from "../lib/sheetData";
 import { CountUp, AnimatedStatValue, Reveal, StaggerRows, Row } from "./motion";
+import { downloadResultCard, shareResultCard } from "./shareCard";
+import PlayerProfile from "./PlayerProfile";
+import NextEventBanner from "./NextEventBanner";
 
 const pages = [
   { id: "home", label: "Home", icon: Home },
@@ -248,9 +251,14 @@ function MatchDetailsModal({ match, onClose }) {
               {match.date || "No date"} {match.week ? `• Week ${match.week}` : ""}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-2xl bg-white/10 p-3">
-            <X />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => shareResultCard(match)} className="rounded-2xl bg-odcRed/90 p-3 text-white transition hover:bg-odcRed" title="Share result card">
+              <Share2 size={18} />
+            </button>
+            <button onClick={onClose} className="rounded-2xl bg-white/10 p-3">
+              <X />
+            </button>
+          </div>
         </div>
 
         <div className="mb-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-3xl bg-odcNavy p-5">
@@ -288,22 +296,31 @@ function ResultCards({ results, onSelectMatch }) {
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {results.map((r, index) => (
-        <button key={r.id || `${r.home}-${r.away}-${index}`} onClick={() => onSelectMatch(r)} className="text-left">
-          <Card className="h-full transition hover:-translate-y-1 hover:border-odcRed/40">
-            <p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{r.division || "Match Result"}</p>
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-              <p className="font-black">{r.home}</p>
-              <p className="rounded-xl bg-odcRed px-3 py-1 text-lg font-black text-white">{r.score}</p>
-              <p className="text-right font-black">{r.away}</p>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-odcCream/60">
-              <span>{r.home}: {r.p1Stats?.avg || "-"} avg</span>
-              <span className="text-right">{r.away}: {r.p2Stats?.avg || "-"} avg</span>
-              <span>{r.home}: {r.p1Stats?.highCheckout || 0} C/O</span>
-              <span className="text-right">{r.away}: {r.p2Stats?.highCheckout || 0} C/O</span>
-            </div>
-          </Card>
-        </button>
+        <div key={r.id || `${r.home}-${r.away}-${index}`} className="relative">
+          <button
+            onClick={(e) => { e.stopPropagation(); shareResultCard(r); }}
+            className="absolute right-3 top-3 z-10 rounded-xl bg-white/10 p-2 text-odcCream/70 backdrop-blur transition hover:bg-odcRed hover:text-white"
+            title="Share result card"
+          >
+            <Share2 size={15} />
+          </button>
+          <button onClick={() => onSelectMatch(r)} className="block w-full text-left">
+            <Card className="h-full transition hover:-translate-y-1 hover:border-odcRed/40">
+              <p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{r.division || "Match Result"}</p>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <p className="font-black">{r.home}</p>
+                <p className="rounded-xl bg-odcRed px-3 py-1 text-lg font-black text-white">{r.score}</p>
+                <p className="text-right font-black">{r.away}</p>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-odcCream/60">
+                <span>{r.home}: {r.p1Stats?.avg || "-"} avg</span>
+                <span className="text-right">{r.away}: {r.p2Stats?.avg || "-"} avg</span>
+                <span>{r.home}: {r.p1Stats?.highCheckout || 0} C/O</span>
+                <span className="text-right">{r.away}: {r.p2Stats?.highCheckout || 0} C/O</span>
+              </div>
+            </Card>
+          </button>
+        </div>
       ))}
     </div>
   );
@@ -378,6 +395,7 @@ function PlayerDetailsModal({ player, masterStats, matches, onClose }) {
 function HomePage({ setActive, data, status, onSelectMatch }) {
   return (
     <div>
+      <NextEventBanner events={data.events} onViewEvents={() => setActive("events")} />
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#123047_0%,#071723_36%,#050505_74%)]" />
         <div className="absolute -right-20 top-16 h-72 w-72 rounded-full bg-odcRed/20 blur-3xl" />
@@ -1118,7 +1136,7 @@ export default function App() {
 
       <BottomNav active={active} setActive={setActive} />
       <MatchDetailsModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
-      <PlayerDetailsModal
+      <PlayerProfile
         player={selectedPlayer}
         masterStats={data.masterStats || {}}
         matches={data.allResults || []}
