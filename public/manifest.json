@@ -2,11 +2,11 @@
   "name": "ODC — Online Darts Circuit",
   "short_name": "ODC",
   "description": "The home of competitive online darts. Live tables, fixtures, results, player stats and leaderboards.",
-  "start_url": "/?from=pwa",
+  "start_url": "/splash?from=pwa",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#050506",
-  "theme_color": "#e51d2a",
+  "background_color": "#020d08",
+  "theme_color": "#16C46C",
   "categories": ["sports"],
   "icons": [
     {
