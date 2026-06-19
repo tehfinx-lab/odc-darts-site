@@ -28,6 +28,8 @@ import {
 import { fallbackData, getLiveLeagueData } from "../lib/sheetData";
 import { CountUp, AnimatedStatValue, Reveal, StaggerRows, Row } from "./motion";
 import { downloadResultCard, shareResultCard } from "./shareCard";
+import Predictions from "./Predictions";
+import { Crosshair } from "lucide-react";
 import PlayerProfile from "./PlayerProfile";
 import NextEventBanner from "./NextEventBanner";
 
@@ -39,9 +41,13 @@ const pages = [
   { id: "duo", label: "Duo League", icon: Trophy },
   { id: "players", label: "Players", icon: Users },
   { id: "leaderboards", label: "Leaders", icon: BarChart3 },
+  { id: "predictions", label: "Predict", icon: Crosshair },
   { id: "mvps", label: "MVPs", icon: Award },
   { id: "events", label: "Events", icon: CalendarDays },
 ];
+
+// ⬇️ PASTE YOUR GOOGLE APPS SCRIPT WEB-APP URL HERE (the one ending in /exec)
+const PREDICTIONS_SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
 
 const socials = [
   { label: "Discord", href: "https://discord.gg/s4GdKykCe9", icon: MessageCircle },
@@ -191,7 +197,7 @@ function Header({ active, setActive }) {
 }
 
 function BottomNav({ active, setActive }) {
-  const mobilePages = pages.filter((p) => ["home", "fixtures", "results", "tables", "players"].includes(p.id));
+  const mobilePages = pages.filter((p) => ["home", "tables", "predictions", "results", "players"].includes(p.id));
 
   const go = (id) => {
     setActive(id);
@@ -1178,6 +1184,7 @@ export default function App() {
         {active === "duo"          && <DuoLeaguePage data={data} />}
         {active === "players"      && <PlayersPage data={data} onSelectPlayer={setSelectedPlayer} />}
         {active === "leaderboards" && <LeaderboardsPage data={data} />}
+        {active === "predictions"  && <Predictions data={data} scriptUrl={PREDICTIONS_SCRIPT_URL} />}
         {active === "mvps"         && <MvpsPage data={data} />}
         {active === "events"       && <EventsPage data={data} />}
       </motion.div>
