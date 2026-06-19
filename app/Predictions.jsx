@@ -170,15 +170,21 @@ export default function Predictions({ data, scriptUrl }) {
 
     setSubmitting(true);
     try {
-      await fetch(scriptUrl, {
+      const res = await fetch("/api/predictions", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           player: playerName,
           week: `Week ${currentWeek}`,
           picks: toSend,
         }),
       });
-      setSubmitted(true);
+      const out = await res.json();
+      if (out.ok) {
+        setSubmitted(true);
+      } else {
+        alert("Could not save: " + (out.error || "unknown error"));
+      }
     } catch (e) {
       alert("Could not submit — check your connection and try again.");
     }
@@ -186,17 +192,24 @@ export default function Predictions({ data, scriptUrl }) {
   }
 
   // ---- Leaderboard: fetch predictions, score them ----
+  const [lbError, setLbError] = useState("");
+
   useEffect(() => {
-    if (tab !== "leaderboard" || !scriptUrl) return;
+    if (tab !== "leaderboard") return;
     setLoadingLb(true);
-    fetch(scriptUrl)
+    setLbError("");
+    fetch("/api/predictions")
       .then((r) => r.json())
       .then((d) => {
-        if (d.ok) setPredictions(d.predictions || []);
+        if (d.ok) {
+          setPredictions(d.predictions || []);
+        } else {
+          setLbError(d.error || "Could not load predictions");
+        }
       })
-      .catch(() => {})
+      .catch((e) => setLbError(String(e)))
       .finally(() => setLoadingLb(false));
-  }, [tab, scriptUrl]);
+  }, [tab]);
 
   // weeks that exist in predictions
   const predWeeks = useMemo(() => {
@@ -209,16 +222,18 @@ export default function Predictions({ data, scriptUrl }) {
 
   // Build leaderboard for the selected week (or "Season")
   const leaderboard = useMemo(() => {
+    const wkOf = (s) => Number(String(s).replace(/\D/g, ""));
     const scope =
       activeLbWeek === "Season"
         ? predictions
-        : predictions.filter((p) => p.week === activeLbWeek);
+        : predictions.filter((p) => wkOf(p.week) === wkOf(activeLbWeek));
 
     const totals = {};
     scope.forEach((p) => {
-      const wkNum = Number(String(p.week).replace(/\D/g, ""));
+      const wkNum = wkOf(p.week);
       const actual = resultMap[`${p.home}|${p.away}|${wkNum}`.toLowerCase()];
       const pts = scorePick(p, actual);
+      // Ensure every predictor appears, even on 0 points
       totals[p.player] = (totals[p.player] || 0) + pts;
     });
 
@@ -426,6 +441,12 @@ export default function Predictions({ data, scriptUrl }) {
           </div>
 
           {loadingLb && <p className="py-8 text-center text-sm text-odcCream/60">Loading leaderboard…</p>}
+
+          {!loadingLb && lbError && (
+            <p className="rounded-2xl border border-odcRed/30 bg-odcRed/10 p-4 text-center text-sm text-odcCream/80">
+              Couldn't load predictions. Try again shortly.
+            </p>
+          )}
 
           {!loadingLb && leaderboard.length === 0 && (
             <p className="rounded-2xl border border-odcGold/15 bg-white/[0.03] p-6 text-center text-sm text-odcCream/60">
