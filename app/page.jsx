@@ -30,6 +30,10 @@ import { CountUp, AnimatedStatValue, Reveal, StaggerRows, Row } from "./motion";
 import { downloadResultCard, shareResultCard } from "./shareCard";
 import Predictions from "./Predictions";
 import { Crosshair } from "lucide-react";
+
+function playerSlug(name) {
+  return String(name).toLowerCase().trim().replace(/\s+/g, "-");
+}
 import PlayerProfile from "./PlayerProfile";
 import NextEventBanner from "./NextEventBanner";
 
@@ -47,7 +51,7 @@ const pages = [
 ];
 
 // ⬇️ PASTE YOUR GOOGLE APPS SCRIPT WEB-APP URL HERE (the one ending in /exec)
-const PREDICTIONS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwgYMa3bXTQZIzuCp4fNyVwm46QvXqk72gY5UiK9pNd1ZonxWlB7i9-vUtMBR1rMbH7Ng/exec";
+const PREDICTIONS_SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
 
 const socials = [
   { label: "Discord", href: "https://discord.gg/s4GdKykCe9", icon: MessageCircle },
@@ -878,24 +882,32 @@ function PlayersPage({ data, onSelectPlayer }) {
 
       <div className="grid gap-4 md:grid-cols-3">
         {filtered.map((p) => (
-          <button key={`${p.division}-${p.name}`} type="button" onClick={() => onSelectPlayer(p)} className="block text-left">
-            <Card className="h-full cursor-pointer transition hover:-translate-y-1 hover:border-odcRed/40">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-xl font-black">{p.name}</h3>
-                  <p className="text-sm text-odcCream/50">{p.division}</p>
+          <div key={`${p.division}-${p.name}`} className="relative">
+            <button type="button" onClick={() => onSelectPlayer(p)} className="block w-full text-left">
+              <Card className="h-full cursor-pointer transition hover:-translate-y-1 hover:border-odcGreen/40">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-xl font-black">{p.name}</h3>
+                    <p className="text-sm text-odcCream/50">{p.division}</p>
+                  </div>
+                  <Target className="text-odcGreen" />
                 </div>
-                <Target className="text-odcRed" />
-              </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <SmallStat label="Avg" value={p.avg} />
-                <SmallStat label="180s" value={p.tons} />
-                <SmallStat label="High C/O" value={p.highCheckout || p.checkout} />
-                <SmallStat label="Best Leg" value={p.bestLeg || "-"} />
-              </div>
-            </Card>
-          </button>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <SmallStat label="Avg" value={p.avg} />
+                  <SmallStat label="180s" value={p.tons} />
+                  <SmallStat label="High C/O" value={p.highCheckout || p.checkout} />
+                  <SmallStat label="Best Leg" value={p.bestLeg || "-"} />
+                </div>
+              </Card>
+            </button>
+            <a
+              href={`/player/${playerSlug(p.name)}`}
+              className="absolute bottom-4 right-4 inline-flex items-center gap-1.5 rounded-xl border border-odcGold/30 bg-odcBlack/60 px-3 py-2 text-xs font-black text-odcGold transition hover:bg-odcGold hover:text-odcBlack"
+            >
+              ↗ Share Card
+            </a>
+          </div>
         ))}
       </div>
     </section>
