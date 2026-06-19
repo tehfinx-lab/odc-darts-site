@@ -1,0 +1,438 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+
+/**
+ * ODC Predictions — Predict tab + Leaderboard tab
+ *
+ * Props:
+ *   data       - your league data object (needs data.fixtures, data.results, data.players)
+ *   scriptUrl  - your Google Apps Script web-app URL (the /exec one)
+ *
+ * Scoring: 5 pts correct winner (or correct draw) + 5 pts exact score.
+ */
+
+const WINNER_PTS = 5;
+const EXACT_PTS = 5;
+
+function initials(name = "") {
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function avatarColor(name = "") {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return h;
+}
+
+// Decide the outcome of a match: "home" | "away" | "draw"
+function outcome(h, a) {
+  if (h > a) return "home";
+  if (a > h) return "away";
+  return "draw";
+}
+
+// Score one prediction against an actual result
+function scorePick(pred, actual) {
+  if (!actual) return 0;
+  let pts = 0;
+  const predOut = outcome(pred.homeScore, pred.awayScore);
+  const actOut = outcome(actual.homeScore, actual.awayScore);
+  if (predOut === actOut) pts += WINNER_PTS;
+  if (
+    Number(pred.homeScore) === Number(actual.homeScore) &&
+    Number(pred.awayScore) === Number(actual.awayScore)
+  )
+    pts += EXACT_PTS;
+  return pts;
+}
+
+export default function Predictions({ data, scriptUrl }) {
+  const [tab, setTab] = useState("predict");
+  const [playerName, setPlayerName] = useState("");
+  const [picks, setPicks] = useState({}); // key -> {homeScore, awayScore}
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [predictions, setPredictions] = useState([]); // all predictions from sheet
+  const [loadingLb, setLoadingLb] = useState(false);
+  const [lbWeek, setLbWeek] = useState(null);
+
+  // ---- Determine current week + upcoming fixtures ----
+  // Your fixtures come grouped by division: { "Div 1": [...], ... } — flatten to a list
+  const fixtures = useMemo(() => {
+    const f = data?.fixtures;
+    if (!f) return [];
+    if (Array.isArray(f)) return f;
+    return Object.values(f).flat();
+  }, [data]);
+  const results = data?.results || [];
+  const players = data?.players || [];
+
+  // Build a lookup of posted results by home|away|week for locking + scoring
+  const resultMap = useMemo(() => {
+    const m = {};
+    results.forEach((r) => {
+      const key = `${r.home}|${r.away}|${r.week}`.toLowerCase();
+      const parts = String(r.score).split("-").map((x) => Number(x.trim()));
+      m[key] = { homeScore: parts[0], awayScore: parts[1] };
+    });
+    return m;
+  }, [results]);
+
+  // The week to predict = the lowest week that still has unplayed fixtures
+  const currentWeek = useMemo(() => {
+    const weeks = [...new Set(fixtures.map((f) => Number(f.week)))].sort((a, b) => a - b);
+    for (const w of weeks) {
+      const wkFix = fixtures.filter((f) => Number(f.week) === w);
+      const anyOpen = wkFix.some(
+        (f) => !resultMap[`${f.home}|${f.away}|${w}`.toLowerCase()]
+      );
+      if (anyOpen) return w;
+    }
+    return weeks[weeks.length - 1] || 1;
+  }, [fixtures, resultMap]);
+
+  const weekFixtures = useMemo(
+    () => fixtures.filter((f) => Number(f.week) === Number(currentWeek)),
+    [fixtures, currentWeek]
+  );
+
+  function fixKey(f) {
+    return `${f.home}|${f.away}|${currentWeek}`.toLowerCase();
+  }
+  function isLocked(f) {
+    return !!resultMap[fixKey(f)];
+  }
+
+  function setScore(key, side, val) {
+    const v = val === "" ? "" : Math.max(0, Math.min(20, Number(val)));
+    setPicks((p) => ({ ...p, [key]: { ...p[key], [side]: v } }));
+    setSubmitted(false);
+  }
+
+  const openFixtures = weekFixtures.filter((f) => !isLocked(f));
+  const filledCount = openFixtures.filter((f) => {
+    const p = picks[fixKey(f)];
+    return p && p.homeScore !== "" && p.homeScore != null && p.awayScore !== "" && p.awayScore != null;
+  }).length;
+
+  async function submit() {
+    if (!playerName) {
+      alert("Pick your name first");
+      return;
+    }
+    const toSend = openFixtures
+      .map((f) => {
+        const p = picks[fixKey(f)];
+        if (!p || p.homeScore === "" || p.homeScore == null || p.awayScore === "" || p.awayScore == null)
+          return null;
+        return {
+          home: f.home,
+          away: f.away,
+          division: f.division,
+          homeScore: p.homeScore,
+          awayScore: p.awayScore,
+        };
+      })
+      .filter(Boolean);
+
+    if (!toSend.length) {
+      alert("Make at least one prediction first");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await fetch(scriptUrl, {
+        method: "POST",
+        body: JSON.stringify({
+          player: playerName,
+          week: `Week ${currentWeek}`,
+          picks: toSend,
+        }),
+      });
+      setSubmitted(true);
+    } catch (e) {
+      alert("Could not submit — check your connection and try again.");
+    }
+    setSubmitting(false);
+  }
+
+  // ---- Leaderboard: fetch predictions, score them ----
+  useEffect(() => {
+    if (tab !== "leaderboard" || !scriptUrl) return;
+    setLoadingLb(true);
+    fetch(scriptUrl)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setPredictions(d.predictions || []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingLb(false));
+  }, [tab, scriptUrl]);
+
+  // weeks that exist in predictions
+  const predWeeks = useMemo(() => {
+    const ws = [...new Set(predictions.map((p) => p.week))];
+    ws.sort((a, b) => Number(String(b).replace(/\D/g, "")) - Number(String(a).replace(/\D/g, "")));
+    return ws;
+  }, [predictions]);
+
+  const activeLbWeek = lbWeek || predWeeks[0] || null;
+
+  // Build leaderboard for the selected week (or "Season")
+  const leaderboard = useMemo(() => {
+    const scope =
+      activeLbWeek === "Season"
+        ? predictions
+        : predictions.filter((p) => p.week === activeLbWeek);
+
+    const totals = {};
+    scope.forEach((p) => {
+      const wkNum = Number(String(p.week).replace(/\D/g, ""));
+      const actual = resultMap[`${p.home}|${p.away}|${wkNum}`.toLowerCase()];
+      const pts = scorePick(p, actual);
+      totals[p.player] = (totals[p.player] || 0) + pts;
+    });
+
+    return Object.entries(totals)
+      .map(([player, pts]) => ({ player, pts }))
+      .sort((a, b) => b.pts - a.pts);
+  }, [predictions, activeLbWeek, resultMap]);
+
+  // =================== RENDER ===================
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-6">
+      <p className="text-xs font-black uppercase tracking-[0.3em] text-odcGreen">Predictions Game</p>
+      <h2 className="mt-1 text-3xl font-black md:text-4xl">
+        {tab === "predict" ? `Predict Week ${currentWeek}` : "Leaderboard"}
+      </h2>
+      <p className="mt-2 text-sm text-odcCream/60">
+        {WINNER_PTS} pts correct winner · +{EXACT_PTS} pts exact score. Locks when results post.
+      </p>
+
+      {/* Tabs */}
+      <div className="mt-5 flex gap-2">
+        <button
+          onClick={() => setTab("predict")}
+          className={`flex-1 rounded-2xl px-4 py-3 text-sm font-black transition ${
+            tab === "predict"
+              ? "bg-odcGreen text-odcBlack shadow-green"
+              : "border border-odcGold/20 bg-white/[0.03] text-odcCream/60"
+          }`}
+        >
+          Predict
+        </button>
+        <button
+          onClick={() => setTab("leaderboard")}
+          className={`flex-1 rounded-2xl px-4 py-3 text-sm font-black transition ${
+            tab === "leaderboard"
+              ? "bg-odcGreen text-odcBlack shadow-green"
+              : "border border-odcGold/20 bg-white/[0.03] text-odcCream/60"
+          }`}
+        >
+          Leaderboard
+        </button>
+      </div>
+
+      {/* ---------- PREDICT TAB ---------- */}
+      {tab === "predict" && (
+        <div className="mt-5">
+          {/* Name dropdown */}
+          <div className="rounded-3xl border border-odcGold/25 bg-gradient-to-br from-odcGreen/10 to-transparent p-4">
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-odcGold">Playing as</p>
+            <select
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full rounded-xl border border-odcGold/30 bg-odcBlack/60 px-4 py-3 text-base font-black text-odcCream outline-none"
+            >
+              <option value="">Select your name…</option>
+              {players
+                .map((p) => (typeof p === "string" ? p : p.name))
+                .filter(Boolean)
+                .sort((a, b) => a.localeCompare(b))
+                .map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div className="mb-3 mt-5 flex items-center justify-between">
+            <span className="text-sm font-black">Week {currentWeek} Fixtures</span>
+            <span className="text-xs text-odcCream/55">{filledCount}/{openFixtures.length} predicted</span>
+          </div>
+
+          {weekFixtures.length === 0 && (
+            <p className="rounded-2xl border border-odcGold/15 bg-white/[0.03] p-6 text-center text-sm text-odcCream/60">
+              No fixtures found for this week yet. Check back soon.
+            </p>
+          )}
+
+          {weekFixtures.map((f, i) => {
+            const key = fixKey(f);
+            const locked = isLocked(f);
+            const p = picks[key] || {};
+            const actual = resultMap[key];
+            return (
+              <div
+                key={i}
+                className={`mb-3 rounded-3xl border border-odcGold/15 bg-gradient-to-br from-odcGreen/[0.07] to-transparent p-4 ${
+                  locked ? "opacity-60" : ""
+                }`}
+              >
+                {locked && (
+                  <span className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-odcGold/12 px-2.5 py-1 text-[9px] font-black text-odcGold">
+                    🔒 Locked · result posted
+                  </span>
+                )}
+                <p className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-odcCream/40">
+                  {f.division}
+                </p>
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <span className="text-sm font-black">{f.home}</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      disabled={locked}
+                      value={locked ? actual?.homeScore ?? "" : p.homeScore ?? ""}
+                      onChange={(e) => setScore(key, "homeScore", e.target.value)}
+                      placeholder="–"
+                      className={`h-11 w-11 rounded-xl border text-center text-lg font-black outline-none ${
+                        (locked ? actual?.homeScore != null : p.homeScore !== "" && p.homeScore != null)
+                          ? "border-transparent bg-odcGreen text-odcBlack"
+                          : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
+                      }`}
+                    />
+                    <span className="text-xs font-black text-odcCream/40">–</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      disabled={locked}
+                      value={locked ? actual?.awayScore ?? "" : p.awayScore ?? ""}
+                      onChange={(e) => setScore(key, "awayScore", e.target.value)}
+                      placeholder="–"
+                      className={`h-11 w-11 rounded-xl border text-center text-lg font-black outline-none ${
+                        (locked ? actual?.awayScore != null : p.awayScore !== "" && p.awayScore != null)
+                          ? "border-transparent bg-odcGreen text-odcBlack"
+                          : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-right text-sm font-black">{f.away}</span>
+                </div>
+              </div>
+            );
+          })}
+
+          {openFixtures.length > 0 && (
+            <button
+              onClick={submit}
+              disabled={submitting}
+              className="mt-2 w-full rounded-2xl bg-odcGreen px-6 py-4 text-base font-black text-odcBlack shadow-glow transition disabled:opacity-60"
+            >
+              {submitting ? "Submitting…" : submitted ? "✓ Predictions Saved!" : "Submit My Predictions"}
+            </button>
+          )}
+          {submitted && (
+            <p className="mt-3 text-center text-sm font-black text-odcGreen">
+              Saved! Come back after results post to see your points.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ---------- LEADERBOARD TAB ---------- */}
+      {tab === "leaderboard" && (
+        <div className="mt-5">
+          {/* Week pills */}
+          <div className="no-scrollbar mb-5 flex gap-2 overflow-x-auto">
+            {[...predWeeks, "Season"].map((w) => (
+              <button
+                key={w}
+                onClick={() => setLbWeek(w)}
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-black transition ${
+                  activeLbWeek === w
+                    ? "border border-odcGold/40 bg-odcGold/15 text-odcGold"
+                    : "border border-odcGold/20 bg-white/[0.03] text-odcCream/60"
+                }`}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+
+          {loadingLb && <p className="py-8 text-center text-sm text-odcCream/60">Loading leaderboard…</p>}
+
+          {!loadingLb && leaderboard.length === 0 && (
+            <p className="rounded-2xl border border-odcGold/15 bg-white/[0.03] p-6 text-center text-sm text-odcCream/60">
+              No scored predictions yet. Once results are posted, points appear here.
+            </p>
+          )}
+
+          {/* Podium */}
+          {!loadingLb && leaderboard.length >= 3 && (
+            <div className="mb-4 flex items-end justify-center gap-3">
+              {[1, 0, 2].map((idx, pos) => {
+                const entry = leaderboard[idx];
+                const isFirst = idx === 0;
+                return (
+                  <div key={idx} className="flex-1 text-center">
+                    <p className="mb-1 text-[10px] font-black text-odcCream/40">
+                      {idx === 0 ? "1st" : idx === 1 ? "2nd" : "3rd"}
+                    </p>
+                    <div
+                      className={`mx-auto mb-2 flex items-center justify-center rounded-2xl font-black text-odcBlack ${
+                        isFirst ? "h-16 w-16 shadow-gold" : "h-14 w-14"
+                      }`}
+                      style={{
+                        background: isFirst
+                          ? "linear-gradient(135deg,#E8C766,#a8852f)"
+                          : "linear-gradient(135deg,#22d97a,#0c8f4c)",
+                      }}
+                    >
+                      {initials(entry.player)}
+                    </div>
+                    <p className="text-sm font-black">{entry.player}</p>
+                    <p className="text-xs font-black text-odcGold">{entry.pts} pts</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Rows 4+ */}
+          {!loadingLb &&
+            leaderboard.slice(leaderboard.length >= 3 ? 3 : 0).map((entry, i) => {
+              const rank = (leaderboard.length >= 3 ? 3 : 0) + i + 1;
+              return (
+                <div
+                  key={entry.player}
+                  className="mb-2 flex items-center gap-4 rounded-2xl border border-odcGold/14 bg-gradient-to-br from-odcGreen/[0.06] to-transparent px-4 py-3"
+                >
+                  <span className="w-6 text-base font-black text-odcGreen">{rank}</span>
+                  <div
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black text-odcBlack"
+                    style={{ background: "linear-gradient(135deg,#22d97a,#0c8f4c)" }}
+                  >
+                    {initials(entry.player)}
+                  </div>
+                  <span className="flex-1 text-base font-black">{entry.player}</span>
+                  <span className="text-lg font-black text-odcGold">
+                    {entry.pts}
+                    <span className="text-[10px] text-odcCream/40"> pts</span>
+                  </span>
+                </div>
+              );
+            })}
+        </div>
+      )}
+    </div>
+  );
+}
