@@ -58,6 +58,7 @@ export default function Predictions({ data, scriptUrl }) {
   const [predictions, setPredictions] = useState([]); // all predictions from sheet
   const [loadingLb, setLoadingLb] = useState(false);
   const [lbWeek, setLbWeek] = useState(null);
+  const [openDivs, setOpenDivs] = useState({}); // which division sections are expanded
 
   // ---- Determine current week + upcoming fixtures ----
   // Your fixtures come grouped by division: { "Div 1": [...], ... } — flatten to a list
@@ -98,6 +99,30 @@ export default function Predictions({ data, scriptUrl }) {
     () => fixtures.filter((f) => Number(f.week) === Number(currentWeek)),
     [fixtures, currentWeek]
   );
+
+  // Group this week's fixtures by division for collapsible sections
+  const fixturesByDivision = useMemo(() => {
+    const groups = {};
+    weekFixtures.forEach((f) => {
+      const d = f.division || "Other";
+      if (!groups[d]) groups[d] = [];
+      groups[d].push(f);
+    });
+    return groups;
+  }, [weekFixtures]);
+
+  const divisionOrder = useMemo(() => {
+    return Object.keys(fixturesByDivision).sort((a, b) => {
+      const na = Number(String(a).replace(/\D/g, "")) || 999;
+      const nb = Number(String(b).replace(/\D/g, "")) || 999;
+      if (na !== nb) return na - nb;
+      return String(a).localeCompare(String(b));
+    });
+  }, [fixturesByDivision]);
+
+  function toggleDiv(d) {
+    setOpenDivs((o) => ({ ...o, [d]: !o[d] }));
+  }
 
   function fixKey(f) {
     return `${f.home}|${f.away}|${currentWeek}`.toLowerCase();
@@ -272,61 +297,93 @@ export default function Predictions({ data, scriptUrl }) {
             </p>
           )}
 
-          {weekFixtures.map((f, i) => {
-            const key = fixKey(f);
-            const locked = isLocked(f);
-            const p = picks[key] || {};
-            const actual = resultMap[key];
+          {divisionOrder.map((division) => {
+            const divFixtures = fixturesByDivision[division];
+            const isOpen = openDivs[division] ?? false;
+            const openCount = divFixtures.filter((f) => !isLocked(f)).length;
+            const predictedInDiv = divFixtures.filter((f) => {
+              const p = picks[fixKey(f)];
+              return p && p.homeScore !== "" && p.homeScore != null && p.awayScore !== "" && p.awayScore != null;
+            }).length;
             return (
-              <div
-                key={i}
-                className={`mb-3 rounded-3xl border border-odcGold/15 bg-gradient-to-br from-odcGreen/[0.07] to-transparent p-4 ${
-                  locked ? "opacity-60" : ""
-                }`}
-              >
-                {locked && (
-                  <span className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-odcGold/12 px-2.5 py-1 text-[9px] font-black text-odcGold">
-                    🔒 Locked · result posted
+              <div key={division} className="mb-3 overflow-hidden rounded-3xl border border-odcGold/15 bg-gradient-to-br from-odcGreen/[0.05] to-transparent">
+                {/* Division header — tap to expand/collapse */}
+                <button
+                  onClick={() => toggleDiv(division)}
+                  className="flex w-full items-center justify-between px-5 py-4 text-left"
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="text-base font-black text-odcCream">{division}</span>
+                    <span className="rounded-full bg-odcGold/15 px-2.5 py-1 text-[10px] font-black text-odcGold">
+                      {divFixtures.length} {divFixtures.length === 1 ? "game" : "games"}
+                    </span>
                   </span>
-                )}
-                <p className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-odcCream/40">
-                  {f.division}
-                </p>
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                  <span className="text-sm font-black">{f.home}</span>
-                  <div className="flex items-center justify-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="20"
-                      disabled={locked}
-                      value={locked ? actual?.homeScore ?? "" : p.homeScore ?? ""}
-                      onChange={(e) => setScore(key, "homeScore", e.target.value)}
-                      placeholder="–"
-                      className={`h-11 w-11 rounded-xl border text-center text-lg font-black outline-none ${
-                        (locked ? actual?.homeScore != null : p.homeScore !== "" && p.homeScore != null)
-                          ? "border-transparent bg-odcGreen text-odcBlack"
-                          : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
-                      }`}
-                    />
-                    <span className="text-xs font-black text-odcCream/40">–</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="20"
-                      disabled={locked}
-                      value={locked ? actual?.awayScore ?? "" : p.awayScore ?? ""}
-                      onChange={(e) => setScore(key, "awayScore", e.target.value)}
-                      placeholder="–"
-                      className={`h-11 w-11 rounded-xl border text-center text-lg font-black outline-none ${
-                        (locked ? actual?.awayScore != null : p.awayScore !== "" && p.awayScore != null)
-                          ? "border-transparent bg-odcGreen text-odcBlack"
-                          : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
-                      }`}
-                    />
+                  <span className="flex items-center gap-3">
+                    {openCount > 0 && (
+                      <span className="text-[11px] font-black text-odcCream/55">{predictedInDiv}/{openCount}</span>
+                    )}
+                    <span className={`text-odcGold transition-transform ${isOpen ? "rotate-180" : ""}`}>▾</span>
+                  </span>
+                </button>
+
+                {/* Fixtures inside this division */}
+                {isOpen && (
+                  <div className="space-y-2 px-3 pb-3">
+                    {divFixtures.map((f, i) => {
+                      const key = fixKey(f);
+                      const locked = isLocked(f);
+                      const p = picks[key] || {};
+                      const actual = resultMap[key];
+                      return (
+                        <div
+                          key={i}
+                          className={`rounded-2xl border border-odcGold/12 bg-odcBlack/20 p-4 ${locked ? "opacity-60" : ""}`}
+                        >
+                          {locked && (
+                            <span className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-odcGold/12 px-2.5 py-1 text-[9px] font-black text-odcGold">
+                              🔒 Locked · result posted
+                            </span>
+                          )}
+                          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                            <span className="text-sm font-black">{f.home}</span>
+                            <div className="flex items-center justify-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                disabled={locked}
+                                value={locked ? actual?.homeScore ?? "" : p.homeScore ?? ""}
+                                onChange={(e) => setScore(key, "homeScore", e.target.value)}
+                                placeholder="–"
+                                className={`h-11 w-11 rounded-xl border text-center text-lg font-black outline-none ${
+                                  (locked ? actual?.homeScore != null : p.homeScore !== "" && p.homeScore != null)
+                                    ? "border-transparent bg-odcGreen text-odcBlack"
+                                    : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
+                                }`}
+                              />
+                              <span className="text-xs font-black text-odcCream/40">–</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                disabled={locked}
+                                value={locked ? actual?.awayScore ?? "" : p.awayScore ?? ""}
+                                onChange={(e) => setScore(key, "awayScore", e.target.value)}
+                                placeholder="–"
+                                className={`h-11 w-11 rounded-xl border text-center text-lg font-black outline-none ${
+                                  (locked ? actual?.awayScore != null : p.awayScore !== "" && p.awayScore != null)
+                                    ? "border-transparent bg-odcGreen text-odcBlack"
+                                    : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
+                                }`}
+                              />
+                            </div>
+                            <span className="text-right text-sm font-black">{f.away}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <span className="text-right text-sm font-black">{f.away}</span>
-                </div>
+                )}
               </div>
             );
           })}
