@@ -362,7 +362,7 @@ function buildMatchesData(rows) {
   return {
     tables,
     players: players.sort((a, b) => b.avg - a.avg),
-    results: allResults.slice(0, 12),
+    results: allResults.slice(0, 200),
     allResults,
     weeklyMvps,
   };
