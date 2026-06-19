@@ -47,7 +47,7 @@ const pages = [
 ];
 
 // ⬇️ PASTE YOUR GOOGLE APPS SCRIPT WEB-APP URL HERE (the one ending in /exec)
-const PREDICTIONS_SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
+const PREDICTIONS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwgYMa3bXTQZIzuCp4fNyVwm46QvXqk72gY5UiK9pNd1ZonxWlB7i9-vUtMBR1rMbH7Ng/exec";
 
 const socials = [
   { label: "Discord", href: "https://discord.gg/s4GdKykCe9", icon: MessageCircle },
