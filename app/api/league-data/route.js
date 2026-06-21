@@ -8,7 +8,7 @@ const DUO_SHEET_ID = "1nN_dbDGg482nZTB1ghwLgxvKJ5My-3PG";
 const DUO_GID = "1207445903";
 const KNOCKOUT_GID = "831104526";
 
-const CURRENT_WEEK = 13;
+const CURRENT_WEEK = 12;
 const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
@@ -99,10 +99,24 @@ function parseCsv(csvText) {
   return rows;
 }
 
-const text = (value) => String(value ?? "").trim();
+// Strip invisible/odd whitespace that bots often inject (non-breaking spaces,
+// zero-width chars, newlines, tabs), plus leading apostrophes used to force text.
+const cleanCell = (value) =>
+  String(value ?? "")
+    .replace(/^['\u2018\u2019]/, "")           // leading apostrophe (forces text in Sheets)
+    .replace(/[\u00A0\u2007\u202F]/g, " ")     // non-breaking / figure / narrow spaces -> normal space
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")     // zero-width spaces / BOM -> remove
+    .replace(/[\r\n\t]+/g, " ")                // newlines/tabs -> space
+    .trim();
+
+const text = (value) => cleanCell(value);
 
 const num = (value) => {
-  const cleaned = text(value).replace("%", "");
+  // remove %, commas, and any character that isn't a digit, dot, or minus
+  const cleaned = cleanCell(value)
+    .replace("%", "")
+    .replace(/,/g, "")
+    .replace(/[^0-9.\-]/g, "");
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
 };
