@@ -99,20 +99,20 @@ function parseCsv(csvText) {
   return rows;
 }
 
-// Strip invisible/odd whitespace that bots often inject (non-breaking spaces,
-// zero-width chars, newlines, tabs), plus leading apostrophes used to force text.
+// Strip invisible/odd characters that bots inject. The Discord bot writes values
+// with a leading apostrophe (e.g. '5) which forces text format in Sheets.
 const cleanCell = (value) =>
   String(value ?? "")
-    .replace(/^['\u2018\u2019]/, "")           // leading apostrophe (forces text in Sheets)
-    .replace(/[\u00A0\u2007\u202F]/g, " ")     // non-breaking / figure / narrow spaces -> normal space
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")     // zero-width spaces / BOM -> remove
-    .replace(/[\r\n\t]+/g, " ")                // newlines/tabs -> space
+    .replace(/['\u2018\u2019\u0060\u00B4]/g, "")  // ALL apostrophe/backtick variants, anywhere
+    .replace(/[\u00A0\u2007\u202F]/g, " ")          // non-breaking / figure / narrow spaces
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")          // zero-width spaces / BOM
+    .replace(/[\r\n\t]+/g, " ")                     // newlines/tabs
     .trim();
 
 const text = (value) => cleanCell(value);
 
 const num = (value) => {
-  // remove %, commas, and any character that isn't a digit, dot, or minus
+  // Keep only digits, dot, minus — kills any stray character (apostrophe, space, etc.)
   const cleaned = cleanCell(value)
     .replace("%", "")
     .replace(/,/g, "")
