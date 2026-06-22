@@ -127,7 +127,7 @@ function bestLegRank(value) {
 }
 
 async function fetchCsvRows(sheetId, gid, label = "Sheet") {
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
   const res = await fetch(csvUrl, { cache: "no-store" });
 
   if (!res.ok) {
