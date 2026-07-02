@@ -2,148 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+/* ============================================================
+   ODC MATCHNIGHT — TV darts coverage translated to web.
+   Palette = the board: baize black-green, bone, wire hairlines,
+   dartboard red. Gold reserved for silverware.
+   ============================================================ */
+
+:root {
+  --pitch: #0a1710;
+  --panel: #0f1f16;
+  --panel-2: #13251b;
+  --line: rgba(233, 239, 231, 0.13);
+  --bone: #e9efe7;
+  --red: #e63329;
+  --disp: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --body: "Archivo", system-ui, sans-serif;
+  --mono: "Spline Sans Mono", ui-monospace, monospace;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
-  /* Emerald Lux: rich green radial with gold glow */
-  background:
-    radial-gradient(circle at 20% 0%, rgba(22, 196, 108, 0.2) 0%, transparent 42%),
-    radial-gradient(circle at 90% 12%, rgba(232, 199, 102, 0.1) 0%, transparent 45%),
-    linear-gradient(175deg, #0a3320 0%, #072818 30%, #04190f 65%, #020d08 100%);
-  background-attachment: fixed;
-  color: #f8ebc6;
+  background: var(--pitch);
+  color: var(--bone);
   min-height: 100vh;
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
 }
 
-button,
-a,
-input,
-select {
-  -webkit-tap-highlight-color: transparent;
-}
+::selection { background: var(--red); color: #fff; }
+:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* Poster / scoreboard type */
+h1, h2, h3, .display {
+  font-family: var(--disp);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  font-weight: 700;
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.mono { font-family: var(--mono); }
+table, .stat, .score, .num { font-variant-numeric: tabular-nums; }
+.score {
+  font-family: var(--disp);
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
+.hollow { color: transparent; -webkit-text-stroke: 2px var(--bone); }
+
+button, a, input, select { -webkit-tap-highlight-color: transparent; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ---------- RESULTS TICKER ---------- */
+.tickwrap { overflow: hidden; display: flex; align-items: center; }
+.tick {
+  display: flex; flex: none; white-space: nowrap;
+  animation: tick 38s linear infinite;
+}
+@keyframes tick { to { transform: translateX(-50%); } }
+.dot-live { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 /* ---------- ANIMATIONS ---------- */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
-.animate-fadeIn { animation: fadeIn 0.6s ease forwards; }
+.animate-fadeIn { animation: fadeIn 0.4s ease forwards; }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
+/* Legacy utility classes kept as quiet no-ops */
+.animate-float { animation: none; }
+.shimmer { background: rgba(233, 239, 231, 0.04); }
+.text-gold { color: #d9b45b; }
+.lux-divider { height: 1px; background: var(--line); }
 
-@keyframes floatY {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-.animate-float { animation: floatY 5s ease-in-out infinite; }
-
-/* ---------- 3D / LUXURY DEPTH LAYER ---------- */
-
-/* Glassy raised panels */
-.rounded-3xl {
-  position: relative;
-  background-image: linear-gradient(
-    160deg,
-    rgba(22, 196, 108, 0.08) 0%,
-    rgba(248, 235, 198, 0.015) 24%,
-    rgba(255, 255, 255, 0) 55%
-  );
-  box-shadow:
-    0 1px 0 rgba(248, 235, 198, 0.08) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.45) inset,
-    0 20px 45px -14px rgba(0, 0, 0, 0.7),
-    0 6px 16px -6px rgba(0, 0, 0, 0.5);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+@media (prefers-reduced-motion: reduce) {
+  .tick, .dot-live { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
-.rounded-3xl:hover {
-  box-shadow:
-    0 1px 0 rgba(248, 235, 198, 0.12) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.45) inset,
-    0 28px 55px -14px rgba(0, 0, 0, 0.75),
-    0 8px 20px -6px rgba(0, 0, 0, 0.55),
-    0 0 40px -10px rgba(22, 196, 108, 0.3);
-}
-
-/* gold top accent line on panels */
-.rounded-3xl::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 12%;
-  right: 12%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(232, 199, 102, 0.5), transparent);
-  opacity: 0.75;
-  pointer-events: none;
-}
-
-/* Green elements get a rich gradient + depth (buttons, score pills, active nav) */
-.bg-odcRed {
-  background-image: linear-gradient(180deg, #22d97a 0%, #16c46c 50%, #0c8f4c 100%) !important;
-  color: #04190f !important;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.35) inset,
-    0 -2px 6px rgba(0, 0, 0, 0.2) inset,
-    0 8px 22px -8px rgba(22, 196, 108, 0.6);
-}
-
-/* keep text white where needed on green buttons */
-.bg-odcRed.text-white { color: #04190f !important; }
-
-/* Navy surfaces -> deep emerald */
-.bg-odcNavy {
-  background-image: linear-gradient(180deg, #0a3320 0%, #063d24 100%) !important;
-  box-shadow: 0 1px 0 rgba(248, 235, 198, 0.05) inset, 0 -1px 0 rgba(0, 0, 0, 0.4) inset;
-}
-
-/* Green accent surfaces */
-.bg-odcGreen {
-  background-image: linear-gradient(180deg, #22d97a 0%, #0c8f4c 100%) !important;
-}
-
-/* Shimmer utility */
-.shimmer {
-  background: linear-gradient(90deg, rgba(248, 235, 198, 0) 0%, rgba(248, 235, 198, 0.12) 50%, rgba(248, 235, 198, 0) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 2.5s infinite;
-}
-
-.text-gold { color: #e8c766; }
-
-.lux-divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(232, 199, 102, 0.4), transparent);
-}
-
-/* Scrollbar themed */
+/* ---------- SCROLLBAR ---------- */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #020d08; }
+::-webkit-scrollbar-track { background: var(--pitch); }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #0a3320, #063d24);
+  background: #22362a;
   border-radius: 6px;
-  border: 2px solid #020d08;
+  border: 2px solid var(--pitch);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #22d97a, #0c8f4c);
-}
+::-webkit-scrollbar-thumb:hover { background: #2d4636; }

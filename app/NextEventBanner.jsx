@@ -45,24 +45,24 @@ export default function NextEventBanner({ events, onViewEvents }) {
     <section className="mx-auto max-w-7xl px-4 pt-6">
       <button
         onClick={onViewEvents}
-        className="group relative block w-full overflow-hidden rounded-3xl border border-odcRed/30 bg-gradient-to-r from-odcRed/15 via-odcRed/10 to-transparent p-5 text-left transition hover:border-odcRed/60"
+        className="group relative block w-full overflow-hidden rounded-xl border border-odcRed/30 bg-odcNavy p-5 text-left transition hover:border-odcRed/60"
       >
         {/* animated shine */}
-        <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
+        <div className="pointer-events-none absolute inset-0 -translate-x-full bg-odcNavy transition-transform duration-1000 group-hover:translate-x-full" />
 
         <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-odcRed/20">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-odcRed/20">
               <Trophy className="text-odcRed" size={26} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-odcRed px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white">
+                <span className="inline-flex items-center gap-1 rounded-full bg-odcRed px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white">
                   <CalendarDays size={12} /> Next Event
                 </span>
-                <span className="text-xs font-black uppercase tracking-[0.2em] text-odcRed">{dayLabel}</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.1em] text-odcRed">{dayLabel}</span>
               </div>
-              <h3 className="mt-2 text-2xl font-black leading-tight">{event.name}</h3>
+              <h3 className="mt-2 text-2xl font-semibold leading-tight">{event.name}</h3>
               <p className="mt-1 text-sm text-odcCream/60">
                 {niceDate}
                 {event.format ? ` • ${event.format}` : ""}
@@ -71,7 +71,7 @@ export default function NextEventBanner({ events, onViewEvents }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start rounded-2xl border border-odcCream/20 px-5 py-3 font-black text-odcCream transition group-hover:bg-odcRed group-hover:text-white md:self-center">
+          <div className="flex items-center gap-2 self-start rounded-lg border border-odcCream/20 px-5 py-3 font-semibold text-odcCream transition group-hover:bg-odcRed group-hover:text-white md:self-center">
             View Events
             <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
           </div>

@@ -112,19 +112,19 @@ export default function Splash() {
 
         {/* ONLINE DARTS CIRCUIT rises in below */}
         <div className="mt-[clamp(20px,4vh,48px)] overflow-hidden">
-          <p className="tagline text-center text-[clamp(13px,2.2vw,26px)] font-black uppercase tracking-[0.55em] text-odcCream">
+          <p className="tagline text-center text-[clamp(13px,2.2vw,26px)] font-semibold uppercase tracking-[0.55em] text-odcCream">
             Online&nbsp;Darts&nbsp;Circuit
           </p>
         </div>
 
         {/* thin red underline sweep */}
-        <div className="underline-sweep mt-5 h-[2px] bg-gradient-to-r from-transparent via-[#16C46C] to-transparent" />
+        <div className="underline-sweep mt-5 h-[2px] bg-odcNavy" />
 
         {/* enter prompt */}
         {ready && !leaving && (
           <button
             onClick={enter}
-            className="enter-btn mt-[clamp(28px,5vh,56px)] rounded-full border border-[#16C46C]/60 bg-[#16C46C]/10 px-10 py-4 text-[12px] font-black uppercase tracking-[0.3em] text-odcCream backdrop-blur-sm transition hover:bg-[#16C46C] hover:text-odcBlack"
+            className="enter-btn mt-[clamp(28px,5vh,56px)] rounded-full border border-[#16C46C]/60 bg-[#16C46C]/10 px-10 py-4 text-[12px] font-semibold uppercase tracking-[0.1em] text-odcCream-sm transition hover:bg-[#16C46C] hover:text-odcBlack"
           >
             Enter the Circuit
           </button>

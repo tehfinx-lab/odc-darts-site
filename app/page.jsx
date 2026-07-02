@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Menu,
   X,
@@ -59,16 +59,120 @@ const socials = [
   { label: "TikTok", href: "https://www.tiktok.com/@odccircuit", icon: ExternalLink },
 ];
 
+/* ---------- RESULTS TICKER — broadcast strip across the very top ---------- */
+function Ticker({ results = [] }) {
+  const items = useMemo(() => {
+    const list = (results || []).slice(0, 8).map((r) => ({
+      home: r.home, away: r.away, score: r.score,
+    }));
+    const tons = (results || []).slice(0, 12).reduce(
+      (sum, r) => sum + (Number(r.p1Stats?.tons) || 0) + (Number(r.p2Stats?.tons) || 0), 0
+    );
+    return { list, tons };
+  }, [results]);
+
+  if (!items.list.length) return null;
+
+  const Strip = () => (
+    <span className="mono flex items-center text-[11px] font-medium tracking-[0.08em] text-odcCream/60">
+      {items.list.map((r, i) => (
+        <span key={i} className="flex items-center">
+          <b className="font-semibold text-odcCream">{r.home}</b>
+          <i className="not-italic px-1.5 font-semibold text-odcRed">{r.score}</i>
+          {r.away}
+          <em className="not-italic px-4 text-odcCream/30">///</em>
+        </span>
+      ))}
+      {items.tons > 0 && (
+        <span className="flex items-center">
+          180 WATCH — {items.tons} MAXIMUMS THIS WEEK
+          <em className="not-italic px-4 text-odcCream/30">///</em>
+        </span>
+      )}
+    </span>
+  );
+
+  return (
+    <div className="flex items-stretch overflow-hidden border-b border-odcCream/10 bg-[#081209]" aria-label="Latest results">
+      <div className="mono flex flex-none items-center gap-2 border-r border-odcCream/10 px-3.5 py-2 text-[10.5px] font-semibold tracking-[0.14em]">
+        <span className="dot-live h-[7px] w-[7px] rounded-full bg-odcRed" /> LIVE
+      </div>
+      <div className="tickwrap flex-1">
+        <div className="tick"><Strip /><Strip /></div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- SIGNATURE — dartboard wireframe, ODC logo seated at the bull ---------- */
+const BOARD_NUMS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+const bPt = (r, deg) => {
+  const a = ((deg - 90) * Math.PI) / 180;
+  return [380 + r * Math.cos(a), 380 + r * Math.sin(a)];
+};
+const bSector = (r1, r2, a1, a2) => {
+  const [x1, y1] = bPt(r1, a1), [x2, y2] = bPt(r2, a1), [x3, y3] = bPt(r2, a2), [x4, y4] = bPt(r1, a2);
+  return `M${x1} ${y1} L${x2} ${y2} A${r2} ${r2} 0 0 1 ${x3} ${y3} L${x4} ${y4} A${r1} ${r1} 0 0 0 ${x1} ${y1}`;
+};
+
+function DartBoard() {
+  const reduce = useReducedMotion();
+  const WIRE = "rgba(233,239,231,0.15)";
+  const draw = (i) =>
+    reduce
+      ? { initial: false }
+      : {
+          initial: { pathLength: 0 },
+          animate: { pathLength: 1 },
+          transition: { duration: 1, delay: 0.15 + i * 0.035, ease: "easeInOut" },
+        };
+  const fade = (d) =>
+    reduce
+      ? { initial: false }
+      : { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.8, delay: d } };
+
+  return (
+    <div className="relative mx-auto w-full max-w-[520px]">
+      <svg viewBox="0 0 760 760" className="w-full" aria-hidden="true">
+        <motion.circle cx="380" cy="380" r="294" fill="#0A1710" {...fade(0.4)} />
+        <motion.path d={bSector(300, 316, -9, 9)} fill="rgba(230,51,41,0.85)" {...fade(0.85)} />
+        {[300, 316].map((r, i) => (
+          <motion.circle key={r} cx="380" cy="380" r={r} fill="none" stroke={WIRE} strokeWidth="1" {...draw(i * 3)} />
+        ))}
+        {BOARD_NUMS.map((n, j) => {
+          const [x, y] = bPt(342, j * 18);
+          return (
+            <motion.text key={`n${j}`} x={x} y={y} textAnchor="middle" dominantBaseline="central"
+              fill={j === 0 ? "rgba(230,51,41,0.95)" : "rgba(233,239,231,0.5)"}
+              style={{ font: '600 24px "Big Shoulders Display", sans-serif' }} {...fade(0.5 + j * 0.045)}>
+              {n}
+            </motion.text>
+          );
+        })}
+      </svg>
+      {/* the bull is the badge */}
+      <motion.img
+        src="/odc-logo.png" alt="ODC logo"
+        className="absolute left-1/2 top-1/2 w-[77%] -translate-x-1/2 -translate-y-1/2 rounded-full object-contain"
+        {...fade(0.55)}
+      />
+    </div>
+  );
+}
+
 function Card({ children, className = "" }) {
-  return <div className={`rounded-3xl border border-odcCream/10 bg-white/[0.055] p-5 shadow-cream backdrop-blur ${className}`}>{children}</div>;
+  return <div className={`rounded-xl border border-odcCream/10 bg-odcNavy p-5 ${className}`}>{children}</div>;
 }
 
 function SectionTitle({ kicker, title, text }) {
   return (
     <div className="mb-7">
-      <p className="text-xs font-black uppercase tracking-[0.35em] text-odcRed">{kicker}</p>
-      <h2 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">{title}</h2>
-      {text && <p className="mt-3 max-w-2xl text-sm leading-7 text-odcCream/65 md:text-base">{text}</p>}
+      <p className="mono flex items-center gap-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-odcCream/60">
+        <span className="text-odcRed">■</span> {kicker}
+        <span className="h-px flex-1 bg-odcCream/[0.13]" aria-hidden="true" />
+      </p>
+      <h2 className="mt-3.5 text-4xl md:text-5xl">{title}</h2>
+      {text && <p className="mt-3 max-w-2xl text-sm leading-7 text-odcCream/60 md:text-base">{text}</p>}
     </div>
   );
 }
@@ -78,8 +182,8 @@ function SmallStat({ label, value, icon: Icon }) {
     <Card className="p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-odcCream/45">{label}</p>
-          <p className="mt-1 text-2xl font-black"><AnimatedStatValue value={value} /></p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-odcCream/45">{label}</p>
+          <p className="mt-1 text-2xl font-semibold"><AnimatedStatValue value={value} /></p>
         </div>
         {Icon && <Icon className="text-odcRed" size={24} />}
       </div>
@@ -98,7 +202,7 @@ function SocialButtons() {
             href={social.href}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-2xl border border-odcCream/15 bg-white/5 px-4 py-3 text-sm font-black text-odcCream transition hover:bg-white/10"
+            className="inline-flex items-center gap-2 rounded-lg border border-odcCream/15 bg-white/5 px-4 py-3 text-sm font-semibold text-odcCream transition hover:bg-white/10"
           >
             <Icon size={17} />
             {social.label}
@@ -120,29 +224,27 @@ function Header({ active, setActive }) {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-odcCream/10 bg-black/75 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+      <header className="sticky top-0 z-50 border-b border-odcCream/10 bg-odcBlack/95">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4">
           <button onClick={() => go("home")} className="flex items-center gap-3 text-left">
-            <img
-              src="/odc-logo.png"
-              alt="ODC logo"
-              className="h-11 w-11 object-contain drop-shadow-[0_0_18px_rgba(229,29,42,0.25)]"
-            />
-            <div>
-              <p className="text-sm font-black leading-none">ODC</p>
-              <p className="text-[11px] text-odcCream/55">Online Darts Circuit</p>
-            </div>
+            <img src="/odc-logo.png" alt="ODC logo" className="h-11 w-11 rounded-full object-contain" />
+            <span>
+              <span className="display block text-xl leading-none tracking-[0.04em]">ODC</span>
+              <span className="mono block pt-0.5 text-[9.5px] uppercase tracking-[0.18em] text-odcCream/40">
+                Online Darts Circuit
+              </span>
+            </span>
           </button>
 
-          <nav className="hidden items-center gap-2 xl:flex">
+          <nav className="hidden items-center gap-0.5 xl:flex">
             {pages.map((p) => (
               <button
                 key={p.id}
                 onClick={() => go(p.id)}
-                className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+                className={`rounded-md px-3.5 py-2 text-[13px] font-semibold transition ${
                   active === p.id
-                    ? "bg-odcRed text-white shadow-glow"
-                    : "text-odcCream/65 hover:bg-white/10 hover:text-odcCream"
+                    ? "text-odcCream shadow-[inset_0_-2px_0_#E63329]"
+                    : "text-odcCream/60 hover:bg-white/5 hover:text-odcCream"
                 }`}
               >
                 {p.label}
@@ -150,44 +252,54 @@ function Header({ active, setActive }) {
             ))}
           </nav>
 
-          <button onClick={() => setOpen(true)} className="rounded-2xl border border-odcCream/15 p-3 xl:hidden">
-            <Menu size={22} />
-          </button>
+          <div className="flex items-center gap-2.5">
+            <a
+              href="https://discord.gg/s4GdKykCe9"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md bg-odcRed px-4 py-2.5 text-xs font-bold uppercase tracking-[0.06em] text-white transition hover:bg-odcRedDeep"
+            >
+              Join
+            </a>
+            <button onClick={() => setOpen(true)} className="rounded-md border border-odcCream/15 p-2.5 xl:hidden" aria-label="Menu">
+              <Menu size={20} />
+            </button>
+          </div>
         </div>
       </header>
 
       {open && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur xl:hidden">
+        <div className="fixed inset-0 z-[100] bg-black/70 xl:hidden">
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
-            className="ml-auto h-full w-[82%] max-w-sm border-l border-odcCream/10 bg-odcBlack p-5"
+            className="ml-auto h-full w-[82%] max-w-sm overflow-y-auto border-l border-odcCream/10 bg-odcBlack p-5"
           >
             <div className="mb-8 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img src="/odc-logo.png" alt="ODC logo" className="h-12 w-12 object-contain" />
+                <img src="/odc-logo.png" alt="ODC logo" className="h-11 w-11 rounded-full object-contain" />
                 <div>
-                  <p className="font-black">ODC Menu</p>
-                  <p className="text-xs text-odcCream/50">League hub navigation</p>
+                  <p className="display text-lg">ODC</p>
+                  <p className="mono text-[10px] uppercase tracking-[0.16em] text-odcCream/40">League hub</p>
                 </div>
               </div>
-              <button onClick={() => setOpen(false)} className="rounded-xl bg-white/10 p-2">
+              <button onClick={() => setOpen(false)} className="rounded-md bg-white/10 p-2" aria-label="Close menu">
                 <X />
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-1.5">
               {pages.map((p) => {
                 const Icon = p.icon;
                 return (
                   <button
                     key={p.id}
                     onClick={() => go(p.id)}
-                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left font-black ${
-                      active === p.id ? "bg-odcRed text-white" : "bg-white/5 text-odcCream"
+                    className={`flex w-full items-center gap-3 rounded-lg px-4 py-3.5 text-left font-semibold ${
+                      active === p.id ? "bg-odcRed text-white" : "bg-white/[0.04] text-odcCream"
                     }`}
                   >
-                    <Icon size={20} />
+                    <Icon size={19} />
                     {p.label}
                   </button>
                 );
@@ -209,7 +321,7 @@ function BottomNav({ active, setActive }) {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-odcCream/10 bg-black/85 px-2 py-2 backdrop-blur-xl xl:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-odcCream/10 bg-odcBlack/95 px-2 py-2 xl:hidden">
       <div className="grid grid-cols-5 gap-1">
         {mobilePages.map((p) => {
           const Icon = p.icon;
@@ -217,7 +329,7 @@ function BottomNav({ active, setActive }) {
             <button
               key={p.id}
               onClick={() => go(p.id)}
-              className={`rounded-2xl px-1 py-2 text-[10px] font-black ${
+              className={`mono rounded-lg px-1 py-2 text-[9.5px] font-semibold uppercase tracking-[0.06em] ${
                 active === p.id ? "bg-odcRed text-white" : "text-odcCream/60"
               }`}
             >
@@ -245,16 +357,16 @@ function MatchDetailsModal({ match, onClose }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4 backdrop-blur">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-3xl rounded-3xl border border-odcCream/15 bg-odcBlack p-5 shadow-glow"
+        className="w-full max-w-3xl rounded-xl border border-odcCream/15 bg-odcBlack p-5"
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-odcRed">{match.division}</p>
-            <h3 className="mt-2 text-2xl font-black">
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcRed">{match.division}</p>
+            <h3 className="mt-2 text-2xl font-semibold">
               {match.home} vs {match.away}
             </h3>
             <p className="mt-1 text-sm text-odcCream/55">
@@ -262,25 +374,25 @@ function MatchDetailsModal({ match, onClose }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => shareResultCard(match)} className="rounded-2xl bg-odcRed/90 p-3 text-white transition hover:bg-odcRed" title="Share result card">
+            <button onClick={() => shareResultCard(match)} className="rounded-lg bg-odcRed/90 p-3 text-white transition hover:bg-odcRed" title="Share result card">
               <Share2 size={18} />
             </button>
-            <button onClick={onClose} className="rounded-2xl bg-white/10 p-3">
+            <button onClick={onClose} className="rounded-lg bg-white/10 p-3">
               <X />
             </button>
           </div>
         </div>
 
-        <div className="mb-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-3xl bg-odcNavy p-5">
-          <p className="text-xl font-black">{match.home}</p>
-          <p className="rounded-2xl bg-odcRed px-5 py-2 text-2xl font-black text-white">{match.score}</p>
-          <p className="text-right text-xl font-black">{match.away}</p>
+        <div className="mb-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl bg-odcNavy p-5">
+          <p className="text-xl font-semibold">{match.home}</p>
+          <p className="score rounded-md bg-odcRed px-5 py-2 text-3xl text-white">{match.score}</p>
+          <p className="text-right text-xl font-semibold">{match.away}</p>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-odcCream/10">
+        <div className="overflow-x-auto rounded-lg border border-odcCream/10">
           <table className="w-full min-w-[520px]">
             <thead className="bg-white/5">
-              <tr className="text-left text-xs uppercase tracking-[0.22em] text-odcCream/55">
+              <tr className="text-left text-xs uppercase tracking-[0.1em] text-odcCream/55">
                 <th className="p-3">Stat</th>
                 <th className="p-3">{match.home}</th>
                 <th className="p-3">{match.away}</th>
@@ -289,7 +401,7 @@ function MatchDetailsModal({ match, onClose }) {
             <tbody>
               {rows.map(([label, p1, p2]) => (
                 <tr key={label} className="border-t border-odcCream/10">
-                  <td className="p-3 font-black">{label}</td>
+                  <td className="p-3 font-semibold">{label}</td>
                   <td className="p-3">{p1 || 0}</td>
                   <td className="p-3">{p2 || 0}</td>
                 </tr>
@@ -309,18 +421,18 @@ function ResultCards({ results, onSelectMatch }) {
         <div key={r.id || `${r.home}-${r.away}-${index}`} className="relative">
           <button
             onClick={(e) => { e.stopPropagation(); shareResultCard(r); }}
-            className="absolute right-3 top-3 z-10 rounded-xl bg-white/10 p-2 text-odcCream/70 backdrop-blur transition hover:bg-odcRed hover:text-white"
+            className="absolute right-3 top-3 z-10 rounded-xl bg-white/10 p-2 text-odcCream/70 transition hover:bg-odcRed hover:text-white"
             title="Share result card"
           >
             <Share2 size={15} />
           </button>
           <button onClick={() => onSelectMatch(r)} className="block w-full text-left">
             <Card className="h-full transition hover:-translate-y-1 hover:border-odcRed/40">
-              <p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{r.division || "Match Result"}</p>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.1em] text-odcCream/45">{r.division || "Match Result"}</p>
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                <p className="font-black">{r.home}</p>
-                <p className="rounded-xl bg-odcRed px-3 py-1 text-lg font-black text-white">{r.score}</p>
-                <p className="text-right font-black">{r.away}</p>
+                <p className="font-semibold">{r.home}</p>
+                <p className="score rounded-md bg-odcRed px-3 py-1 text-xl text-white">{r.score}</p>
+                <p className="text-right font-semibold">{r.away}</p>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-odcCream/60">
                 <span>{r.home}: {r.p1Stats?.avg || "-"} avg</span>
@@ -359,19 +471,19 @@ function PlayerDetailsModal({ player, masterStats, matches, onClose }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4 backdrop-blur">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-odcCream/15 bg-odcBlack p-5 shadow-glow"
+        className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-odcCream/15 bg-odcBlack p-5"
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-odcRed">{master?.division || player.division}</p>
-            <h3 className="mt-2 text-3xl font-black">{player.name}</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcRed">{master?.division || player.division}</p>
+            <h3 className="mt-2 text-3xl font-semibold">{player.name}</h3>
             <p className="mt-1 text-sm text-odcCream/55">Season profile, key performance records and recent match history.</p>
           </div>
-          <button onClick={onClose} className="rounded-2xl bg-white/10 p-3">
+          <button onClick={onClose} className="rounded-lg bg-white/10 p-3">
             <X />
           </button>
         </div>
@@ -383,15 +495,15 @@ function PlayerDetailsModal({ player, masterStats, matches, onClose }) {
         </div>
 
         <div className="mt-8">
-          <h4 className="mb-4 text-xl font-black">Recent Matches</h4>
+          <h4 className="mb-4 text-xl font-semibold">Recent Matches</h4>
           <div className="grid gap-3 md:grid-cols-2">
             {playerMatches.map((m) => (
               <Card key={m.id} className="p-4">
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{m.division}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcCream/45">{m.division}</p>
                 <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                  <p className="font-black">{m.home}</p>
-                  <p className="rounded-xl bg-odcRed px-3 py-1 font-black text-white">{m.score}</p>
-                  <p className="text-right font-black">{m.away}</p>
+                  <p className="font-semibold">{m.home}</p>
+                  <p className="rounded-xl bg-odcRed px-3 py-1 font-semibold text-white">{m.score}</p>
+                  <p className="text-right font-semibold">{m.away}</p>
                 </div>
               </Card>
             ))}
@@ -403,147 +515,351 @@ function PlayerDetailsModal({ player, masterStats, matches, onClose }) {
 }
 
 function HomePage({ setActive, data, status, onSelectMatch }) {
+  const divisions = Object.keys(data.tables || {});
+  const firstDivision = divisions[0];
+  const tableRows = (data.tables?.[firstDivision] || []).slice(0, 8);
+
+  const currentWeek = data.currentWeek || 1;
+  const weekFixtures = Object.entries(data.fixtures || {})
+    .flatMap(([division, rows]) => (rows || []).map((f) => ({ ...f, division: f.division || division })))
+    .filter((f) => Number(f.week) === Number(currentWeek))
+    .slice(0, 6);
+
+  const motw = data.results?.[0];
+  const h2h = motw
+    ? [
+        { label: "3-Dart Avg", a: parseFloat(motw.p1Stats?.avg) || 0, b: parseFloat(motw.p2Stats?.avg) || 0 },
+        { label: "180s", a: Number(motw.p1Stats?.tons) || 0, b: Number(motw.p2Stats?.tons) || 0 },
+        { label: "High Checkout", a: Number(motw.p1Stats?.highCheckout) || 0, b: Number(motw.p2Stats?.highCheckout) || 0 },
+      ]
+    : [];
+  const pct = (v, other) => {
+    const max = Math.max(v, other);
+    return max > 0 ? `${Math.round((v / max) * 100)}%` : "50%";
+  };
+
+  const heroLine = {
+    hidden: { y: "112%" },
+    show: (i) => ({ y: 0, transition: { duration: 0.85, delay: 0.12 + i * 0.1, ease: [0.22, 1, 0.36, 1] } }),
+  };
+  const rise = (d) => ({
+    initial: { opacity: 0, y: 16 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.7, delay: d, ease: [0.22, 1, 0.36, 1] },
+  });
+
   return (
     <div>
       <NextEventBanner events={data.events} onViewEvents={() => setActive("events")} />
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_8%,rgba(22,196,108,0.25)_0%,transparent_50%),radial-gradient(circle_at_80%_18%,rgba(232,199,102,0.14)_0%,transparent_55%),radial-gradient(ellipse_at_top,#0a3a23_0%,#072818_45%,#04190f_85%)]" />
-        <img src="/odc-logo.png" alt="" aria-hidden="true" className="pointer-events-none absolute -right-16 -top-8 w-[340px] opacity-[0.06] select-none" />
-        <div className="absolute -left-20 top-16 h-96 w-96 rounded-full bg-odcGreen/30 blur-3xl" />
-        <div className="absolute -right-20 top-40 h-80 w-80 rounded-full bg-odcGold/15 blur-3xl" />
 
-        <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 md:grid-cols-[1.05fr_0.95fr] md:py-20">
-          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-odcGreen/45 bg-odcGreen/15 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-odcCream shadow-green">
-              <span className="h-2 w-2 rounded-full bg-odcGreen shadow-[0_0_10px_#16C46C]" /> Season 4 Registration
-            </div>
+      {/* ---------- HERO ---------- */}
+      <section className="relative overflow-hidden border-b border-odcCream/10">
+        <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 pb-0 pt-14 md:grid-cols-[1.05fr_0.95fr] md:pt-20">
+          <div>
+            <motion.p
+              {...rise(0.05)}
+              className="mono inline-flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-odcCream/60"
+            >
+              <span className="inline-block h-px w-6 bg-odcRed" aria-hidden="true" />
+              Season 4 · Matchweek {currentWeek} · Registration open
+            </motion.p>
 
-            <h1 className="text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
-              Welcome to the <span className="bg-gradient-to-br from-odcGreenBright to-odcGold bg-clip-text text-transparent">Online Darts Circuit</span>, join today
+            <h1 className="mt-5 text-[clamp(64px,15vw,150px)] font-extrabold leading-[0.86]">
+              {["Online", "Darts", "Circuit"].map((line, i) => (
+                <span key={line} className="block overflow-hidden">
+                  <motion.span
+                    className={`block ${line === "Darts" ? "hollow" : ""}`}
+                    variants={heroLine}
+                    initial="hidden"
+                    animate="show"
+                    custom={i}
+                  >
+                    {line}
+                  </motion.span>
+                </span>
+              ))}
             </h1>
 
-            <p className="mt-5 max-w-2xl text-base leading-7 text-odcCream/70 md:text-lg">
-              Compete in one of the UK's most competitive online darts leagues. Real fixtures, live stats and weekly glory.
-            </p>
+            <motion.p {...rise(0.45)} className="mt-6 max-w-md text-base leading-7 text-odcCream/60">
+              The UK's most competitive online darts league.{" "}
+              <b className="font-semibold text-odcCream">Real fixtures. Live stats. Weekly glory.</b>{" "}
+              Played Thursday nights, settled at the oche.
+            </motion.p>
 
-            <p className="mt-3 text-sm font-black tracking-wide text-odcGold">
-              ⭐ {data.players?.length || 56}+ players • {Object.keys(data.tables || {}).length || 7} divisions • Free to join
-            </p>
-
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <motion.div {...rise(0.55)} className="mt-8 flex flex-wrap gap-3">
               <a
                 href="https://discord.gg/s4GdKykCe9"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-black text-white shadow-[0_12px_30px_-6px_rgba(88,101,242,0.6)] transition hover:-translate-y-0.5"
-                style={{ background: "linear-gradient(135deg,#5865F2,#4752c4)" }}
+                className="inline-flex items-center gap-2 rounded-md bg-odcRed px-6 py-4 text-[13px] font-bold uppercase tracking-[0.05em] text-white transition hover:bg-odcRedDeep"
               >
-                <MessageCircle size={20} /> Join the Discord to Sign Up
+                <MessageCircle size={17} /> Join on Discord
               </a>
-              <button onClick={() => setActive("tables")} className="rounded-2xl bg-odcRed px-6 py-4 font-black text-white shadow-glow">
-                View Live Tables
+              <button
+                onClick={() => setActive("tables")}
+                className="rounded-md border border-odcCream/25 px-6 py-4 text-[13px] font-bold uppercase tracking-[0.05em] text-odcCream transition hover:border-odcCream/60"
+              >
+                View live tables <span className="mono font-medium">→</span>
               </button>
-            </div>
+            </motion.div>
 
-            <div className="mt-6">
+            <motion.div {...rise(0.62)} className="mt-6">
               <SocialButtons />
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative mx-auto flex w-full max-w-xl items-center justify-center"
-          >
-            <div className="absolute h-72 w-72 rounded-full bg-odcGreen/15 blur-3xl md:h-96 md:w-96" />
-            <img
-              src="/odc-logo.png"
-              alt="ODC logo"
-              className="relative z-10 w-full max-w-[460px] object-contain drop-shadow-[0_0_45px_rgba(22,196,108,0.4)]"
-            />
+          <motion.div {...rise(0.3)} className="pb-10 md:pb-0">
+            <DartBoard />
           </motion.div>
         </div>
+
+        {/* stat strip along the hero's baseline */}
+        <motion.div {...rise(0.7)} className="mx-auto max-w-7xl px-4">
+          <div className="mt-10 flex flex-wrap border-t border-odcCream/10 md:mt-6">
+            {[
+              { v: <CountUp value={data.players?.length || 0} />, l: "Players" },
+              { v: <CountUp value={divisions.length} />, l: "Divisions" },
+              { v: "£0", l: "Entry" },
+              { v: status === "live" ? "LIVE" : "DEMO", l: "Stats feed" },
+            ].map((x, i, arr) => (
+              <div
+                key={x.l}
+                className={`num flex items-baseline gap-2.5 py-4 pr-5 md:gap-3 md:pr-9 ${
+                  i < arr.length - 1 ? "mr-5 border-r border-odcCream/10 md:mr-9" : ""
+                }`}
+              >
+                <span className="display text-2xl md:text-3xl">{x.v}</span>
+                <span className="mono text-[10px] uppercase tracking-[0.14em] text-odcCream/40">{x.l}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pt-4">
-        <p className="mb-5 text-center text-xs font-black uppercase tracking-[0.3em] text-odcGreen">◆ How It Works</p>
-        <div className="grid gap-3 md:grid-cols-3">
-          {[
-            { n: "1", t: "Join our Discord", d: "Tap the button, hop in, say hello" },
-            { n: "2", t: "Get placed in a division", d: "Matched to your skill level" },
-            { n: "3", t: "Play weekly & climb", d: "Fixtures, stats, leaderboards" },
-          ].map((step) => (
-            <div key={step.n} className="flex items-center gap-4 rounded-3xl border border-odcCream/10 bg-white/[0.04] p-5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-odcGreenBright to-odcGreenDeep text-lg font-black text-odcBlack">
-                {step.n}
+      {/* ---------- MATCH OF THE WEEK — tale of the tape ---------- */}
+      {motw && (
+        <section className="mx-auto max-w-7xl px-4 pt-14 md:pt-20">
+          <SectionTitle kicker="Match of the week" title="Head to Head" />
+          <button onClick={() => onSelectMatch(motw)} className="block w-full text-left">
+            <div className="overflow-hidden rounded-xl border border-odcCream/10 bg-odcNavy transition hover:border-odcCream/25">
+              <div className="mono flex justify-between gap-3 border-b border-odcCream/10 px-5 py-3.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-odcCream/55">
+                <span><span className="text-odcGold">★</span>&nbsp; {motw.division || "Featured"}</span>
+                <span>{motw.week ? `Week ${motw.week} · ` : ""}Final</span>
               </div>
-              <div>
-                <p className="font-black">{step.t}</p>
-                <p className="text-sm text-odcCream/55">{step.d}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-8">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SmallStat label="Players" value={data.players.length} icon={Users} />
-          <SmallStat label="Divisions" value={Object.keys(data.tables).length} icon={Shield} />
-          <SmallStat label={`Week ${data.currentWeek || 7} Fixtures`} value={Object.values(data.fixtures || {}).flat().length} icon={CalendarCheck} />
-          <SmallStat label="Updates" value={status === "live" ? "Live" : "Demo"} icon={Zap} />
-        </div>
-      </section>
-
-      {data.results && data.results.length > 0 && (
-        <section className="mx-auto max-w-7xl px-4 pt-2">
-          <p className="mb-3 text-xs font-black uppercase tracking-[0.3em] text-odcGold">◆ Match of the Week</p>
-          <button onClick={() => onSelectMatch(data.results[0])} className="block w-full text-left">
-            <div className="relative overflow-hidden rounded-3xl border border-odcGreen/30 bg-gradient-to-br from-odcGreen/15 to-odcNavy/40 p-6 shadow-glow transition hover:-translate-y-1">
-              <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-odcGold">
-                {data.results[0].division || "Featured"}{data.results[0].week ? ` • Week ${data.results[0].week}` : ""}
-              </p>
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                <p className="text-xl font-black md:text-2xl">{data.results[0].home}</p>
-                <p className="rounded-2xl bg-odcGreen px-5 py-2 text-2xl font-black text-odcBlack shadow-green">{data.results[0].score}</p>
-                <p className="text-right text-xl font-black md:text-2xl">{data.results[0].away}</p>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 py-8 md:gap-8 md:py-12">
+                <Reveal>
+                  <p className="display text-[clamp(26px,5.5vw,60px)] font-extrabold leading-[0.92]">{motw.home}</p>
+                </Reveal>
+                <Reveal delay={0.15}>
+                  <p className="score rounded-lg bg-odcRed px-4 py-2 text-[clamp(26px,4vw,44px)] text-white md:px-6">
+                    {motw.score}
+                  </p>
+                </Reveal>
+                <Reveal delay={0.05}>
+                  <p className="display text-right text-[clamp(26px,5.5vw,60px)] font-extrabold leading-[0.92]">{motw.away}</p>
+                </Reveal>
               </div>
-              <div className="mt-4 flex justify-between border-t border-odcCream/10 pt-4 text-sm text-odcCream/60">
-                <span>{data.results[0].p1Stats?.avg || "-"} avg{data.results[0].p1Stats?.tons ? ` • ${data.results[0].p1Stats.tons}×180` : ""}</span>
-                <span>{data.results[0].p2Stats?.avg || "-"} avg</span>
+
+              <div className="num border-t border-odcCream/10 px-5 pb-5 pt-2">
+                {h2h.map((row, i) => (
+                  <Reveal key={row.label} delay={0.15 + i * 0.12}>
+                    <div className="grid grid-cols-[44px_1fr_92px_1fr_44px] items-center gap-2.5 py-2.5 md:grid-cols-[52px_1fr_130px_1fr_52px] md:gap-3">
+                      <span className="mono text-right text-[13px] font-semibold">{row.a}</span>
+                      <span className="flex h-[5px] justify-end overflow-hidden rounded-sm bg-odcCream/[0.08]">
+                        <motion.i
+                          className={`block h-full ${row.a >= row.b ? "bg-odcRed" : "bg-odcCream/45"}`}
+                          initial={{ width: 0 }}
+                          whileInView={{ width: pct(row.a, row.b) }}
+                          viewport={{ once: true }}
+                          transition={{ duration: 0.9, delay: 0.2 + i * 0.15, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      </span>
+                      <span className="mono text-center text-[10px] uppercase tracking-[0.14em] text-odcCream/40">{row.label}</span>
+                      <span className="flex h-[5px] overflow-hidden rounded-sm bg-odcCream/[0.08]">
+                        <motion.i
+                          className={`block h-full ${row.b > row.a ? "bg-odcRed" : "bg-odcCream/45"}`}
+                          initial={{ width: 0 }}
+                          whileInView={{ width: pct(row.b, row.a) }}
+                          viewport={{ once: true }}
+                          transition={{ duration: 0.9, delay: 0.2 + i * 0.15, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      </span>
+                      <span className="mono text-[13px] font-semibold">{row.b}</span>
+                    </div>
+                  </Reveal>
+                ))}
               </div>
             </div>
           </button>
         </section>
       )}
 
-      <section className="mx-auto max-w-7xl px-4 py-10">
-        <SectionTitle
-          kicker="Latest Results"
-          title="Recent Match Results"
-          text="Review the latest completed ODC league matches and open any result for a full player-by-player breakdown."
-        />
+      {/* ---------- STANDINGS + FIXTURES ---------- */}
+      <section className="mx-auto grid max-w-7xl gap-12 px-4 pt-14 md:pt-20 lg:grid-cols-[1.35fr_1fr]">
+        {firstDivision && (
+          <div>
+            <SectionTitle kicker="Standings" title={firstDivision} />
+            <div className="num overflow-x-auto">
+              <table className="w-full min-w-[440px] border-collapse">
+                <thead>
+                  <tr className="mono border-b border-odcCream/[0.13] text-left text-[10px] uppercase tracking-[0.14em] text-odcCream/40">
+                    <th className="px-2.5 py-2.5 font-semibold">Pos</th>
+                    <th className="px-2.5 py-2.5 font-semibold">Player</th>
+                    <th className="px-2.5 py-2.5 text-right font-semibold">P</th>
+                    <th className="px-2.5 py-2.5 text-right font-semibold">W</th>
+                    <th className="hidden px-2.5 py-2.5 text-right font-semibold sm:table-cell">L</th>
+                    <th className="hidden px-2.5 py-2.5 text-right font-semibold sm:table-cell">+/−</th>
+                    <th className="px-2.5 py-2.5 text-right font-semibold">Pts</th>
+                    <th className="hidden px-2.5 py-2.5 text-right font-semibold sm:table-cell">Form</th>
+                  </tr>
+                </thead>
+                <StaggerRows>
+                  {tableRows.map((row, i) => (
+                    <Row
+                      key={row.name || i}
+                      className="border-b border-odcCream/[0.06] odd:bg-odcNavy hover:bg-odcPanel2"
+                    >
+                      <td className="mono w-12 px-2.5 py-3 text-xs font-semibold text-odcCream/55">
+                        {String(row.pos ?? i + 1).padStart(2, "0")}
+                      </td>
+                      <td className="px-2.5 py-3 text-[13.5px] font-semibold">{row.name}</td>
+                      <td className="mono px-2.5 py-3 text-right text-xs text-odcCream/55">{row.played ?? "-"}</td>
+                      <td className="mono px-2.5 py-3 text-right text-xs text-odcCream/55">{row.wins ?? "-"}</td>
+                      <td className="mono hidden px-2.5 py-3 text-right text-xs text-odcCream/55 sm:table-cell">{row.losses ?? "-"}</td>
+                      <td className="mono hidden px-2.5 py-3 text-right text-xs text-odcCream/55 sm:table-cell">{row.legs ?? "-"}</td>
+                      <td className="mono px-2.5 py-3 text-right text-sm font-bold">{row.points ?? "-"}</td>
+                      <td className="hidden px-2.5 py-3 sm:table-cell">
+                        <span className="flex justify-end gap-1">
+                          {String(row.form || "")
+                            .replace(/[^WLD]/gi, "")
+                            .slice(-5)
+                            .split("")
+                            .map((f, fi) => (
+                              <s
+                                key={fi}
+                                className={`flex h-[15px] w-[15px] items-center justify-center rounded-[3px] text-[8.5px] font-bold no-underline ${
+                                  f.toUpperCase() === "W"
+                                    ? "bg-odcGreen text-[#06130c]"
+                                    : f.toUpperCase() === "L"
+                                    ? "bg-odcRed/90 text-white"
+                                    : "bg-odcCream/20 text-odcBlack"
+                                }`}
+                              >
+                                {f.toUpperCase()}
+                              </s>
+                            ))}
+                        </span>
+                      </td>
+                    </Row>
+                  ))}
+                </StaggerRows>
+              </table>
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <p className="mono text-[10.5px] uppercase tracking-[0.08em] text-odcCream/40">
+                <span className="text-odcGreen">■</span> Updated live from the league sheet
+              </p>
+              <button onClick={() => setActive("tables")} className="mono text-xs font-semibold uppercase tracking-[0.1em] text-odcCream/60 transition hover:text-odcCream">
+                All {divisions.length} divisions →
+              </button>
+            </div>
+          </div>
+        )}
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {data.results.slice(0, 6).map((r, index) => (
-            <button key={r.id || `${r.home}-${r.away}-${index}`} onClick={() => onSelectMatch(r)} className="text-left">
-              <Card className="h-full transition hover:-translate-y-1 hover:border-odcRed/40">
-                <p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
-                  {r.division || "Match Result"}
-                </p>
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                  <p className="font-black">{r.home}</p>
-                  <p className="rounded-xl bg-odcRed px-3 py-1 text-lg font-black text-white">{r.score}</p>
-                  <p className="text-right font-black">{r.away}</p>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-odcCream/60">
-                  <span>{r.home}: {r.p1Stats?.avg || "-"} avg</span>
-                  <span className="text-right">{r.away}: {r.p2Stats?.avg || "-"} avg</span>
-                  <span>{r.home}: {r.p1Stats?.highCheckout || 0} C/O</span>
-                  <span className="text-right">{r.away}: {r.p2Stats?.highCheckout || 0} C/O</span>
-                </div>
-              </Card>
-            </button>
+        <div>
+          <SectionTitle kicker={`Matchweek ${currentWeek}`} title="Fixtures" />
+          {weekFixtures.length === 0 ? (
+            <Card>
+              <p className="font-semibold">No fixtures listed for Week {currentWeek}.</p>
+              <p className="mt-1.5 text-sm text-odcCream/55">They'll appear here as soon as they're added.</p>
+            </Card>
+          ) : (
+            <ul className="border-t border-odcCream/[0.13]">
+              {weekFixtures.map((f, i) => (
+                <Reveal key={`${f.home}-${f.away}-${i}`} delay={i * 0.05}>
+                  <li className="grid grid-cols-[1fr_auto] items-center gap-3.5 border-b border-odcCream/[0.06] px-1 py-3.5 transition hover:bg-odcNavy">
+                    <span>
+                      <span className="text-sm font-semibold">
+                        {f.home} <span className="px-1.5 font-medium text-odcCream/35">v</span> {f.away}
+                      </span>
+                      <span className="mono mt-1 block text-[10px] uppercase tracking-[0.12em] text-odcCream/40">
+                        {f.division}
+                      </span>
+                    </span>
+                    <span className="mono text-xs font-semibold text-odcCream/70">{f.date || "TBC"}</span>
+                  </li>
+                </Reveal>
+              ))}
+            </ul>
+          )}
+          <button onClick={() => setActive("fixtures")} className="mono mt-4 text-xs font-semibold uppercase tracking-[0.1em] text-odcCream/60 transition hover:text-odcCream">
+            Full fixture list →
+          </button>
+        </div>
+      </section>
+
+      {/* ---------- LATEST RESULTS — final scores rundown ---------- */}
+      {data.results && data.results.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 pt-14 md:pt-20">
+          <SectionTitle kicker="Latest results" title="Final Scores" />
+          <ul className="num border-t border-odcCream/[0.13]">
+            {data.results.slice(0, 6).map((r, index) => (
+              <Reveal key={r.id || `${r.home}-${r.away}-${index}`} delay={index * 0.06}>
+                <li className="group relative">
+                  <button
+                    onClick={() => onSelectMatch(r)}
+                    className="grid w-full grid-cols-[auto_1fr_auto_1fr] items-center gap-3 px-1 py-4 text-left transition hover:bg-odcNavy md:grid-cols-[auto_1fr_auto_1fr_auto] md:gap-4"
+                  >
+                    <span className="mono rounded border border-odcCream/[0.13] px-1.5 py-1 text-[9.5px] font-semibold tracking-[0.12em] text-odcCream/40">
+                      FT
+                    </span>
+                    <span className="display truncate text-right text-base tracking-[0.02em] md:text-lg">{r.home}</span>
+                    <span className="score rounded bg-odcRed px-2.5 py-1 text-[15px] text-white">{r.score}</span>
+                    <span className="display truncate text-base tracking-[0.02em] md:text-lg">{r.away}</span>
+                    <span className="mono hidden text-right text-[10.5px] text-odcCream/40 md:block">
+                      {r.p1Stats?.avg || "-"} / {r.p2Stats?.avg || "-"} AVG
+                    </span>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); shareResultCard(r); }}
+                    className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded-md p-2 text-odcCream/40 transition hover:bg-odcRed hover:text-white group-hover:block md:right-24"
+                    title="Share result card"
+                  >
+                    <Share2 size={14} />
+                  </button>
+                  <span className="block border-b border-odcCream/[0.06]" aria-hidden="true" />
+                </li>
+              </Reveal>
+            ))}
+          </ul>
+          <button onClick={() => setActive("results")} className="mono mt-4 text-xs font-semibold uppercase tracking-[0.1em] text-odcCream/60 transition hover:text-odcCream">
+            All results →
+          </button>
+        </section>
+      )}
+
+      {/* ---------- GET IN THE GAME ---------- */}
+      <section className="mx-auto max-w-7xl px-4 py-14 md:py-20">
+        <SectionTitle kicker="New players" title="Get in the Game" />
+        <div className="grid gap-px overflow-hidden rounded-xl border border-odcCream/[0.13] bg-odcCream/[0.13] md:grid-cols-3">
+          {[
+            { n: "01", t: "Join the Discord", d: "One tap, say hello — you're in the room where it happens." },
+            { n: "02", t: "Get your division", d: "Placed by average, so every leg is a contest." },
+            { n: "03", t: "Throw Thursday nights", d: "Fixtures land weekly. Stats, tables and bragging rights follow." },
+          ].map((step, i) => (
+            <Reveal key={step.n} delay={i * 0.08}>
+              <div className="group h-full bg-odcNavy p-6 pb-7">
+                <span
+                  className="display num text-[44px] leading-none text-transparent transition"
+                  style={{ WebkitTextStroke: "1.5px rgba(233,239,231,.3)" }}
+                >
+                  {step.n}
+                </span>
+                <h3 className="mt-3.5 text-xl tracking-[0.03em]">{step.t}</h3>
+                <p className="mt-1.5 text-[13.5px] leading-6 text-odcCream/55">{step.d}</p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -581,7 +897,7 @@ function FixturesPage({ data }) {
             <select
               value={selectedDivision}
               onChange={(e) => setSelectedDivision(e.target.value)}
-              className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
+              className="w-full appearance-none rounded-lg border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-semibold text-odcCream outline-none md:w-72"
             >
               {divisionNames.map((name) => (
                 <option key={name} value={name}>{name}</option>
@@ -594,7 +910,7 @@ function FixturesPage({ data }) {
             <select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
-              className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-56"
+              className="w-full appearance-none rounded-lg border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-semibold text-odcCream outline-none md:w-56"
             >
               <option value="current">This Week (Week {currentWeek})</option>
               <option value="next">Next Week (Week {currentWeek + 1})</option>
@@ -606,20 +922,20 @@ function FixturesPage({ data }) {
 
       {rows.length === 0 ? (
         <Card>
-          <p className="text-lg font-black">No fixtures listed for Week {targetWeek}.</p>
+          <p className="text-lg font-semibold">No fixtures listed for Week {targetWeek}.</p>
           <p className="mt-2 text-odcCream/60">Fixtures will appear here once they've been added.</p>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((fixture, index) => (
             <Card key={`${fixture.division}-${fixture.home}-${fixture.away}-${index}`}>
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcCream/45">
                 {fixture.division} • Week {fixture.week}
               </p>
               <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                <p className="text-lg font-black">{fixture.home}</p>
-                <p className="rounded-xl bg-odcRed px-3 py-1 text-sm font-black text-white">VS</p>
-                <p className="text-right text-lg font-black">{fixture.away}</p>
+                <p className="text-lg font-semibold">{fixture.home}</p>
+                <p className="rounded-xl bg-odcRed px-3 py-1 text-sm font-semibold text-white">VS</p>
+                <p className="text-right text-lg font-semibold">{fixture.away}</p>
               </div>
               <p className="mt-4 text-sm text-odcCream/60">
                 {fixture.date ? `Scheduled: ${fixture.date}` : "Date to be confirmed"}
@@ -652,7 +968,7 @@ function ResultsPage({ data, onSelectMatch }) {
           <select
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
-            className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
+            className="w-full appearance-none rounded-lg border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-semibold text-odcCream outline-none md:w-72"
           >
             {divisionNames.map((name) => (
               <option key={name}>{name}</option>
@@ -664,7 +980,7 @@ function ResultsPage({ data, onSelectMatch }) {
 
       {rows.length === 0 ? (
         <Card>
-          <p className="text-lg font-black">No results available for this division yet.</p>
+          <p className="text-lg font-semibold">No results available for this division yet.</p>
         </Card>
       ) : (
         <ResultCards results={rows} onSelectMatch={onSelectMatch} />
@@ -691,7 +1007,7 @@ function TablesPage({ data }) {
           <select
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
-            className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
+            className="w-full appearance-none rounded-lg border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-semibold text-odcCream outline-none md:w-72"
           >
             {tableNames.map((name) => (
               <option key={name}>{name}</option>
@@ -704,7 +1020,7 @@ function TablesPage({ data }) {
       <Card className="overflow-x-auto p-0">
         <table className="w-full min-w-[760px] border-collapse">
           <thead className="bg-odcNavy">
-            <tr className="text-left text-xs uppercase tracking-[0.22em] text-odcCream/55">
+            <tr className="text-left text-xs uppercase tracking-[0.1em] text-odcCream/55">
               <th className="p-4">#</th>
               <th className="p-4">Player</th>
               <th className="p-4">P</th>
@@ -719,15 +1035,15 @@ function TablesPage({ data }) {
           <StaggerRows>
             {rows.map((row) => (
               <Row key={row.name} className="border-t border-odcCream/10">
-                <td className="p-4 font-black text-odcRed">{row.pos}</td>
-                <td className="p-4 font-black">{row.name}</td>
+                <td className="p-4 font-semibold text-odcRed">{row.pos}</td>
+                <td className="p-4 font-semibold">{row.name}</td>
                 <td className="p-4">{row.played}</td>
                 <td className="p-4">{row.wins}</td>
                 <td className="p-4">{row.draws || 0}</td>
                 <td className="p-4">{row.losses}</td>
                 <td className="p-4">{row.legs}</td>
                 <td className="p-4 text-sm text-odcCream/60">{row.form}</td>
-                <td className="p-4 text-xl font-black">{row.points}</td>
+                <td className="p-4 text-xl font-semibold">{row.points}</td>
               </Row>
             ))}
           </StaggerRows>
@@ -769,7 +1085,7 @@ function DuoLeaguePage({ data }) {
   <select
     value={view}
     onChange={(e) => setView(e.target.value)}
-    className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
+    className="w-full appearance-none rounded-lg border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-semibold text-odcCream outline-none md:w-72"
   >
     <option value="tables">Group Tables</option>
     <option value="knockout">Knockout Bracket</option>
@@ -783,7 +1099,7 @@ function DuoLeaguePage({ data }) {
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
-              className="w-full appearance-none rounded-2xl border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-black text-odcCream outline-none md:w-72"
+              className="w-full appearance-none rounded-lg border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-semibold text-odcCream outline-none md:w-72"
             >
               {groupNames.map((name) => (
                 <option key={name} value={name}>{name}</option>
@@ -799,14 +1115,14 @@ function DuoLeaguePage({ data }) {
 {rows.length === 0 ? (
   
         <Card>
-          <p className="text-lg font-black">No Duo League table data found.</p>
+          <p className="text-lg font-semibold">No Duo League table data found.</p>
           <p className="mt-2 text-odcCream/60">The standings table could not be read from the Duo League sheet.</p>
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[900px] border-collapse">
             <thead className="bg-odcNavy">
-              <tr className="text-left text-xs uppercase tracking-[0.22em] text-odcCream/55">
+              <tr className="text-left text-xs uppercase tracking-[0.1em] text-odcCream/55">
                 <th className="p-4">#</th>
                 <th className="p-4">Team</th>
                 <th className="p-4">Avg</th>
@@ -824,8 +1140,8 @@ function DuoLeaguePage({ data }) {
             <tbody>
               {rows.map((row) => (
                 <tr key={`${selected}-${row.team}`} className="border-t border-odcCream/10">
-                  <td className="p-4 font-black text-odcRed">{row.rank}</td>
-                  <td className="p-4 font-black">{row.team}</td>
+                  <td className="p-4 font-semibold text-odcRed">{row.rank}</td>
+                  <td className="p-4 font-semibold">{row.team}</td>
                   <td className="p-4">{row.teamAvg || "-"}</td>
                   <td className="p-4">{row.played}</td>
                   <td className="p-4">{row.wins}</td>
@@ -834,10 +1150,10 @@ function DuoLeaguePage({ data }) {
                   <td className="p-4">{row.legsFor}</td>
                   <td className="p-4">{row.legsAgainst}</td>
                   <td className="p-4">{row.legDiff}</td>
-                  <td className="p-4 text-xl font-black">{row.points}</td>
+                  <td className="p-4 text-xl font-semibold">{row.points}</td>
                   <td className="p-4">
                     {row.status ? (
-                      <span className="rounded-xl bg-odcRed/15 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-odcRed">
+                      <span className="rounded-xl bg-odcRed/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-odcRed">
                         {row.status}
                       </span>
                     ) : (
@@ -875,7 +1191,7 @@ function PlayersPage({ data, onSelectPlayer }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search player..."
-            className="w-full rounded-2xl border border-odcCream/15 bg-odcNavy px-11 py-4 font-bold text-odcCream outline-none placeholder:text-odcCream/35 md:w-80"
+            className="w-full rounded-lg border border-odcCream/15 bg-odcNavy px-11 py-4 font-bold text-odcCream outline-none placeholder:text-odcCream/35 md:w-80"
           />
         </div>
       </div>
@@ -887,7 +1203,7 @@ function PlayersPage({ data, onSelectPlayer }) {
               <Card className="h-full cursor-pointer transition hover:-translate-y-1 hover:border-odcGreen/40">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-xl font-black">{p.name}</h3>
+                    <h3 className="text-xl font-semibold">{p.name}</h3>
                     <p className="text-sm text-odcCream/50">{p.division}</p>
                   </div>
                   <Target className="text-odcGreen" />
@@ -903,7 +1219,7 @@ function PlayersPage({ data, onSelectPlayer }) {
             </button>
             <a
               href={`/player/${playerSlug(p.name)}`}
-              className="absolute bottom-4 right-4 inline-flex items-center gap-1.5 rounded-xl border border-odcGold/30 bg-odcBlack/60 px-3 py-2 text-xs font-black text-odcGold transition hover:bg-odcGold hover:text-odcBlack"
+              className="absolute bottom-4 right-4 inline-flex items-center gap-1.5 rounded-xl border border-odcGold/30 bg-odcBlack/60 px-3 py-2 text-xs font-semibold text-odcGold transition hover:bg-odcGold hover:text-odcBlack"
             >
               ↗ Share Card
             </a>
@@ -933,7 +1249,7 @@ function LeaderboardsPage({ data }) {
           <Card key={title}>
             <div className="mb-4 flex items-center gap-2">
               <Icon className="text-odcRed" />
-              <h3 className="text-xl font-black">{title}</h3>
+              <h3 className="text-xl font-semibold">{title}</h3>
             </div>
             {list
               .filter((p) => Number(p[key]) > 0)
@@ -943,7 +1259,7 @@ function LeaderboardsPage({ data }) {
                   <span className="font-bold">
                     {i + 1}. {p.name}
                   </span>
-                  <span className="rounded-lg bg-odcCream/10 px-3 py-1 font-black">{p[key]}</span>
+                  <span className="rounded-lg bg-odcCream/10 px-3 py-1 font-semibold">{p[key]}</span>
                 </div>
               ))}
           </Card>
@@ -962,17 +1278,17 @@ function MvpsPage({ data }) {
 
       {mvps.length === 0 ? (
         <Card>
-          <p className="text-lg font-black">No MVPs available yet.</p>
+          <p className="text-lg font-semibold">No MVPs available yet.</p>
           <p className="mt-2 text-odcCream/60">Weekly MVPs will appear here once the relevant ODC match results have been recorded.</p>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {mvps.map((mvp) => (
             <Card key={`${mvp.division}-${mvp.player}`}>
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-odcCream/45">{mvp.division}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcCream/45">{mvp.division}</p>
               <div className="mt-4 flex items-center gap-3">
                 <Award className="text-odcRed" size={30} />
-                <h3 className="text-2xl font-black">{mvp.player}</h3>
+                <h3 className="text-2xl font-semibold">{mvp.player}</h3>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <SmallStat label="3DA" value={mvp.avg} />
@@ -1001,7 +1317,7 @@ function KnockoutBracket({ knockout }) {
             ? "bg-odcRed/25 border border-odcRed"
             : "bg-white/5"
         }`}>
-          <span className="font-black">
+          <span className="font-semibold">
             {match.home || "TBD"}
           </span>
 
@@ -1016,7 +1332,7 @@ function KnockoutBracket({ knockout }) {
             ? "bg-odcRed/25 border border-odcRed"
             : "bg-white/5"
         }`}>
-          <span className="font-black">
+          <span className="font-semibold">
             {match.away || "TBD"}
           </span>
 
@@ -1033,7 +1349,7 @@ function KnockoutBracket({ knockout }) {
   return (
     <section className="mt-10 overflow-x-auto">
 
-      <h2 className="mb-8 text-center text-3xl font-black">
+      <h2 className="mb-8 text-center text-3xl font-semibold">
         🏆 Dynamic Duo Knockout
       </h2>
 
@@ -1041,7 +1357,7 @@ function KnockoutBracket({ knockout }) {
       <div className="flex min-w-[1000px] items-center gap-12">
 
         <div className="space-y-6">
-          <h3 className="text-center font-black text-odcRed">
+          <h3 className="text-center font-semibold text-odcRed">
             Quarter Finals
           </h3>
 
@@ -1052,7 +1368,7 @@ function KnockoutBracket({ knockout }) {
 
 
         <div className="space-y-20">
-          <h3 className="text-center font-black text-odcRed">
+          <h3 className="text-center font-semibold text-odcRed">
             Semi Finals
           </h3>
 
@@ -1063,7 +1379,7 @@ function KnockoutBracket({ knockout }) {
 
 
         <div>
-          <h3 className="text-center font-black text-odcRed mb-6">
+          <h3 className="text-center font-semibold text-odcRed mb-6">
             Final
           </h3>
 
@@ -1081,7 +1397,7 @@ function KnockoutBracket({ knockout }) {
             Champion
           </p>
 
-          <h2 className="text-2xl font-black mt-2">
+          <h2 className="text-2xl font-semibold mt-2">
             {knockout.champion || "TBD"}
           </h2>
         </Card>
@@ -1106,7 +1422,7 @@ function EventsPage({ data }) {
 
       {events.length === 0 ? (
         <Card className="max-w-2xl">
-          <p className="text-lg font-black">No events listed yet.</p>
+          <p className="text-lg font-semibold">No events listed yet.</p>
           <p className="mt-2 text-odcCream/60">Events will appear here once added to the sheet.</p>
           <div className="mt-5">
             <SocialButtons />
@@ -1118,21 +1434,21 @@ function EventsPage({ data }) {
             <Card key={e.name} className="flex flex-col gap-3 transition hover:-translate-y-1 hover:border-odcRed/40">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.25em] text-odcRed">{e.date}</p>
-                  <h3 className="mt-1 text-xl font-black">{e.name}</h3>
+                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcRed">{e.date}</p>
+                  <h3 className="mt-1 text-xl font-semibold">{e.name}</h3>
                 </div>
                 <CalendarDays className="shrink-0 text-odcRed" size={22} />
               </div>
 
               {e.format && (
                 <p className="text-sm text-odcCream/60">
-                  <span className="font-black text-odcCream/80">Format: </span>{e.format}
+                  <span className="font-semibold text-odcCream/80">Format: </span>{e.format}
                 </p>
               )}
 
               {e.prize && (
                 <p className="text-sm text-odcCream/60">
-                  <span className="font-black text-odcCream/80">Prize: </span>{e.prize}
+                  <span className="font-semibold text-odcCream/80">Prize: </span>{e.prize}
                 </p>
               )}
 
@@ -1141,13 +1457,13 @@ function EventsPage({ data }) {
                   href={e.signUp}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-auto inline-flex w-fit items-center gap-2 rounded-2xl bg-odcRed px-4 py-2 text-sm font-black text-white shadow-glow"
+                  className="mt-auto inline-flex w-fit items-center gap-2 rounded-lg bg-odcRed px-4 py-2 text-sm font-semibold text-white"
                 >
                   <ExternalLink size={15} /> Sign Up
                 </a>
               ) : e.signUp ? (
                 <p className="text-sm text-odcCream/60">
-                  <span className="font-black text-odcCream/80">Sign Up: </span>{e.signUp}
+                  <span className="font-semibold text-odcCream/80">Sign Up: </span>{e.signUp}
                 </p>
               ) : null}
             </Card>
@@ -1179,11 +1495,12 @@ export default function App() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(22,196,108,0.2)_0%,transparent_42%),radial-gradient(circle_at_90%_12%,rgba(232,199,102,0.1)_0%,transparent_45%),linear-gradient(175deg,#0a3320_0%,#072818_30%,#04190f_65%,#020d08_100%)] pb-24 text-odcCream xl:pb-0">
+    <main className="min-h-screen bg-odcBlack pb-24 text-odcCream xl:pb-0">
+      <Ticker results={data.allResults?.length ? data.allResults : data.results} />
       <Header active={active} setActive={setActive} />
 
       {status === "fallback" && (
-        <div className="bg-odcRed px-4 py-2 text-center text-sm font-black text-white">
+        <div className="bg-odcRed px-4 py-2 text-center text-sm font-semibold text-white">
           Google Sheets data could not be loaded. Showing demo data.
         </div>
       )}
@@ -1201,8 +1518,8 @@ export default function App() {
         {active === "events"       && <EventsPage data={data} />}
       </motion.div>
 
-      <footer className="border-t border-odcCream/10 px-4 py-8 text-center text-sm text-odcCream/45">
-        © ODC — Online Darts Circuit. Competitive online darts, organised properly.
+      <footer className="mono border-t border-odcCream/10 px-4 py-8 text-center text-[11px] uppercase tracking-[0.1em] text-odcCream/40">
+        © ODC — Online Darts Circuit · Stats update live from the league sheet
       </footer>
 
       <BottomNav active={active} setActive={setActive} />

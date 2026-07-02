@@ -245,8 +245,8 @@ export default function Predictions({ data, scriptUrl }) {
   // =================== RENDER ===================
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <p className="text-xs font-black uppercase tracking-[0.3em] text-odcGreen">Predictions Game</p>
-      <h2 className="mt-1 text-3xl font-black md:text-4xl">
+      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcGreen">Predictions Game</p>
+      <h2 className="mt-1 text-3xl font-semibold md:text-4xl">
         {tab === "predict" ? `Predict Week ${currentWeek}` : "Leaderboard"}
       </h2>
       <p className="mt-2 text-sm text-odcCream/60">
@@ -257,9 +257,9 @@ export default function Predictions({ data, scriptUrl }) {
       <div className="mt-5 flex gap-2">
         <button
           onClick={() => setTab("predict")}
-          className={`flex-1 rounded-2xl px-4 py-3 text-sm font-black transition ${
+          className={`flex-1 rounded-lg px-4 py-3 text-sm font-semibold transition ${
             tab === "predict"
-              ? "bg-odcGreen text-odcBlack shadow-green"
+              ? "bg-odcGreen text-odcBlack"
               : "border border-odcGold/20 bg-white/[0.03] text-odcCream/60"
           }`}
         >
@@ -267,9 +267,9 @@ export default function Predictions({ data, scriptUrl }) {
         </button>
         <button
           onClick={() => setTab("leaderboard")}
-          className={`flex-1 rounded-2xl px-4 py-3 text-sm font-black transition ${
+          className={`flex-1 rounded-lg px-4 py-3 text-sm font-semibold transition ${
             tab === "leaderboard"
-              ? "bg-odcGreen text-odcBlack shadow-green"
+              ? "bg-odcGreen text-odcBlack"
               : "border border-odcGold/20 bg-white/[0.03] text-odcCream/60"
           }`}
         >
@@ -281,12 +281,12 @@ export default function Predictions({ data, scriptUrl }) {
       {tab === "predict" && (
         <div className="mt-5">
           {/* Name dropdown */}
-          <div className="rounded-3xl border border-odcGold/25 bg-gradient-to-br from-odcGreen/10 to-transparent p-4">
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-odcGold">Playing as</p>
+          <div className="rounded-xl border border-odcGold/25 bg-odcNavy p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-odcGold">Playing as</p>
             <select
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full rounded-xl border border-odcGold/30 bg-odcBlack/60 px-4 py-3 text-base font-black text-odcCream outline-none"
+              className="w-full rounded-xl border border-odcGold/30 bg-odcBlack/60 px-4 py-3 text-base font-semibold text-odcCream outline-none"
             >
               <option value="">Select your name…</option>
               {players
@@ -302,12 +302,12 @@ export default function Predictions({ data, scriptUrl }) {
           </div>
 
           <div className="mb-3 mt-5 flex items-center justify-between">
-            <span className="text-sm font-black">Week {currentWeek} Fixtures</span>
+            <span className="text-sm font-semibold">Week {currentWeek} Fixtures</span>
             <span className="text-xs text-odcCream/55">{filledCount}/{openFixtures.length} predicted</span>
           </div>
 
           {weekFixtures.length === 0 && (
-            <p className="rounded-2xl border border-odcGold/15 bg-white/[0.03] p-6 text-center text-sm text-odcCream/60">
+            <p className="rounded-lg border border-odcGold/15 bg-white/[0.03] p-6 text-center text-sm text-odcCream/60">
               No fixtures found for this week yet. Check back soon.
             </p>
           )}
@@ -321,21 +321,21 @@ export default function Predictions({ data, scriptUrl }) {
               return p && p.homeScore !== "" && p.homeScore != null && p.awayScore !== "" && p.awayScore != null;
             }).length;
             return (
-              <div key={division} className="mb-3 overflow-hidden rounded-3xl border border-odcGold/15 bg-gradient-to-br from-odcGreen/[0.05] to-transparent">
+              <div key={division} className="mb-3 overflow-hidden rounded-xl border border-odcGold/15 bg-odcNavy">
                 {/* Division header — tap to expand/collapse */}
                 <button
                   onClick={() => toggleDiv(division)}
                   className="flex w-full items-center justify-between px-5 py-4 text-left"
                 >
                   <span className="flex items-center gap-3">
-                    <span className="text-base font-black text-odcCream">{division}</span>
-                    <span className="rounded-full bg-odcGold/15 px-2.5 py-1 text-[10px] font-black text-odcGold">
+                    <span className="text-base font-semibold text-odcCream">{division}</span>
+                    <span className="rounded-full bg-odcGold/15 px-2.5 py-1 text-[10px] font-semibold text-odcGold">
                       {divFixtures.length} {divFixtures.length === 1 ? "game" : "games"}
                     </span>
                   </span>
                   <span className="flex items-center gap-3">
                     {openCount > 0 && (
-                      <span className="text-[11px] font-black text-odcCream/55">{predictedInDiv}/{openCount}</span>
+                      <span className="text-[11px] font-semibold text-odcCream/55">{predictedInDiv}/{openCount}</span>
                     )}
                     <span className={`text-odcGold transition-transform ${isOpen ? "rotate-180" : ""}`}>▾</span>
                   </span>
@@ -352,15 +352,15 @@ export default function Predictions({ data, scriptUrl }) {
                       return (
                         <div
                           key={i}
-                          className={`rounded-2xl border border-odcGold/12 bg-odcBlack/20 p-4 ${locked ? "opacity-60" : ""}`}
+                          className={`rounded-lg border border-odcGold/12 bg-odcBlack/20 p-4 ${locked ? "opacity-60" : ""}`}
                         >
                           {locked && (
-                            <span className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-odcGold/12 px-2.5 py-1 text-[9px] font-black text-odcGold">
+                            <span className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-odcGold/12 px-2.5 py-1 text-[9px] font-semibold text-odcGold">
                               🔒 Locked · result posted
                             </span>
                           )}
                           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                            <span className="text-sm font-black">{f.home}</span>
+                            <span className="text-sm font-semibold">{f.home}</span>
                             <div className="flex items-center justify-center gap-2">
                               <input
                                 type="number"
@@ -370,13 +370,13 @@ export default function Predictions({ data, scriptUrl }) {
                                 value={locked ? actual?.homeScore ?? "" : p.homeScore ?? ""}
                                 onChange={(e) => setScore(key, "homeScore", e.target.value)}
                                 placeholder="–"
-                                className={`h-11 w-11 rounded-xl border text-center text-lg font-black outline-none ${
+                                className={`h-11 w-11 rounded-xl border text-center text-lg font-semibold outline-none ${
                                   (locked ? actual?.homeScore != null : p.homeScore !== "" && p.homeScore != null)
                                     ? "border-transparent bg-odcGreen text-odcBlack"
                                     : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
                                 }`}
                               />
-                              <span className="text-xs font-black text-odcCream/40">–</span>
+                              <span className="text-xs font-semibold text-odcCream/40">–</span>
                               <input
                                 type="number"
                                 min="0"
@@ -385,14 +385,14 @@ export default function Predictions({ data, scriptUrl }) {
                                 value={locked ? actual?.awayScore ?? "" : p.awayScore ?? ""}
                                 onChange={(e) => setScore(key, "awayScore", e.target.value)}
                                 placeholder="–"
-                                className={`h-11 w-11 rounded-xl border text-center text-lg font-black outline-none ${
+                                className={`h-11 w-11 rounded-xl border text-center text-lg font-semibold outline-none ${
                                   (locked ? actual?.awayScore != null : p.awayScore !== "" && p.awayScore != null)
                                     ? "border-transparent bg-odcGreen text-odcBlack"
                                     : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
                                 }`}
                               />
                             </div>
-                            <span className="text-right text-sm font-black">{f.away}</span>
+                            <span className="text-right text-sm font-semibold">{f.away}</span>
                           </div>
                         </div>
                       );
@@ -407,13 +407,13 @@ export default function Predictions({ data, scriptUrl }) {
             <button
               onClick={submit}
               disabled={submitting}
-              className="mt-2 w-full rounded-2xl bg-odcGreen px-6 py-4 text-base font-black text-odcBlack shadow-glow transition disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-odcGreen px-6 py-4 text-base font-semibold text-odcBlack transition disabled:opacity-60"
             >
               {submitting ? "Submitting…" : submitted ? "✓ Predictions Saved!" : "Submit My Predictions"}
             </button>
           )}
           {submitted && (
-            <p className="mt-3 text-center text-sm font-black text-odcGreen">
+            <p className="mt-3 text-center text-sm font-semibold text-odcGreen">
               Saved! Come back after results post to see your points.
             </p>
           )}
@@ -429,7 +429,7 @@ export default function Predictions({ data, scriptUrl }) {
               <button
                 key={w}
                 onClick={() => setLbWeek(w)}
-                className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-black transition ${
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition ${
                   activeLbWeek === w
                     ? "border border-odcGold/40 bg-odcGold/15 text-odcGold"
                     : "border border-odcGold/20 bg-white/[0.03] text-odcCream/60"
@@ -443,13 +443,13 @@ export default function Predictions({ data, scriptUrl }) {
           {loadingLb && <p className="py-8 text-center text-sm text-odcCream/60">Loading leaderboard…</p>}
 
           {!loadingLb && lbError && (
-            <p className="rounded-2xl border border-odcRed/30 bg-odcRed/10 p-4 text-center text-sm text-odcCream/80">
+            <p className="rounded-lg border border-odcRed/30 bg-odcRed/10 p-4 text-center text-sm text-odcCream/80">
               Couldn't load predictions. Try again shortly.
             </p>
           )}
 
           {!loadingLb && leaderboard.length === 0 && (
-            <p className="rounded-2xl border border-odcGold/15 bg-white/[0.03] p-6 text-center text-sm text-odcCream/60">
+            <p className="rounded-lg border border-odcGold/15 bg-white/[0.03] p-6 text-center text-sm text-odcCream/60">
               No scored predictions yet. Once results are posted, points appear here.
             </p>
           )}
@@ -462,12 +462,12 @@ export default function Predictions({ data, scriptUrl }) {
                 const isFirst = idx === 0;
                 return (
                   <div key={idx} className="flex-1 text-center">
-                    <p className="mb-1 text-[10px] font-black text-odcCream/40">
+                    <p className="mb-1 text-[10px] font-semibold text-odcCream/40">
                       {idx === 0 ? "1st" : idx === 1 ? "2nd" : "3rd"}
                     </p>
                     <div
-                      className={`mx-auto mb-2 flex items-center justify-center rounded-2xl font-black text-odcBlack ${
-                        isFirst ? "h-16 w-16 shadow-gold" : "h-14 w-14"
+                      className={`mx-auto mb-2 flex items-center justify-center rounded-lg font-semibold text-odcBlack ${
+                        isFirst ? "h-16 w-16" : "h-14 w-14"
                       }`}
                       style={{
                         background: isFirst
@@ -477,8 +477,8 @@ export default function Predictions({ data, scriptUrl }) {
                     >
                       {initials(entry.player)}
                     </div>
-                    <p className="text-sm font-black">{entry.player}</p>
-                    <p className="text-xs font-black text-odcGold">{entry.pts} pts</p>
+                    <p className="text-sm font-semibold">{entry.player}</p>
+                    <p className="text-xs font-semibold text-odcGold">{entry.pts} pts</p>
                   </div>
                 );
               })}
@@ -492,17 +492,17 @@ export default function Predictions({ data, scriptUrl }) {
               return (
                 <div
                   key={entry.player}
-                  className="mb-2 flex items-center gap-4 rounded-2xl border border-odcGold/14 bg-gradient-to-br from-odcGreen/[0.06] to-transparent px-4 py-3"
+                  className="mb-2 flex items-center gap-4 rounded-lg border border-odcGold/14 bg-odcNavy px-4 py-3"
                 >
-                  <span className="w-6 text-base font-black text-odcGreen">{rank}</span>
+                  <span className="w-6 text-base font-semibold text-odcGreen">{rank}</span>
                   <div
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black text-odcBlack"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-semibold text-odcBlack"
                     style={{ background: "linear-gradient(135deg,#22d97a,#0c8f4c)" }}
                   >
                     {initials(entry.player)}
                   </div>
-                  <span className="flex-1 text-base font-black">{entry.player}</span>
-                  <span className="text-lg font-black text-odcGold">
+                  <span className="flex-1 text-base font-semibold">{entry.player}</span>
+                  <span className="text-lg font-semibold text-odcGold">
                     {entry.pts}
                     <span className="text-[10px] text-odcCream/40"> pts</span>
                   </span>

@@ -182,30 +182,29 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
   ];
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4 backdrop-blur">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.94, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-odcCream/15 bg-odcBlack shadow-glow"
+        className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-odcCream/15 bg-odcBlack"
       >
-        <div className="relative overflow-hidden rounded-t-3xl border-b border-odcCream/10 bg-gradient-to-br from-odcNavy to-black p-6">
-          <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-odcRed/20 blur-3xl" />
+        <div className="relative overflow-hidden rounded-t-3xl border-b border-odcCream/10 bg-odcNavy p-6">
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
               <div
-                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl text-2xl font-black text-white shadow-lg"
+                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg text-2xl font-semibold text-white shadow-lg"
                 style={{ background: avatarColor(player.name) }}
               >
                 {initials(player.name)}
               </div>
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.3em] text-odcRed">{master?.division || player.division}</p>
-                <h3 className="mt-1 text-3xl font-black">{player.name}</h3>
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcRed">{master?.division || player.division}</p>
+                <h3 className="mt-1 text-3xl font-semibold">{player.name}</h3>
                 <div className="mt-2 flex items-center gap-2">
                   {recentForm.map((r, i) => (
                     <span
                       key={i}
-                      className={`flex h-6 w-6 items-center justify-center rounded-md text-xs font-black ${
+                      className={`flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold ${
                         r === "W" ? "bg-green-500/20 text-green-400" : r === "L" ? "bg-odcRed/20 text-odcRed" : "bg-white/10 text-odcCream/60"
                       }`}
                     >
@@ -213,7 +212,7 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
                     </span>
                   ))}
                   {streak.count >= 2 && streak.type && (
-                    <span className="ml-1 text-xs font-black text-odcCream/60">
+                    <span className="ml-1 text-xs font-semibold text-odcCream/60">
                       {streak.count} {streak.type === "W" ? "win" : streak.type === "L" ? "loss" : "draw"} streak
                     </span>
                   )}
@@ -222,11 +221,11 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
             </div>
             <div className="flex items-center gap-2">
               {onShare && (
-                <button onClick={() => onShare(player)} className="rounded-2xl bg-odcRed/90 p-3 text-white transition hover:bg-odcRed" title="Share profile">
+                <button onClick={() => onShare(player)} className="rounded-lg bg-odcRed/90 p-3 text-white transition hover:bg-odcRed" title="Share profile">
                   <Share2 size={18} />
                 </button>
               )}
-              <button onClick={onClose} className="rounded-2xl bg-white/10 p-3">
+              <button onClick={onClose} className="rounded-lg bg-white/10 p-3">
                 <X />
               </button>
             </div>
@@ -239,7 +238,7 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
               {badges.map((b, i) => {
                 const Icon = b.icon;
                 return (
-                  <span key={i} className="inline-flex items-center gap-2 rounded-full border border-odcCream/15 bg-white/5 px-3 py-2 text-xs font-black">
+                  <span key={i} className="inline-flex items-center gap-2 rounded-full border border-odcCream/15 bg-white/5 px-3 py-2 text-xs font-semibold">
                     <Icon size={15} className={b.color} />
                     {b.label}
                   </span>
@@ -249,11 +248,11 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
           )}
 
           {formData.length >= 2 && (
-            <div className="mb-6 rounded-3xl border border-odcCream/10 bg-white/[0.03] p-5">
+            <div className="mb-6 rounded-xl border border-odcCream/10 bg-white/[0.03] p-5">
               <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-black uppercase tracking-[0.2em] text-odcCream/70">Average Form</h4>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.1em] text-odcCream/70">Average Form</h4>
                 {trend !== 0 && (
-                  <span className={`inline-flex items-center gap-1 text-xs font-black ${trend > 0 ? "text-green-400" : "text-odcRed"}`}>
+                  <span className={`inline-flex items-center gap-1 text-xs font-semibold ${trend > 0 ? "text-green-400" : "text-odcRed"}`}>
                     {trend > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     {trend > 0 ? "+" : ""}{trend.toFixed(1)} trend
                   </span>
@@ -265,16 +264,16 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {statGrid.map(([label, value]) => (
-              <div key={label} className="rounded-2xl border border-odcCream/10 bg-white/[0.04] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-odcCream/45">{label}</p>
-                <p className="mt-1 text-2xl font-black">{value ?? "-"}</p>
+              <div key={label} className="rounded-lg border border-odcCream/10 bg-white/[0.04] p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-odcCream/45">{label}</p>
+                <p className="mt-1 text-2xl font-semibold">{value ?? "-"}</p>
               </div>
             ))}
           </div>
 
           {playerMatches.length > 0 && (
             <div className="mt-8">
-              <h4 className="mb-4 text-xl font-black">Recent Matches</h4>
+              <h4 className="mb-4 text-xl font-semibold">Recent Matches</h4>
               <div className="grid gap-3 md:grid-cols-2">
                 {chronoMatches.slice(-8).reverse().map((m, i) => {
                   const isHome = m.home === player.name;
@@ -282,14 +281,14 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
                   const won = sc && sc.for > sc.against;
                   const opp = isHome ? m.away : m.home;
                   return (
-                    <div key={m.id || i} className={`rounded-2xl border p-4 ${won ? "border-green-500/30 bg-green-500/5" : "border-odcRed/30 bg-odcRed/5"}`}>
+                    <div key={m.id || i} className={`rounded-lg border p-4 ${won ? "border-green-500/30 bg-green-500/5" : "border-odcRed/30 bg-odcRed/5"}`}>
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-odcCream/45">{m.division || "League"}</p>
-                          <p className="mt-1 font-black">vs {opp}</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-odcCream/45">{m.division || "League"}</p>
+                          <p className="mt-1 font-semibold">vs {opp}</p>
                         </div>
                         <div className="text-right">
-                          <span className={`rounded-lg px-3 py-1 text-lg font-black ${won ? "bg-green-500/20 text-green-400" : "bg-odcRed/20 text-odcRed"}`}>
+                          <span className={`rounded-lg px-3 py-1 text-lg font-semibold ${won ? "bg-green-500/20 text-green-400" : "bg-odcRed/20 text-odcRed"}`}>
                             {m.score}
                           </span>
                         </div>
