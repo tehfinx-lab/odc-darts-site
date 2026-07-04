@@ -239,10 +239,39 @@ function hasRealResult(p1Stats, p2Stats) {
   );
 }
 
+const normHeader = (h) => String(h ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * Finds extra stat columns BY HEADER NAME so they work no matter where
+ * they sit in the sheet (and keep working if more columns get added).
+ * Expected headers: "Checkout rate (P1/P2)", "Checkouts (P1/P2)", "Worst leg (P1/P2)".
+ */
+function findExtraCols(headerRow) {
+  const map = {};
+  (headerRow || []).forEach((h, i) => {
+    const key = normHeader(h);
+    if (key && map[key] === undefined) map[key] = i;
+  });
+  const find = (...keys) => {
+    for (const k of keys) if (map[k] !== undefined) return map[k];
+    return -1;
+  };
+  return {
+    p1CheckoutRate: find("checkoutratep1", "p1checkoutrate", "checkoutpercentp1"),
+    p2CheckoutRate: find("checkoutratep2", "p2checkoutrate", "checkoutpercentp2"),
+    p1Checkouts: find("checkoutsp1", "p1checkouts"),
+    p2Checkouts: find("checkoutsp2", "p2checkouts"),
+    p1WorstLeg: find("worstlegp1", "p1worstleg"),
+    p2WorstLeg: find("worstlegp2", "p2worstleg"),
+  };
+}
+
 function buildMatchesData(rows) {
   const playerMap = {};
   const latestResults = [];
   const mvpCandidates = {};
+  const EX = findExtraCols(rows[0]);
+  const cell = (row, idx) => (idx >= 0 ? text(row[idx]) : "");
 
   for (const row of rows.slice(1)) {
     const week = num(row[MATCH_COL.week]);
@@ -261,6 +290,9 @@ function buildMatchesData(rows) {
       tons: num(row[MATCH_COL.p1Tons]),
       bestLeg: num(row[MATCH_COL.p1BestLeg]),
       bestLegRaw: text(row[MATCH_COL.p1BestLeg]),
+      checkoutRate: cell(row, EX.p1CheckoutRate),
+      checkouts: cell(row, EX.p1Checkouts),
+      worstLeg: cell(row, EX.p1WorstLeg),
     };
 
     const p2Stats = {
@@ -272,6 +304,9 @@ function buildMatchesData(rows) {
       tons: num(row[MATCH_COL.p2Tons]),
       bestLeg: num(row[MATCH_COL.p2BestLeg]),
       bestLegRaw: text(row[MATCH_COL.p2BestLeg]),
+      checkoutRate: cell(row, EX.p2CheckoutRate),
+      checkouts: cell(row, EX.p2Checkouts),
+      worstLeg: cell(row, EX.p2WorstLeg),
     };
 
     if (!hasRealResult(p1Stats, p2Stats)) continue;

@@ -96,3 +96,10 @@ button, a, input, select { -webkit-tap-highlight-color: transparent; }
   border: 2px solid var(--pitch);
 }
 ::-webkit-scrollbar-thumb:hover { background: #2d4636; }
+
+/* ---------- GIANT WORDMARK MARQUEE ---------- */
+.marq { animation: tick 46s linear infinite; }
+.marq-wrap { overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .marq { animation: none; }
+}

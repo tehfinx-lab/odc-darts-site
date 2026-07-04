@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import {
   Menu,
   X,
@@ -24,8 +24,10 @@ import {
   CalendarCheck,
   Award,
   ClipboardList,
+  Archive,
 } from "lucide-react";
 import { fallbackData, getLiveLeagueData } from "../lib/sheetData";
+import { seasonArchive } from "../lib/seasonArchive";
 import { CountUp, AnimatedStatValue, Reveal, StaggerRows, Row } from "./motion";
 import { downloadResultCard, shareResultCard } from "./shareCard";
 import Predictions from "./Predictions";
@@ -48,6 +50,7 @@ const pages = [
   { id: "predictions", label: "Predict", icon: Crosshair },
   { id: "mvps", label: "MVPs", icon: Award },
   { id: "events", label: "Events", icon: CalendarDays },
+  { id: "archive", label: "Archive", icon: Archive },
 ];
 
 // ⬇️ PASTE YOUR GOOGLE APPS SCRIPT WEB-APP URL HERE (the one ending in /exec)
@@ -132,7 +135,7 @@ function DartBoard() {
       : { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.8, delay: d } };
 
   return (
-    <div className="relative mx-auto w-full max-w-[520px]">
+    <div className="relative mx-auto w-full max-w-[340px] md:max-w-[520px]">
       <svg viewBox="0 0 760 760" className="w-full" aria-hidden="true">
         <motion.circle cx="380" cy="380" r="294" fill="#0A1710" {...fade(0.4)} />
         <motion.path d={bSector(300, 316, -9, 9)} fill="rgba(230,51,41,0.85)" {...fade(0.85)} />
@@ -160,19 +163,137 @@ function DartBoard() {
   );
 }
 
+/* ---------- NINE-DART LOADER — the perfect leg while data loads ---------- */
+const NINE_DART_SEQ = [
+  { n: "501", sub: "\u00A0" },
+  { n: "321", sub: "visit: 180" },
+  { n: "141", sub: "visit: 180" },
+  { n: "GAME SHOT", sub: "141 out \u2014 T20 \u00B7 T19 \u00B7 D12", done: true },
+];
+
+function NineDartLoader() {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (step >= NINE_DART_SEQ.length - 1) {
+      const reset = setTimeout(() => setStep(0), 1600);
+      return () => clearTimeout(reset);
+    }
+    const t = setTimeout(() => setStep((v) => v + 1), 620);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  const cur = NINE_DART_SEQ[step];
+  return (
+    <div className="flex flex-col items-center gap-2 py-16">
+      <p className="mono text-[10px] font-semibold uppercase tracking-[0.24em] text-odcCream/40">Loading league data</p>
+      <span className="block h-[72px] overflow-hidden">
+        <motion.span
+          key={step}
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+          className={`display num block leading-[72px] ${cur.done ? "text-[52px] text-odcGold" : "text-[72px]"}`}
+        >
+          {cur.n}
+        </motion.span>
+      </span>
+      <p className="mono min-h-[16px] text-[11px] tracking-[0.14em] text-odcCream/55">{cur.sub}</p>
+      {cur.done && (
+        <motion.div initial={{ width: 0 }} animate={{ width: 170 }} transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }} className="h-[2px] bg-odcGold" />
+      )}
+      {cur.done && (
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="mono text-[9.5px] font-semibold uppercase tracking-[0.3em] text-odcGold">
+          ★ Nine-dart leg
+        </motion.p>
+      )}
+    </div>
+  );
+}
+
 function Card({ children, className = "" }) {
   return <div className={`rounded-xl border border-odcCream/10 bg-odcNavy p-5 ${className}`}>{children}</div>;
 }
 
+const easeOut = [0.22, 1, 0.36, 1];
+
 function SectionTitle({ kicker, title, text }) {
   return (
     <div className="mb-7">
-      <p className="mono flex items-center gap-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-odcCream/60">
+      <motion.p
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+        transition={{ duration: 0.5 }}
+        className="mono flex items-center gap-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-odcCream/60"
+      >
         <span className="text-odcRed">■</span> {kicker}
-        <span className="h-px flex-1 bg-odcCream/[0.13]" aria-hidden="true" />
-      </p>
-      <h2 className="mt-3.5 text-4xl md:text-5xl">{title}</h2>
-      {text && <p className="mt-3 max-w-2xl text-sm leading-7 text-odcCream/60 md:text-base">{text}</p>}
+        <motion.span
+          className="h-px flex-1 origin-left bg-odcCream/[0.13]"
+          aria-hidden="true"
+          initial={{ scaleX: 0 }}
+          whileInView={{ scaleX: 1 }}
+          viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+          transition={{ duration: 0.9, delay: 0.15, ease: easeOut }}
+        />
+      </motion.p>
+      <span className="block overflow-hidden">
+        <motion.h2
+          className="mt-3.5 text-4xl md:text-5xl"
+          initial={{ y: "105%" }}
+          whileInView={{ y: 0 }}
+          viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+          transition={{ duration: 0.8, ease: easeOut }}
+        >
+          {title}
+        </motion.h2>
+      </span>
+      {text && (
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.15, ease: easeOut }}
+          className="mt-3 max-w-2xl text-sm leading-7 text-odcCream/60 md:text-base"
+        >
+          {text}
+        </motion.p>
+      )}
+    </div>
+  );
+}
+
+/* Panels unclip as they scroll into view — the video's signature move */
+function ClipReveal({ children, delay = 0, className = "" }) {
+  const reduce = useReducedMotion();
+  if (reduce) return <div className={className}>{children}</div>;
+  return (
+    <motion.div
+      className={className}
+      initial={{ clipPath: "inset(0% 0% 100% 0%)", y: 40 }}
+      whileInView={{ clipPath: "inset(0% 0% 0% 0%)", y: 0 }}
+      viewport={{ once: true, margin: "0px 0px -12% 0px" }}
+      transition={{ duration: 0.9, delay, ease: easeOut }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* Giant scrolling wordmark strip */
+function Marquee({ items }) {
+  const Strip = () => (
+    <span className="flex flex-none items-center">
+      {items.map((t, i) => (
+        <span key={i} className="display flex items-center whitespace-nowrap text-[clamp(44px,8vw,92px)] leading-none">
+          <span className={i % 2 ? "hollow" : ""}>{t}</span>
+          <span className="mx-6 text-[0.4em] text-odcRed md:mx-10">///</span>
+        </span>
+      ))}
+    </span>
+  );
+  return (
+    <div className="marq-wrap mt-14 border-y border-odcCream/10 py-6 md:mt-20 md:py-8" aria-hidden="true">
+      <div className="marq flex w-max"><Strip /><Strip /></div>
     </div>
   );
 }
@@ -356,6 +477,15 @@ function MatchDetailsModal({ match, onClose }) {
     ["Best Leg", match.p1Stats?.bestLeg || "-", match.p2Stats?.bestLeg || "-"],
   ];
 
+  const has = (v) => v !== undefined && v !== null && String(v).trim() !== "" && String(v).trim() !== "0";
+  for (const [label, a, b] of [
+    ["Checkout %", match.p1Stats?.checkoutRate, match.p2Stats?.checkoutRate],
+    ["Checkouts", match.p1Stats?.checkouts, match.p2Stats?.checkouts],
+    ["Worst Leg", match.p1Stats?.worstLeg, match.p2Stats?.worstLeg],
+  ]) {
+    if (has(a) || has(b)) rows.push([label, has(a) ? a : "-", has(b) ? b : "-"]);
+  }
+
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4">
       <motion.div
@@ -515,6 +645,10 @@ function PlayerDetailsModal({ player, masterStats, matches, onClose }) {
 }
 
 function HomePage({ setActive, data, status, onSelectMatch }) {
+  const heroRef = useRef(null);
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
+  const boardY = useTransform(scrollYProgress, [0, 1], [0, -70]);
+
   const divisions = Object.keys(data.tables || {});
   const firstDivision = divisions[0];
   const tableRows = (data.tables?.[firstDivision] || []).slice(0, 8);
@@ -526,6 +660,27 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
     .slice(0, 6);
 
   const motw = data.results?.[0];
+
+  const potw = useMemo(() => {
+    const rs = data.results || [];
+    if (!rs.length) return null;
+    const latestWeek = Math.max(...rs.map((r) => Number(r.week) || 0));
+    const pool = rs.filter((r) => (Number(r.week) || 0) === latestWeek);
+    let best = null;
+    for (const r of pool) {
+      const sides = [
+        { name: r.home, opp: r.away, s: r.p1Stats, won: (r.p1Stats?.legsFor || 0) > (r.p2Stats?.legsFor || 0) },
+        { name: r.away, opp: r.home, s: r.p2Stats, won: (r.p2Stats?.legsFor || 0) > (r.p1Stats?.legsFor || 0) },
+      ];
+      for (const c of sides) {
+        const avg = parseFloat(c.s?.avg) || 0;
+        if (!avg) continue;
+        const rank = avg + (Number(c.s?.tons) || 0) * 1.5 + (c.won ? 3 : 0);
+        if (!best || rank > best.rank) best = { ...c, division: r.division, week: latestWeek, score: r.score, rank };
+      }
+    }
+    return best;
+  }, [data.results]);
   const h2h = motw
     ? [
         { label: "3-Dart Avg", a: parseFloat(motw.p1Stats?.avg) || 0, b: parseFloat(motw.p2Stats?.avg) || 0 },
@@ -553,7 +708,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
       <NextEventBanner events={data.events} onViewEvents={() => setActive("events")} />
 
       {/* ---------- HERO ---------- */}
-      <section className="relative overflow-hidden border-b border-odcCream/10">
+      <section ref={heroRef} className="relative overflow-hidden border-b border-odcCream/10">
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 pb-0 pt-14 md:grid-cols-[1.05fr_0.95fr] md:pt-20">
           <div>
             <motion.p
@@ -583,7 +738,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             <motion.p {...rise(0.45)} className="mt-6 max-w-md text-base leading-7 text-odcCream/60">
               The UK's most competitive online darts league.{" "}
               <b className="font-semibold text-odcCream">Real fixtures. Live stats. Weekly glory.</b>{" "}
-              Played Thursday nights, settled at the oche.
+              Played online. Settled at the oche.
             </motion.p>
 
             <motion.div {...rise(0.55)} className="mt-8 flex flex-wrap gap-3">
@@ -608,25 +763,27 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             </motion.div>
           </div>
 
-          <motion.div {...rise(0.3)} className="pb-10 md:pb-0">
+          <motion.div {...rise(0.3)} style={{ y: boardY }} className="pb-4 md:pb-0">
             <DartBoard />
           </motion.div>
         </div>
 
         {/* stat strip along the hero's baseline */}
         <motion.div {...rise(0.7)} className="mx-auto max-w-7xl px-4">
-          <div className="mt-10 flex flex-wrap border-t border-odcCream/10 md:mt-6">
+          <div className="mt-10 grid grid-cols-2 border-t border-odcCream/10 md:mt-6 md:flex">
             {[
               { v: <CountUp value={data.players?.length || 0} />, l: "Players" },
               { v: <CountUp value={divisions.length} />, l: "Divisions" },
               { v: "£0", l: "Entry" },
               { v: status === "live" ? "LIVE" : "DEMO", l: "Stats feed" },
-            ].map((x, i, arr) => (
+            ].map((x, i) => (
               <div
                 key={x.l}
-                className={`num flex items-baseline gap-2.5 py-4 pr-5 md:gap-3 md:pr-9 ${
-                  i < arr.length - 1 ? "mr-5 border-r border-odcCream/10 md:mr-9" : ""
-                }`}
+                className={`num flex items-baseline gap-2.5 py-4 md:gap-3 md:border-b-0 md:pr-9 ${
+                  i % 2 === 0 ? "border-r border-odcCream/10 pr-4" : "pl-4 md:pl-0"
+                } ${i < 2 ? "border-b border-odcCream/10 md:border-b-0" : ""} ${
+                  i > 0 && i < 3 ? "md:mr-9 md:border-r" : ""
+                } ${i === 0 ? "md:mr-9" : ""}`}
               >
                 <span className="display text-2xl md:text-3xl">{x.v}</span>
                 <span className="mono text-[10px] uppercase tracking-[0.14em] text-odcCream/40">{x.l}</span>
@@ -640,6 +797,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
       {motw && (
         <section className="mx-auto max-w-7xl px-4 pt-14 md:pt-20">
           <SectionTitle kicker="Match of the week" title="Head to Head" />
+          <ClipReveal>
           <button onClick={() => onSelectMatch(motw)} className="block w-full text-left">
             <div className="overflow-hidden rounded-xl border border-odcCream/10 bg-odcNavy transition hover:border-odcCream/25">
               <div className="mono flex justify-between gap-3 border-b border-odcCream/10 px-5 py-3.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-odcCream/55">
@@ -649,7 +807,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
 
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 py-8 md:gap-8 md:py-12">
                 <Reveal>
-                  <p className="display text-[clamp(26px,5.5vw,60px)] font-extrabold leading-[0.92]">{motw.home}</p>
+                  <p className="display break-words text-[clamp(21px,5.5vw,60px)] font-extrabold leading-[0.95]">{motw.home}</p>
                 </Reveal>
                 <Reveal delay={0.15}>
                   <p className="score rounded-lg bg-odcRed px-4 py-2 text-[clamp(26px,4vw,44px)] text-white md:px-6">
@@ -657,7 +815,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
                   </p>
                 </Reveal>
                 <Reveal delay={0.05}>
-                  <p className="display text-right text-[clamp(26px,5.5vw,60px)] font-extrabold leading-[0.92]">{motw.away}</p>
+                  <p className="display break-words text-right text-[clamp(21px,5.5vw,60px)] font-extrabold leading-[0.95]">{motw.away}</p>
                 </Reveal>
               </div>
 
@@ -692,6 +850,41 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
               </div>
             </div>
           </button>
+          </ClipReveal>
+        </section>
+      )}
+
+      {/* ---------- PLAYER OF THE WEEK — the gold moment ---------- */}
+      {potw && (
+        <section className="mx-auto max-w-7xl px-4 pt-14 md:pt-20">
+          <ClipReveal>
+            <div className="relative overflow-hidden rounded-xl border border-odcGold/30 bg-odcNavy">
+              <div className="absolute inset-y-0 left-0 w-1 bg-odcGold" aria-hidden="true" />
+              <div className="flex flex-col gap-5 p-6 md:flex-row md:items-center md:justify-between md:p-8">
+                <div>
+                  <p className="mono text-[10.5px] font-semibold uppercase tracking-[0.18em] text-odcGold">
+                    ★ Player of the week · Week {potw.week}
+                  </p>
+                  <p className="display mt-2.5 text-[clamp(34px,7vw,58px)] font-extrabold leading-[0.95]">{potw.name}</p>
+                  <p className="mono mt-2 text-[11px] uppercase tracking-[0.12em] text-odcCream/45">
+                    {potw.division} · {potw.won ? "Beat" : "vs"} {potw.opp} {potw.score}
+                  </p>
+                </div>
+                <div className="num flex gap-6 md:gap-10">
+                  {[
+                    { v: potw.s?.avg || "-", l: "3-Dart Avg" },
+                    { v: potw.s?.tons ?? "-", l: "180s" },
+                    { v: potw.s?.highCheckout || "-", l: "High C/O" },
+                  ].map((x) => (
+                    <div key={x.l}>
+                      <p className="display text-3xl md:text-4xl">{x.v}</p>
+                      <p className="mono mt-1 text-[9.5px] uppercase tracking-[0.14em] text-odcCream/40">{x.l}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </ClipReveal>
         </section>
       )}
 
@@ -839,6 +1032,8 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
         </section>
       )}
 
+      <Marquee items={["Game On", "Season 4", "Every Leg Counts", "Online Darts Circuit"]} />
+
       {/* ---------- GET IN THE GAME ---------- */}
       <section className="mx-auto max-w-7xl px-4 py-14 md:py-20">
         <SectionTitle kicker="New players" title="Get in the Game" />
@@ -846,9 +1041,9 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
           {[
             { n: "01", t: "Join the Discord", d: "One tap, say hello — you're in the room where it happens." },
             { n: "02", t: "Get your division", d: "Placed by average, so every leg is a contest." },
-            { n: "03", t: "Throw Thursday nights", d: "Fixtures land weekly. Stats, tables and bragging rights follow." },
+            { n: "03", t: "Play your fixtures", d: "Arrange each match for whatever night suits you both. Stats and bragging rights follow." },
           ].map((step, i) => (
-            <Reveal key={step.n} delay={i * 0.08}>
+            <ClipReveal key={step.n} delay={i * 0.12} className="h-full">
               <div className="group h-full bg-odcNavy p-6 pb-7">
                 <span
                   className="display num text-[44px] leading-none text-transparent transition"
@@ -859,10 +1054,105 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
                 <h3 className="mt-3.5 text-xl tracking-[0.03em]">{step.t}</h3>
                 <p className="mt-1.5 text-[13.5px] leading-6 text-odcCream/55">{step.d}</p>
               </div>
-            </Reveal>
+            </ClipReveal>
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+function ArchivePage({ data }) {
+  const snapshot = () => {
+    const name = window.prompt("Name this season (this freezes the CURRENT tables):", "Season 4");
+    if (!name) return;
+    const tables = data.tables || {};
+    const entry = {
+      name,
+      savedOn: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
+      champions: Object.fromEntries(Object.entries(tables).map(([d, rows]) => [d, rows?.[0]?.name || ""])),
+      tables,
+    };
+    const file =
+      "/**\n * SEASON ARCHIVE — generated by the site.\n * Replace lib/seasonArchive.js on GitHub with this file to freeze the season.\n */\nexport const seasonArchive = " +
+      JSON.stringify([entry, ...seasonArchive], null, 2) +
+      ";\n";
+    const blob = new Blob([file], { type: "text/javascript" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "seasonArchive.js";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-10">
+      <SectionTitle
+        kicker="History"
+        title="Season Archive"
+        text="Finished seasons, frozen forever — final tables and champions."
+      />
+
+      <Card className="mb-10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-semibold">End of season? Freeze it here.</p>
+            <p className="mt-1.5 text-sm leading-6 text-odcCream/55">
+              This downloads a file called <span className="mono text-odcCream/80">seasonArchive.js</span> containing the current
+              tables. Upload it to GitHub inside the <span className="mono text-odcCream/80">lib</span> folder (replacing the old
+              one) and the season appears below, preserved for good.
+            </p>
+          </div>
+          <button
+            onClick={snapshot}
+            className="mono shrink-0 rounded-md bg-odcRed px-5 py-3.5 text-xs font-bold uppercase tracking-[0.08em] text-white transition hover:bg-odcRedDeep"
+          >
+            Download season snapshot
+          </button>
+        </div>
+      </Card>
+
+      {seasonArchive.length === 0 ? (
+        <Card>
+          <p className="font-semibold">No archived seasons yet.</p>
+          <p className="mt-1.5 text-sm text-odcCream/55">Season 4 is live — it'll be the first one in the vault.</p>
+        </Card>
+      ) : (
+        seasonArchive.map((season) => (
+          <div key={season.name} className="mb-12">
+            <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3 border-b border-odcCream/[0.13] pb-4">
+              <h3 className="text-3xl md:text-4xl">{season.name}</h3>
+              <p className="mono text-[10.5px] uppercase tracking-[0.14em] text-odcCream/40">Frozen {season.savedOn}</p>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              {Object.entries(season.tables || {}).map(([division, rows]) => (
+                <Card key={division}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <p className="display text-lg tracking-[0.03em]">{division}</p>
+                    {season.champions?.[division] && (
+                      <p className="mono text-[10px] uppercase tracking-[0.1em] text-odcGold">
+                        ★ {season.champions[division]}
+                      </p>
+                    )}
+                  </div>
+                  <table className="num w-full">
+                    <tbody>
+                      {(rows || []).map((row, i) => (
+                        <tr key={row.name || i} className="border-b border-odcCream/[0.06] last:border-0">
+                          <td className="mono w-9 py-2 text-xs text-odcCream/45">{String(row.pos ?? i + 1).padStart(2, "0")}</td>
+                          <td className={`py-2 text-[13.5px] font-semibold ${i === 0 ? "text-odcGold" : ""}`}>{row.name}</td>
+                          <td className="mono py-2 text-right text-xs text-odcCream/55">{row.played ?? "-"}P</td>
+                          <td className="mono py-2 pl-3 text-right text-sm font-bold">{row.points ?? "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
@@ -1495,7 +1785,7 @@ export default function App() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-odcBlack pb-24 text-odcCream xl:pb-0">
+    <main className="min-h-screen overflow-x-hidden bg-odcBlack pb-24 text-odcCream xl:pb-0">
       <Ticker results={data.allResults?.length ? data.allResults : data.results} />
       <Header active={active} setActive={setActive} />
 
@@ -1505,7 +1795,9 @@ export default function App() {
         </div>
       )}
 
-      <motion.div key={active} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+      {status === "loading" && <NineDartLoader />}
+
+      <motion.div key={active} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className={status === "loading" ? "hidden" : ""}>
         {active === "home"         && <HomePage setActive={setActive} data={data} status={status} onSelectMatch={setSelectedMatch} />}
         {active === "fixtures"     && <FixturesPage data={data} />}
         {active === "results"      && <ResultsPage data={data} onSelectMatch={setSelectedMatch} />}
@@ -1516,6 +1808,7 @@ export default function App() {
         {active === "predictions"  && <Predictions data={data} scriptUrl={PREDICTIONS_SCRIPT_URL} />}
         {active === "mvps"         && <MvpsPage data={data} />}
         {active === "events"       && <EventsPage data={data} />}
+        {active === "archive"      && <ArchivePage data={data} />}
       </motion.div>
 
       <footer className="mono border-t border-odcCream/10 px-4 py-8 text-center text-[11px] uppercase tracking-[0.1em] text-odcCream/40">

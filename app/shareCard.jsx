@@ -127,9 +127,16 @@ export async function buildResultCardCanvas(match) {
     ["180s", p1.tons, p2.tons],
     ["BEST LEG", p1.bestLeg, p2.bestLeg],
   ];
+  const hasVal = (v) => v !== undefined && v !== null && String(v).trim() !== "" && String(v).trim() !== "0";
+  for (const [label, a, b] of [
+    ["CHECKOUT %", p1.checkoutRate, p2.checkoutRate],
+    ["WORST LEG", p1.worstLeg, p2.worstLeg],
+  ]) {
+    if (hasVal(a) || hasVal(b)) statRows.push([label, hasVal(a) ? a : "-", hasVal(b) ? b : "-"]);
+  }
 
   let y = 620;
-  const rowH = 78;
+  const rowH = statRows.length > 5 ? 64 : 78;
   statRows.forEach(([label, a, b]) => {
     // row bg
     ctx.fillStyle = "rgba(255,255,255,0.04)";
