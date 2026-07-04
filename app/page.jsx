@@ -163,7 +163,8 @@ function DartBoard() {
   );
 }
 
-/* ---------- NINE-DART LOADER — the perfect leg while data loads ---------- */
+/* ---------- NINE-DART LOADER — plays beside the board while data loads.
+   Always completes at least one full leg, then bows out. ---------- */
 const NINE_DART_SEQ = [
   { n: "501", sub: "\u00A0" },
   { n: "321", sub: "visit: 180" },
@@ -171,41 +172,50 @@ const NINE_DART_SEQ = [
   { n: "GAME SHOT", sub: "141 out \u2014 T20 \u00B7 T19 \u00B7 D12", done: true },
 ];
 
-function NineDartLoader() {
+function NineDartLoader({ loading }) {
   const [step, setStep] = useState(0);
-  useEffect(() => {
-    if (step >= NINE_DART_SEQ.length - 1) {
-      const reset = setTimeout(() => setStep(0), 1600);
-      return () => clearTimeout(reset);
-    }
-    const t = setTimeout(() => setStep((v) => v + 1), 620);
-    return () => clearTimeout(t);
-  }, [step]);
+  const [fading, setFading] = useState(false);
+  const [gone, setGone] = useState(false);
+  const finished = step >= NINE_DART_SEQ.length - 1;
 
+  useEffect(() => {
+    if (gone) return;
+    if (!finished) {
+      const t = setTimeout(() => setStep((v) => v + 1), 620);
+      return () => clearTimeout(t);
+    }
+    if (loading) {
+      const t = setTimeout(() => setStep(0), 1500);
+      return () => clearTimeout(t);
+    }
+    const f = setTimeout(() => setFading(true), 1300);
+    const g = setTimeout(() => setGone(true), 1950);
+    return () => { clearTimeout(f); clearTimeout(g); };
+  }, [step, loading, finished, gone]);
+
+  if (gone) return null;
   const cur = NINE_DART_SEQ[step];
+
   return (
-    <div className="flex flex-col items-center gap-2 py-16">
-      <p className="mono text-[10px] font-semibold uppercase tracking-[0.24em] text-odcCream/40">Loading league data</p>
-      <span className="block h-[72px] overflow-hidden">
+    <div
+      className={`pointer-events-none absolute left-1/2 top-full z-10 -mt-1 flex w-max -translate-x-1/2 flex-col items-center transition-opacity duration-500 md:-mt-3 ${
+        fading ? "opacity-0" : "opacity-90"
+      }`}
+      aria-hidden="true"
+    >
+      <p className="mono text-[8.5px] font-semibold uppercase tracking-[0.24em] text-odcCream/35">Loading league data</p>
+      <span className="block h-[38px] overflow-hidden">
         <motion.span
           key={step}
           initial={{ y: "100%" }}
           animate={{ y: 0 }}
-          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-          className={`display num block leading-[72px] ${cur.done ? "text-[52px] text-odcGold" : "text-[72px]"}`}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className={`display num block leading-[38px] ${cur.done ? "text-[26px] text-odcGold/90" : "text-[36px] text-odcCream/70"}`}
         >
           {cur.n}
         </motion.span>
       </span>
-      <p className="mono min-h-[16px] text-[11px] tracking-[0.14em] text-odcCream/55">{cur.sub}</p>
-      {cur.done && (
-        <motion.div initial={{ width: 0 }} animate={{ width: 170 }} transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }} className="h-[2px] bg-odcGold" />
-      )}
-      {cur.done && (
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="mono text-[9.5px] font-semibold uppercase tracking-[0.3em] text-odcGold">
-          ★ Nine-dart leg
-        </motion.p>
-      )}
+      <p className="mono min-h-[13px] text-[9px] tracking-[0.14em] text-odcCream/40">{cur.sub}</p>
     </div>
   );
 }
@@ -763,8 +773,9 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             </motion.div>
           </div>
 
-          <motion.div {...rise(0.3)} style={{ y: boardY }} className="pb-4 md:pb-0">
+          <motion.div {...rise(0.3)} style={{ y: boardY }} className="relative pb-4 md:pb-0">
             <DartBoard />
+            <NineDartLoader loading={status === "loading"} />
           </motion.div>
         </div>
 
@@ -791,6 +802,31 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             ))}
           </div>
         </motion.div>
+      </section>
+
+      {/* ---------- GET IN THE GAME ---------- */}
+      <section className="mx-auto max-w-7xl px-4 pt-14 md:pt-20">
+        <SectionTitle kicker="New players" title="Get in the Game" />
+        <div className="grid gap-px overflow-hidden rounded-xl border border-odcCream/[0.13] bg-odcCream/[0.13] md:grid-cols-3">
+          {[
+            { n: "01", t: "Join the Discord", d: "One tap, say hello — you're in the room where it happens." },
+            { n: "02", t: "Get your division", d: "Placed by average, so every leg is a contest." },
+            { n: "03", t: "Play your fixtures", d: "Arrange each match for whatever night suits you both. Stats and bragging rights follow." },
+          ].map((step, i) => (
+            <ClipReveal key={step.n} delay={i * 0.12} className="h-full">
+              <div className="group h-full bg-odcNavy p-6 pb-7">
+                <span
+                  className="display num text-[44px] leading-none text-transparent transition"
+                  style={{ WebkitTextStroke: "1.5px rgba(233,239,231,.3)" }}
+                >
+                  {step.n}
+                </span>
+                <h3 className="mt-3.5 text-xl tracking-[0.03em]">{step.t}</h3>
+                <p className="mt-1.5 text-[13.5px] leading-6 text-odcCream/55">{step.d}</p>
+              </div>
+            </ClipReveal>
+          ))}
+        </div>
       </section>
 
       {/* ---------- MATCH OF THE WEEK — tale of the tape ---------- */}
@@ -1034,30 +1070,6 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
 
       <Marquee items={["Game On", "Season 4", "Every Leg Counts", "Online Darts Circuit"]} />
 
-      {/* ---------- GET IN THE GAME ---------- */}
-      <section className="mx-auto max-w-7xl px-4 py-14 md:py-20">
-        <SectionTitle kicker="New players" title="Get in the Game" />
-        <div className="grid gap-px overflow-hidden rounded-xl border border-odcCream/[0.13] bg-odcCream/[0.13] md:grid-cols-3">
-          {[
-            { n: "01", t: "Join the Discord", d: "One tap, say hello — you're in the room where it happens." },
-            { n: "02", t: "Get your division", d: "Placed by average, so every leg is a contest." },
-            { n: "03", t: "Play your fixtures", d: "Arrange each match for whatever night suits you both. Stats and bragging rights follow." },
-          ].map((step, i) => (
-            <ClipReveal key={step.n} delay={i * 0.12} className="h-full">
-              <div className="group h-full bg-odcNavy p-6 pb-7">
-                <span
-                  className="display num text-[44px] leading-none text-transparent transition"
-                  style={{ WebkitTextStroke: "1.5px rgba(233,239,231,.3)" }}
-                >
-                  {step.n}
-                </span>
-                <h3 className="mt-3.5 text-xl tracking-[0.03em]">{step.t}</h3>
-                <p className="mt-1.5 text-[13.5px] leading-6 text-odcCream/55">{step.d}</p>
-              </div>
-            </ClipReveal>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
@@ -1098,9 +1110,13 @@ function ArchivePage({ data }) {
           <div>
             <p className="font-semibold">End of season? Freeze it here.</p>
             <p className="mt-1.5 text-sm leading-6 text-odcCream/55">
-              This downloads a file called <span className="mono text-odcCream/80">seasonArchive.js</span> containing the current
-              tables. Upload it to GitHub inside the <span className="mono text-odcCream/80">lib</span> folder (replacing the old
-              one) and the season appears below, preserved for good.
+              Only do this when the season is finished. The button downloads a file called{" "}
+              <span className="mono text-odcCream/80">seasonArchive.js</span> — the final tables, frozen. Then:{" "}
+              <b className="text-odcCream/80">1.</b> go to your GitHub repo and click into the{" "}
+              <span className="mono text-odcCream/80">lib</span> folder,{" "}
+              <b className="text-odcCream/80">2.</b> Add file &rarr; Upload files,{" "}
+              <b className="text-odcCream/80">3.</b> drag the downloaded file in and commit. The season then appears on this
+              page forever. Until you do that, the file just sits in your Downloads doing nothing.
             </p>
           </div>
           <button
@@ -1795,9 +1811,7 @@ export default function App() {
         </div>
       )}
 
-      {status === "loading" && <NineDartLoader />}
-
-      <motion.div key={active} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className={status === "loading" ? "hidden" : ""}>
+      <motion.div key={active} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
         {active === "home"         && <HomePage setActive={setActive} data={data} status={status} onSelectMatch={setSelectedMatch} />}
         {active === "fixtures"     && <FixturesPage data={data} />}
         {active === "results"      && <ResultsPage data={data} onSelectMatch={setSelectedMatch} />}
