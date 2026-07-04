@@ -477,77 +477,110 @@ function BottomNav({ active, setActive }) {
 function MatchDetailsModal({ match, onClose }) {
   if (!match) return null;
 
-  const rows = [
-    ["Legs For", match.p1Stats?.legsFor, match.p2Stats?.legsFor],
-    ["Legs Against", match.p1Stats?.legsAgainst, match.p2Stats?.legsAgainst],
-    ["3DA", match.p1Stats?.avg, match.p2Stats?.avg],
-    ["9DA", match.p1Stats?.nineAvg, match.p2Stats?.nineAvg],
-    ["High C/O", match.p1Stats?.highCheckout, match.p2Stats?.highCheckout],
-    ["180s", match.p1Stats?.tons, match.p2Stats?.tons],
-    ["Best Leg", match.p1Stats?.bestLeg || "-", match.p2Stats?.bestLeg || "-"],
-  ];
+  const p1 = match.p1Stats || {};
+  const p2 = match.p2Stats || {};
+  const blank = (v) => v === undefined || v === null || String(v).trim() === "";
+  const show = (v) => (blank(v) ? "\u2013" : v);
 
-  const has = (v) => v !== undefined && v !== null && String(v).trim() !== "" && String(v).trim() !== "0";
-  for (const [label, a, b] of [
-    ["Checkout %", match.p1Stats?.checkoutRate, match.p2Stats?.checkoutRate],
-    ["Checkouts", match.p1Stats?.checkouts, match.p2Stats?.checkouts],
-    ["Worst Leg", match.p1Stats?.worstLeg, match.p2Stats?.worstLeg],
-  ]) {
-    if (has(a) || has(b)) rows.push([label, has(a) ? a : "-", has(b) ? b : "-"]);
-  }
+  /* full broadcast stat sheet, grouped like TV coverage */
+  const groups = [
+    {
+      name: "Scoring",
+      rows: [
+        ["3-Dart Avg", p1.avg, p2.avg],
+        ["9-Dart Avg", p1.nineAvg, p2.nineAvg],
+        ["180s", p1.tons, p2.tons],
+      ],
+    },
+    {
+      name: "Finishing",
+      rows: [
+        ["High Checkout", p1.highCheckout, p2.highCheckout],
+        ["Checkout %", p1.checkoutRate, p2.checkoutRate],
+        ["Checkouts", p1.checkouts, p2.checkouts],
+      ],
+    },
+    {
+      name: "Legs",
+      rows: [
+        ["Legs Won", p1.legsFor, p2.legsFor],
+        ["Best Leg", p1.bestLegRaw || p1.bestLeg, p2.bestLegRaw || p2.bestLeg],
+        ["Worst Leg", p1.worstLeg, p2.worstLeg],
+      ],
+    },
+  ]
+    // drop rows where BOTH sides are truly empty (zeros are real data and stay)
+    .map((g) => ({ ...g, rows: g.rows.filter(([, a, b]) => !blank(a) || !blank(b)) }))
+    .filter((g) => g.rows.length);
+
+  const better = (a, b) => {
+    const na = parseFloat(String(a).replace("%", ""));
+    const nb = parseFloat(String(b).replace("%", ""));
+    if (isNaN(na) || isNaN(nb) || na === nb) return 0;
+    return na > nb ? 1 : -1;
+  };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-3 md:p-4" onClick={onClose}>
       <motion.div
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-3xl rounded-xl border border-odcCream/15 bg-odcBlack p-5"
+        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-odcCream/15 bg-odcBlack"
       >
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcRed">{match.division}</p>
-            <h3 className="mt-2 text-2xl font-semibold">
-              {match.home} vs {match.away}
-            </h3>
-            <p className="mt-1 text-sm text-odcCream/55">
-              {match.date || "No date"} {match.week ? `• Week ${match.week}` : ""}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => shareResultCard(match)} className="rounded-lg bg-odcRed/90 p-3 text-white transition hover:bg-odcRed" title="Share result card">
-              <Share2 size={18} />
-            </button>
-            <button onClick={onClose} className="rounded-lg bg-white/10 p-3">
-              <X />
-            </button>
-          </div>
+        {/* top bar */}
+        <div className="mono flex items-center justify-between gap-3 border-b border-odcCream/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-odcCream/55">
+          <span className="text-odcRed">■ <span className="text-odcCream/55">{match.division}</span></span>
+          <span>
+            {match.date || ""} {match.week ? `· Week ${match.week}` : ""} · Final
+          </span>
         </div>
 
-        <div className="mb-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl bg-odcNavy p-5">
-          <p className="text-xl font-semibold">{match.home}</p>
-          <p className="score rounded-md bg-odcRed px-5 py-2 text-3xl text-white">{match.score}</p>
-          <p className="text-right text-xl font-semibold">{match.away}</p>
+        {/* tale of the tape */}
+        <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 py-7 md:gap-6 md:py-9">
+          <p className="display break-words text-[clamp(20px,4.5vw,40px)] font-extrabold leading-[0.95]">{match.home}</p>
+          <p className="score rounded-lg bg-odcRed px-4 py-1.5 text-[clamp(24px,4vw,36px)] text-white md:px-5">{match.score}</p>
+          <p className="display break-words text-right text-[clamp(20px,4.5vw,40px)] font-extrabold leading-[0.95]">{match.away}</p>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-odcCream/10">
-          <table className="w-full min-w-[520px]">
-            <thead className="bg-white/5">
-              <tr className="text-left text-xs uppercase tracking-[0.1em] text-odcCream/55">
-                <th className="p-3">Stat</th>
-                <th className="p-3">{match.home}</th>
-                <th className="p-3">{match.away}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(([label, p1, p2]) => (
-                <tr key={label} className="border-t border-odcCream/10">
-                  <td className="p-3 font-semibold">{label}</td>
-                  <td className="p-3">{p1 || 0}</td>
-                  <td className="p-3">{p2 || 0}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* stat sheet */}
+        <div className="num px-5 pb-5">
+          {groups.map((g) => (
+            <div key={g.name} className="mb-4 last:mb-0">
+              <p className="mono flex items-center gap-3 pb-1 text-[9.5px] font-semibold uppercase tracking-[0.2em] text-odcCream/35">
+                {g.name}
+                <span className="h-px flex-1 bg-odcCream/[0.09]" aria-hidden="true" />
+              </p>
+              {g.rows.map(([label, a, b]) => {
+                const w = better(a, b);
+                return (
+                  <div key={label} className="grid grid-cols-[1fr_minmax(96px,auto)_1fr] items-center gap-3 border-b border-odcCream/[0.06] py-2.5 last:border-0">
+                    <span className={`mono text-right text-[13.5px] ${w === 1 ? "font-bold text-odcCream" : "font-medium text-odcCream/55"}`}>
+                      {show(a)}
+                    </span>
+                    <span className="mono text-center text-[9.5px] uppercase tracking-[0.14em] text-odcCream/40">{label}</span>
+                    <span className={`mono text-[13.5px] ${w === -1 ? "font-bold text-odcCream" : "font-medium text-odcCream/55"}`}>
+                      {show(b)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* actions */}
+        <div className="flex items-center justify-between gap-3 border-t border-odcCream/10 px-5 py-3.5">
+          <button
+            onClick={() => shareResultCard(match)}
+            className="mono inline-flex items-center gap-2 rounded-md bg-odcRed px-4 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.1em] text-white transition hover:bg-odcRedDeep"
+          >
+            <Share2 size={14} /> Share result card
+          </button>
+          <button onClick={onClose} className="mono rounded-md border border-odcCream/20 px-4 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.1em] text-odcCream/70 transition hover:border-odcCream/50 hover:text-odcCream">
+            Close
+          </button>
         </div>
       </motion.div>
     </div>
