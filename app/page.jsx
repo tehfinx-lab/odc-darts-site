@@ -1392,27 +1392,54 @@ function ArchivePage({ data }) {
             </div>
             <div className="grid gap-5 md:grid-cols-2">
               {Object.entries(season.tables || {}).map(([division, rows]) => (
-                <Card key={division}>
-                  <div className="mb-3 flex items-center justify-between gap-2">
+                <Card key={division} className="!p-0 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 border-b border-odcCream/10 px-4 py-3">
                     <p className="display text-lg tracking-[0.03em]">{division}</p>
                     {season.champions?.[division] && (
                       <p className="mono text-[10px] uppercase tracking-[0.1em] text-odcGold">
-                        ★ {season.champions[division]}
+                        ★ Champion — {season.champions[division]}
                       </p>
                     )}
                   </div>
-                  <table className="num w-full">
-                    <tbody>
-                      {(rows || []).map((row, i) => (
-                        <tr key={row.name || i} className="border-b border-odcCream/[0.06] last:border-0">
-                          <td className="mono w-9 py-2 text-xs text-odcCream/45">{String(row.pos ?? i + 1).padStart(2, "0")}</td>
-                          <td className={`py-2 text-[13.5px] font-semibold ${i === 0 ? "text-odcGold" : ""}`}>{row.name}</td>
-                          <td className="mono py-2 text-right text-xs text-odcCream/55">{row.played ?? "-"}P</td>
-                          <td className="mono py-2 pl-3 text-right text-sm font-bold">{row.points ?? "-"}</td>
+                  <div className="num overflow-x-auto">
+                    <table className="w-full min-w-[420px] border-collapse">
+                      <thead>
+                        <tr className="mono border-b border-odcCream/[0.13] text-left text-[9.5px] uppercase tracking-[0.14em] text-odcCream/40">
+                          <th className="px-3 py-2.5 font-semibold">Pos</th>
+                          <th className="px-2 py-2.5 font-semibold">Player</th>
+                          <th className="px-2 py-2.5 text-right font-semibold">P</th>
+                          <th className="px-2 py-2.5 text-right font-semibold">W</th>
+                          <th className="px-2 py-2.5 text-right font-semibold">D</th>
+                          <th className="px-2 py-2.5 text-right font-semibold">L</th>
+                          <th className="hidden px-2 py-2.5 text-right font-semibold sm:table-cell">+/−</th>
+                          <th className="px-3 py-2.5 text-right font-semibold">Pts</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {(rows || []).map((row, i) => (
+                          <tr
+                            key={row.name || i}
+                            className={`border-b border-odcCream/[0.06] last:border-0 odd:bg-odcBlack/40 ${
+                              i === 0 ? "bg-odcGold/[0.07] odd:bg-odcGold/[0.07]" : ""
+                            }`}
+                          >
+                            <td className="mono w-11 px-3 py-2.5 text-xs font-semibold text-odcCream/50">
+                              {String(row.pos ?? i + 1).padStart(2, "0")}
+                            </td>
+                            <td className={`px-2 py-2.5 text-[13px] font-semibold ${i === 0 ? "text-odcGold" : ""}`}>
+                              {i === 0 ? "★ " : ""}{row.name}
+                            </td>
+                            <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.played ?? "\u2013"}</td>
+                            <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.wins ?? "\u2013"}</td>
+                            <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.draws ?? "\u2013"}</td>
+                            <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.losses ?? "\u2013"}</td>
+                            <td className="mono hidden px-2 py-2.5 text-right text-xs text-odcCream/55 sm:table-cell">{row.legs ?? "\u2013"}</td>
+                            <td className="mono px-3 py-2.5 text-right text-sm font-bold">{row.points ?? "\u2013"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </Card>
               ))}
             </div>

@@ -1,9 +1,3 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  async redirects() {
-    return [
-      { source: "/", destination: "/splash", permanent: false, missing: [{ type: "query", key: "from" }] },
-    ];
-  },
-};
+const nextConfig = {};
 module.exports = nextConfig;
