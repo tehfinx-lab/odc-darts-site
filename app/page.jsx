@@ -56,6 +56,10 @@ const pages = [
 ];
 
 // ⬇️ PASTE YOUR GOOGLE APPS SCRIPT WEB-APP URL HERE (the one ending in /exec)
+/* Update these two each season rollover */
+const CURRENT_SEASON = "Season 4";  // the season being played / coming up
+const LAST_SEASON = "Season 3";     // the season Wrapped + Archive refer to
+
 const PREDICTIONS_SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
 
 const socials = [
@@ -761,7 +765,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
               className="mono inline-flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-odcCream/60"
             >
               <span className="inline-block h-px w-6 bg-odcRed" aria-hidden="true" />
-              Season 4 · Matchweek {currentWeek} · Registration open
+              {CURRENT_SEASON} · Matchweek {currentWeek} · Registration open
             </motion.p>
 
             <h1 className="mt-5 text-[clamp(64px,15vw,150px)] font-extrabold leading-[0.86]">
@@ -849,7 +853,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             <span className="flex items-center gap-3">
               <span className="text-odcGold">★</span>
               <span>
-                <span className="display block text-xl tracking-[0.03em] md:text-2xl">Season 4 Wrapped is here</span>
+                <span className="display block text-xl tracking-[0.03em] md:text-2xl">{LAST_SEASON} Wrapped is here</span>
                 <span className="mono mt-0.5 block text-[10px] uppercase tracking-[0.14em] text-odcCream/45">
                   Your whole season in one shareable card
                 </span>
@@ -1126,7 +1130,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
         </section>
       )}
 
-      <Marquee items={["Game On", "Season 4", "Every Leg Counts", "Online Darts Circuit"]} />
+      <Marquee items={["Game On", CURRENT_SEASON, "Every Leg Counts", "Online Darts Circuit"]} />
 
     </div>
   );
@@ -1178,6 +1182,7 @@ function computeWrapped(p, data) {
   else if (winRate >= 50) archetype = "The Contender";
 
   return {
+    season: LAST_SEASON,
     name: p.name,
     division: p.division,
     archetype,
@@ -1214,7 +1219,7 @@ function WrappedPage({ data }) {
       {!picked && (
         <>
           <SectionTitle
-            kicker="Season 4"
+            kicker={LAST_SEASON}
             title="Your Wrapped"
             text="Your whole season in one card — find your name, see your numbers, share it everywhere."
           />
@@ -1244,7 +1249,7 @@ function WrappedPage({ data }) {
           <ClipReveal>
             <div className="overflow-hidden rounded-xl border border-odcCream/15 bg-odcNavy">
               <div className="mono flex justify-between border-b border-odcCream/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-odcCream/50">
-                <span>ODC · Season 4</span>
+                <span>ODC · {LAST_SEASON}</span>
                 <span className="text-odcRed">Wrapped</span>
               </div>
               <div className="p-6 md:p-8">
@@ -1321,7 +1326,7 @@ function WrappedPage({ data }) {
 
 function ArchivePage({ data }) {
   const snapshot = () => {
-    const name = window.prompt("Name this season (this freezes the CURRENT tables):", "Season 4");
+    const name = window.prompt("Name this season (this freezes the CURRENT tables):", LAST_SEASON);
     if (!name) return;
     const tables = data.tables || {};
     const entry = {
@@ -1376,7 +1381,7 @@ function ArchivePage({ data }) {
       {seasonArchive.length === 0 ? (
         <Card>
           <p className="font-semibold">No archived seasons yet.</p>
-          <p className="mt-1.5 text-sm text-odcCream/55">Season 4 is live — it'll be the first one in the vault.</p>
+          <p className="mt-1.5 text-sm text-odcCream/55">{LAST_SEASON} has just finished — it'll be the first one in the vault.</p>
         </Card>
       ) : (
         seasonArchive.map((season) => (
