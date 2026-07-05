@@ -1139,24 +1139,27 @@ function computeWrapped(p, data) {
   const mine = all.filter((r) => r.home === p.name || r.away === p.name);
 
   let biggest = null;
+  let bestPerf = null;
   const oppCount = {};
   for (const r of mine) {
     const isHome = r.home === p.name;
     const me = isHome ? r.p1Stats : r.p2Stats;
     const them = isHome ? r.p2Stats : r.p1Stats;
     const opp = isHome ? r.away : r.home;
-    oppCount[opp] = oppCount[opp] || { n: 0, w: 0, l: 0 };
-    oppCount[opp].n += 1;
+    oppCount[opp] = oppCount[opp] || { w: 0, l: 0 };
     const lf = Number(me?.legsFor) || 0, la = Number(them?.legsFor) || 0;
     if (lf > la) {
       oppCount[opp].w += 1;
       if (!biggest || lf - la > biggest.m) biggest = { m: lf - la, text: `${lf}\u2013${la} v ${opp}` };
     } else if (la > lf) oppCount[opp].l += 1;
+    const avg = parseFloat(me?.avg) || 0;
+    if (avg > 0 && (!bestPerf || avg > bestPerf.avg)) bestPerf = { avg, text: `${avg} avg v ${opp}` };
   }
-  const rivalName = Object.keys(oppCount).sort((a, b) => oppCount[b].n - oppCount[a].n)[0];
-  const rival = rivalName
-    ? `${rivalName} (${oppCount[rivalName].w}\u2013${oppCount[rivalName].l})`
-    : null;
+  /* nemesis = the opponent who beat them most (2+ defeats, never beaten back) */
+  const nemesisName = Object.keys(oppCount)
+    .filter((o) => oppCount[o].l >= 2 && oppCount[o].w === 0)
+    .sort((a, b) => oppCount[b].l - oppCount[a].l)[0];
+  const nemesis = nemesisName ? `${nemesisName} (0\u2013${oppCount[nemesisName].l})` : null;
 
   const table = data.tables?.[p.division] || [];
   const posIdx = table.findIndex((r) => r.name === p.name);
@@ -1188,7 +1191,8 @@ function computeWrapped(p, data) {
     bestLeg: bestLeg || "\u2013",
     legsWon: p.legsFor,
     biggestWin: biggest?.text || "\u2013",
-    rival: rival || "\u2013",
+    bestPerf: bestPerf?.text || "\u2013",
+    nemesis,
     position: posIdx >= 0 ? posIdx + 1 : "\u2013",
     totalPlayers: table.length,
   };
@@ -1279,10 +1283,18 @@ function WrappedPage({ data }) {
                 </Reveal>
                 <Reveal delay={0.7}>
                   <div className="mt-3 rounded-lg border border-odcCream/[0.08] p-4">
-                    <p className="mono text-[9px] uppercase tracking-[0.14em] text-odcCream/40">Most-played rival</p>
-                    <p className="display mt-1 text-2xl">{w.rival}</p>
+                    <p className="mono text-[9px] uppercase tracking-[0.14em] text-odcCream/40">Best performance</p>
+                    <p className="display mt-1 text-2xl">{w.bestPerf}</p>
                   </div>
                 </Reveal>
+                {w.nemesis && (
+                  <Reveal delay={0.8}>
+                    <div className="mt-3 rounded-lg border border-odcGold/30 p-4">
+                      <p className="mono text-[9px] uppercase tracking-[0.14em] text-odcGold/80">Your nemesis</p>
+                      <p className="display mt-1 text-2xl">{w.nemesis}</p>
+                    </div>
+                  </Reveal>
+                )}
               </div>
             </div>
           </ClipReveal>
