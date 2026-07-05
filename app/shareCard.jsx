@@ -253,7 +253,7 @@ export async function buildWrappedCanvas(w) {
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(233,239,231,0.6)";
   ctx.font = `600 30px ${MONO}`;
-  ctx.fillText("O D C  ·  S E A S O N  4", 210, 140);
+  ctx.fillText(`O D C  ·  ${String(w.season || "SEASON").toUpperCase().split("").join(" ")}`, 210, 140);
   ctx.fillStyle = RED;
   ctx.font = `800 56px ${DISP}`;
   ctx.fillText("WRAPPED", 210, 200);
@@ -331,7 +331,7 @@ export async function shareWrappedCard(w) {
     const file = new File([blob], "odc-wrapped.png", { type: "image/png" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: "My ODC Season Wrapped", text: `My Season 4 Wrapped \u2014 Online Darts Circuit` });
+        await navigator.share({ files: [file], title: "My ODC Season Wrapped", text: `My ${w.season || "season"} Wrapped \u2014 Online Darts Circuit` });
         return;
       } catch (e) {}
     }
