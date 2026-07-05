@@ -221,3 +221,122 @@ export async function shareResultCard(match) {
     link.click();
   }, "image/png");
 }
+
+
+/* ================= SEASON WRAPPED — 1080x1920 story card ================= */
+export async function buildWrappedCanvas(w) {
+  const W = 1080, H = 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  try { await document.fonts.ready; } catch (e) {}
+  const DISP = '"Big Shoulders Display","Arial Narrow",sans-serif';
+  const MONO = '"Spline Sans Mono",monospace';
+  const PITCH = "#0A1710", BONE = "#E9EFE7", RED = "#E63329", GOLD = "#D9B45B";
+  const LINE = "rgba(233,239,231,0.14)";
+
+  ctx.fillStyle = PITCH; ctx.fillRect(0, 0, W, H);
+
+  /* board rim arcs bleeding off top-right */
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2;
+  [520, 560].forEach((r) => { ctx.beginPath(); ctx.arc(W - 60, 120, r, 0, Math.PI * 2); ctx.stroke(); });
+  ctx.strokeStyle = "rgba(230,51,41,0.85)"; ctx.lineWidth = 40;
+  ctx.beginPath(); ctx.arc(W - 60, 120, 540, Math.PI * 0.62, Math.PI * 0.78); ctx.stroke();
+
+  /* logo + header */
+  const logo = await loadLogo();
+  if (logo) {
+    ctx.save(); ctx.beginPath(); ctx.arc(120, 150, 56, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(logo, 64, 94, 112, 112); ctx.restore();
+  }
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(233,239,231,0.6)";
+  ctx.font = `600 30px ${MONO}`;
+  ctx.fillText("O D C  ·  S E A S O N  4", 210, 140);
+  ctx.fillStyle = RED;
+  ctx.font = `800 56px ${DISP}`;
+  ctx.fillText("WRAPPED", 210, 200);
+
+  /* player name */
+  ctx.fillStyle = BONE;
+  let nameSize = 150;
+  ctx.font = `800 ${nameSize}px ${DISP}`;
+  while (ctx.measureText(w.name.toUpperCase()).width > W - 160 && nameSize > 60) {
+    nameSize -= 10; ctx.font = `800 ${nameSize}px ${DISP}`;
+  }
+  ctx.fillText(w.name.toUpperCase(), 80, 420);
+  ctx.fillStyle = GOLD;
+  ctx.font = `700 52px ${DISP}`;
+  ctx.fillText(`\u2605 ${w.archetype.toUpperCase()}`, 82, 496);
+  ctx.fillStyle = "rgba(233,239,231,0.5)";
+  ctx.font = `500 28px ${MONO}`;
+  ctx.fillText(`${w.division}  ·  FINISHED #${w.position}`, 84, 550);
+
+  /* stat grid 2 x 3 */
+  const stats = [
+    ["RECORD", w.record], ["WIN RATE", w.winRate],
+    ["SEASON AVG", w.seasonAvg], ["BEST 3DA", w.best3DA],
+    ["180s", String(w.tons)], ["HIGH CHECKOUT", String(w.highCheckout)],
+  ];
+  const gx = 80, gy = 640, cw = (W - 160 - 24) / 2, ch = 210;
+  stats.forEach(([label, val], i) => {
+    const x = gx + (i % 2) * (cw + 24);
+    const y = gy + Math.floor(i / 2) * (ch + 24);
+    ctx.fillStyle = "#0F1F16";
+    roundRect(ctx, x, y, cw, ch, 18); ctx.fill();
+    ctx.strokeStyle = LINE; ctx.lineWidth = 1.5; roundRect(ctx, x, y, cw, ch, 18); ctx.stroke();
+    ctx.fillStyle = "rgba(233,239,231,0.45)";
+    ctx.font = `600 24px ${MONO}`;
+    ctx.fillText(label, x + 30, y + 60);
+    ctx.fillStyle = BONE;
+    ctx.font = `800 84px ${DISP}`;
+    ctx.fillText(String(val ?? "\u2013"), x + 28, y + 160);
+  });
+
+  /* biggest win band */
+  let by = gy + 3 * (ch + 24) + 20;
+  ctx.fillStyle = RED; roundRect(ctx, 80, by, W - 160, 130, 18); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.font = `600 24px ${MONO}`;
+  ctx.fillText("BIGGEST WIN", 112, by + 52);
+  ctx.fillStyle = "#fff";
+  ctx.font = `800 56px ${DISP}`;
+  ctx.fillText(w.biggestWin || "\u2013", 110, by + 108);
+
+  /* rival band */
+  by += 154;
+  ctx.strokeStyle = LINE; roundRect(ctx, 80, by, W - 160, 130, 18); ctx.stroke();
+  ctx.fillStyle = "rgba(233,239,231,0.45)";
+  ctx.font = `600 24px ${MONO}`;
+  ctx.fillText("MOST-PLAYED RIVAL", 112, by + 52);
+  ctx.fillStyle = BONE;
+  ctx.font = `800 52px ${DISP}`;
+  ctx.fillText(w.rival || "\u2013", 110, by + 106);
+
+  /* footer */
+  ctx.fillStyle = "rgba(233,239,231,0.4)";
+  ctx.font = `600 26px ${MONO}`;
+  ctx.textAlign = "center";
+  ctx.fillText("GAME ON  ///  onlinedartscircuit.vercel.app", W / 2, H - 70);
+
+  return canvas;
+}
+
+export async function shareWrappedCard(w) {
+  const canvas = await buildWrappedCanvas(w);
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+    const file = new File([blob], "odc-wrapped.png", { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "My ODC Season Wrapped", text: `My Season 4 Wrapped \u2014 Online Darts Circuit` });
+        return;
+      } catch (e) {}
+    }
+    const link = document.createElement("a");
+    link.download = "odc-wrapped.png";
+    link.href = URL.createObjectURL(blob);
+    link.click();
+  }, "image/png");
+}
