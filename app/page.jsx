@@ -1570,15 +1570,30 @@ function PlayersPage({ data, onSelectPlayer }) {
 }
 
 function LeaderboardsPage({ data }) {
-  const boards = useMemo(
-    () => [
+  const boards = useMemo(() => {
+    /* Master Stats tab = the season-best numbers maintained in the sheet.
+       Use it as the source of truth; fall back to match-derived stats if empty. */
+    const master = Object.values(data.masterStats || {}).map((p) => ({ ...p, name: p.player }));
+    const useMaster = master.some((p) => Number(p.best3DA) > 0 || Number(p.bestCheckout) > 0);
+
+    /* Best Leg lives only in the Matches data (fewest darts, so lowest wins) */
+    const bestLeg = ["Best Leg", [...data.players].filter((p) => Number(p.bestLeg) > 0).sort((a, b) => a.bestLeg - b.bestLeg), "bestLeg", Zap];
+
+    if (useMaster) {
+      return [
+        ["Highest Average", [...master].sort((a, b) => b.best3DA - a.best3DA), "best3DA", Trophy],
+        ["Most 180s", [...master].sort((a, b) => b.tons - a.tons), "tons", Flame],
+        ["Highest Checkout", [...master].sort((a, b) => b.bestCheckout - a.bestCheckout), "bestCheckout", Medal],
+        bestLeg,
+      ];
+    }
+    return [
       ["Highest Average", [...data.players].sort((a, b) => b.avg - a.avg), "avg", Trophy],
       ["Most 180s", [...data.players].sort((a, b) => b.tons - a.tons), "tons", Flame],
       ["Highest Checkout", [...data.players].sort((a, b) => b.highCheckout - a.highCheckout), "highCheckout", Medal],
-      ["Best Leg", [...data.players].filter((p) => Number(p.bestLeg) > 0).sort((a, b) => a.bestLeg - b.bestLeg), "bestLeg", Zap],
-    ],
-    [data.players]
-  );
+      bestLeg,
+    ];
+  }, [data.players, data.masterStats]);
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
