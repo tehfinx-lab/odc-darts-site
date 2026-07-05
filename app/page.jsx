@@ -25,11 +25,12 @@ import {
   Award,
   ClipboardList,
   Archive,
+  Sparkles,
 } from "lucide-react";
 import { fallbackData, getLiveLeagueData } from "../lib/sheetData";
 import { seasonArchive } from "../lib/seasonArchive";
 import { CountUp, AnimatedStatValue, Reveal, StaggerRows, Row } from "./motion";
-import { downloadResultCard, shareResultCard } from "./shareCard";
+import { downloadResultCard, shareResultCard, shareWrappedCard } from "./shareCard";
 import Predictions from "./Predictions";
 import { Crosshair } from "lucide-react";
 
@@ -51,6 +52,7 @@ const pages = [
   { id: "mvps", label: "MVPs", icon: Award },
   { id: "events", label: "Events", icon: CalendarDays },
   { id: "archive", label: "Archive", icon: Archive },
+  { id: "wrapped", label: "Wrapped", icon: Sparkles },
 ];
 
 // ⬇️ PASTE YOUR GOOGLE APPS SCRIPT WEB-APP URL HERE (the one ending in /exec)
@@ -837,6 +839,29 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
         </motion.div>
       </section>
 
+      {/* ---------- WRAPPED PROMO ---------- */}
+      <section className="mx-auto max-w-7xl px-4 pt-8 md:pt-10">
+        <ClipReveal>
+          <button
+            onClick={() => setActive("wrapped")}
+            className="group flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-odcGold/40 bg-odcNavy px-5 py-4 text-left transition hover:border-odcGold md:px-7 md:py-5"
+          >
+            <span className="flex items-center gap-3">
+              <span className="text-odcGold">★</span>
+              <span>
+                <span className="display block text-xl tracking-[0.03em] md:text-2xl">Season 4 Wrapped is here</span>
+                <span className="mono mt-0.5 block text-[10px] uppercase tracking-[0.14em] text-odcCream/45">
+                  Your whole season in one shareable card
+                </span>
+              </span>
+            </span>
+            <span className="mono text-xs font-bold uppercase tracking-[0.1em] text-odcGold transition group-hover:translate-x-1">
+              See yours →
+            </span>
+          </button>
+        </ClipReveal>
+      </section>
+
       {/* ---------- GET IN THE GAME ---------- */}
       <section className="mx-auto max-w-7xl px-4 pt-14 md:pt-20">
         <SectionTitle kicker="New players" title="Get in the Game" />
@@ -1103,6 +1128,181 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
 
       <Marquee items={["Game On", "Season 4", "Every Leg Counts", "Online Darts Circuit"]} />
 
+    </div>
+  );
+}
+
+/* ================= SEASON WRAPPED ================= */
+function computeWrapped(p, data) {
+  const master = data.masterStats?.[String(p.name).toLowerCase()];
+  const all = (data.allResults?.length ? data.allResults : data.results) || [];
+  const mine = all.filter((r) => r.home === p.name || r.away === p.name);
+
+  let biggest = null;
+  const oppCount = {};
+  for (const r of mine) {
+    const isHome = r.home === p.name;
+    const me = isHome ? r.p1Stats : r.p2Stats;
+    const them = isHome ? r.p2Stats : r.p1Stats;
+    const opp = isHome ? r.away : r.home;
+    oppCount[opp] = oppCount[opp] || { n: 0, w: 0, l: 0 };
+    oppCount[opp].n += 1;
+    const lf = Number(me?.legsFor) || 0, la = Number(them?.legsFor) || 0;
+    if (lf > la) {
+      oppCount[opp].w += 1;
+      if (!biggest || lf - la > biggest.m) biggest = { m: lf - la, text: `${lf}\u2013${la} v ${opp}` };
+    } else if (la > lf) oppCount[opp].l += 1;
+  }
+  const rivalName = Object.keys(oppCount).sort((a, b) => oppCount[b].n - oppCount[a].n)[0];
+  const rival = rivalName
+    ? `${rivalName} (${oppCount[rivalName].w}\u2013${oppCount[rivalName].l})`
+    : null;
+
+  const table = data.tables?.[p.division] || [];
+  const posIdx = table.findIndex((r) => r.name === p.name);
+  const winRate = p.played ? Math.round((p.wins / p.played) * 100) : 0;
+  const tons = Number(master?.tons) || p.tons || 0;
+  const highCheckout = Number(master?.bestCheckout) || p.highCheckout || 0;
+  const best3DA = Number(master?.best3DA) || 0;
+  const bestLeg = Number(p.bestLeg) || 0;
+
+  let archetype = "The Warrior";
+  if (tons >= 8) archetype = "The Maximum Machine";
+  else if (highCheckout >= 120) archetype = "The Big Finish";
+  else if (winRate >= 65 && p.played >= 5) archetype = "The Assassin";
+  else if (bestLeg > 0 && bestLeg <= 15) archetype = "The Speed Merchant";
+  else if (p.played >= 12) archetype = "The Ever-Present";
+  else if (winRate >= 50) archetype = "The Contender";
+
+  return {
+    name: p.name,
+    division: p.division,
+    archetype,
+    played: p.played,
+    record: `${p.wins}\u2013${p.draws || 0}\u2013${p.losses}`,
+    winRate: `${winRate}%`,
+    seasonAvg: p.avg || "\u2013",
+    best3DA: best3DA || "\u2013",
+    tons,
+    highCheckout,
+    bestLeg: bestLeg || "\u2013",
+    legsWon: p.legsFor,
+    biggestWin: biggest?.text || "\u2013",
+    rival: rival || "\u2013",
+    position: posIdx >= 0 ? posIdx + 1 : "\u2013",
+    totalPlayers: table.length,
+  };
+}
+
+function WrappedPage({ data }) {
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState(null);
+
+  const players = useMemo(
+    () => [...(data.players || [])].sort((a, b) => String(a.name).localeCompare(String(b.name))),
+    [data.players]
+  );
+  const filtered = players.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
+  const w = picked ? computeWrapped(picked, data) : null;
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10">
+      {!picked && (
+        <>
+          <SectionTitle
+            kicker="Season 4"
+            title="Your Wrapped"
+            text="Your whole season in one card — find your name, see your numbers, share it everywhere."
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find your name..."
+            className="mono w-full rounded-lg border border-odcCream/15 bg-odcNavy px-4 py-3.5 text-sm text-odcCream placeholder:text-odcCream/30 focus:border-odcRed focus:outline-none"
+          />
+          <div className="mt-4 grid gap-1.5 sm:grid-cols-2">
+            {filtered.slice(0, 24).map((p) => (
+              <button
+                key={`${p.division}-${p.name}`}
+                onClick={() => setPicked(p)}
+                className="flex items-center justify-between rounded-lg border border-odcCream/[0.08] bg-odcNavy px-4 py-3 text-left transition hover:border-odcRed/60"
+              >
+                <span className="text-sm font-semibold">{p.name}</span>
+                <span className="mono text-[10px] uppercase tracking-[0.1em] text-odcCream/40">{p.division}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {w && (
+        <div>
+          <ClipReveal>
+            <div className="overflow-hidden rounded-xl border border-odcCream/15 bg-odcNavy">
+              <div className="mono flex justify-between border-b border-odcCream/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-odcCream/50">
+                <span>ODC · Season 4</span>
+                <span className="text-odcRed">Wrapped</span>
+              </div>
+              <div className="p-6 md:p-8">
+                <p className="display break-words text-[clamp(44px,11vw,84px)] font-extrabold leading-[0.9]">{w.name}</p>
+                <p className="display mt-2 text-xl text-odcGold">★ {w.archetype}</p>
+                <p className="mono mt-1.5 text-[10.5px] uppercase tracking-[0.14em] text-odcCream/45">
+                  {w.division} · Finished #{w.position} of {w.totalPlayers}
+                </p>
+
+                <div className="num mt-7 grid grid-cols-2 gap-3 md:grid-cols-3">
+                  {[
+                    ["Record", w.record],
+                    ["Win rate", w.winRate],
+                    ["Season avg", w.seasonAvg],
+                    ["Best 3DA", w.best3DA],
+                    ["180s", w.tons],
+                    ["High checkout", w.highCheckout],
+                    ["Best leg", w.bestLeg],
+                    ["Legs won", w.legsWon],
+                    ["Matches", w.played],
+                  ].map(([l, v], i) => (
+                    <Reveal key={l} delay={0.1 + i * 0.06}>
+                      <div className="rounded-lg border border-odcCream/[0.08] bg-odcBlack p-4">
+                        <p className="mono text-[9px] uppercase tracking-[0.14em] text-odcCream/40">{l}</p>
+                        <p className="display mt-1 text-3xl">{v}</p>
+                      </div>
+                    </Reveal>
+                  ))}
+                </div>
+
+                <Reveal delay={0.6}>
+                  <div className="mt-3 rounded-lg bg-odcRed p-4">
+                    <p className="mono text-[9px] uppercase tracking-[0.14em] text-white/70">Biggest win</p>
+                    <p className="display mt-1 text-2xl text-white">{w.biggestWin}</p>
+                  </div>
+                </Reveal>
+                <Reveal delay={0.7}>
+                  <div className="mt-3 rounded-lg border border-odcCream/[0.08] p-4">
+                    <p className="mono text-[9px] uppercase tracking-[0.14em] text-odcCream/40">Most-played rival</p>
+                    <p className="display mt-1 text-2xl">{w.rival}</p>
+                  </div>
+                </Reveal>
+              </div>
+            </div>
+          </ClipReveal>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => shareWrappedCard(w)}
+              className="mono inline-flex items-center gap-2 rounded-md bg-odcRed px-5 py-3.5 text-xs font-bold uppercase tracking-[0.08em] text-white transition hover:bg-odcRedDeep"
+            >
+              <Share2 size={15} /> Share my Wrapped
+            </button>
+            <button
+              onClick={() => setPicked(null)}
+              className="mono rounded-md border border-odcCream/20 px-5 py-3.5 text-xs font-bold uppercase tracking-[0.08em] text-odcCream/70 transition hover:border-odcCream/50 hover:text-odcCream"
+            >
+              Pick another player
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1871,6 +2071,7 @@ export default function App() {
         {active === "mvps"         && <MvpsPage data={data} />}
         {active === "events"       && <EventsPage data={data} />}
         {active === "archive"      && <ArchivePage data={data} />}
+        {active === "wrapped"      && <WrappedPage data={data} />}
       </motion.div>
 
       <footer className="mono border-t border-odcCream/10 px-4 py-8 text-center text-[11px] uppercase tracking-[0.1em] text-odcCream/40">
