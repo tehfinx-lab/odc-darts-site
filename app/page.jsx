@@ -485,6 +485,14 @@ function MatchDetailsModal({ match, onClose }) {
   /* full broadcast stat sheet, grouped like TV coverage */
   const groups = [
     {
+      name: "Legs",
+      rows: [
+        ["Legs Won", p1.legsFor, p2.legsFor],
+        ["Best Leg", p1.bestLegRaw || p1.bestLeg, p2.bestLegRaw || p2.bestLeg],
+        ["Worst Leg", p1.worstLeg, p2.worstLeg],
+      ],
+    },
+    {
       name: "Scoring",
       rows: [
         ["3-Dart Avg", p1.avg, p2.avg],
@@ -498,14 +506,6 @@ function MatchDetailsModal({ match, onClose }) {
         ["High Checkout", p1.highCheckout, p2.highCheckout],
         ["Checkout %", p1.checkoutRate, p2.checkoutRate],
         ["Checkouts", p1.checkouts, p2.checkouts],
-      ],
-    },
-    {
-      name: "Legs",
-      rows: [
-        ["Legs Won", p1.legsFor, p2.legsFor],
-        ["Best Leg", p1.bestLegRaw || p1.bestLeg, p2.bestLegRaw || p2.bestLeg],
-        ["Worst Leg", p1.worstLeg, p2.worstLeg],
       ],
     },
   ]
