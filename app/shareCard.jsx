@@ -304,15 +304,16 @@ export async function buildWrappedCanvas(w) {
   ctx.font = `800 56px ${DISP}`;
   ctx.fillText(w.biggestWin || "\u2013", 110, by + 108);
 
-  /* rival band */
+  /* best performance band */
   by += 154;
   ctx.strokeStyle = LINE; roundRect(ctx, 80, by, W - 160, 130, 18); ctx.stroke();
+  ctx.textAlign = "left";
   ctx.fillStyle = "rgba(233,239,231,0.45)";
   ctx.font = `600 24px ${MONO}`;
-  ctx.fillText("MOST-PLAYED RIVAL", 112, by + 52);
+  ctx.fillText("BEST PERFORMANCE", 112, by + 52);
   ctx.fillStyle = BONE;
   ctx.font = `800 52px ${DISP}`;
-  ctx.fillText(w.rival || "\u2013", 110, by + 106);
+  ctx.fillText(w.bestPerf || "\u2013", 110, by + 106);
 
   /* footer */
   ctx.fillStyle = "rgba(233,239,231,0.4)";
