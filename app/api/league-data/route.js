@@ -8,7 +8,7 @@ const DUO_SHEET_ID = "1nN_dbDGg482nZTB1ghwLgxvKJ5My-3PG";
 const DUO_GID = "1207445903";
 const KNOCKOUT_GID = "831104526";
 
-const CURRENT_WEEK = 13;
+const CURRENT_WEEK = 1;
 const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
