@@ -34,6 +34,41 @@ function outcome(h, a) {
   return "draw";
 }
 
+// ---------------------------------------------------------------
+// MATCH FORMATS per division ("best of N legs", first to majority,
+// draw when legs split evenly). Change the numbers here if formats
+// change season to season.
+// ---------------------------------------------------------------
+const DIVISION_BEST_OF = {
+  1: 10, 2: 10, 3: 10, 4: 10,
+  5: 8, 6: 8, 7: 8, 8: 8, 9: 8, 10: 8, // TODO: confirm best-of for divs 5-10
+};
+const DEFAULT_BEST_OF = 8;
+
+function bestOfForDivision(divisionName) {
+  const m = String(divisionName || "").match(/\d+/);
+  const n = m ? Number(m[0]) : 0;
+  return DIVISION_BEST_OF[n] || DEFAULT_BEST_OF;
+}
+
+// All valid final scorelines for a "best of N legs" match:
+// first to floor(N/2)+1 wins; if it splits evenly (N/2 - N/2) it's a draw.
+// e.g. best of 10 -> 6-0..6-4 either way, or 5-5 draw.
+function validScorelines(bestOf) {
+  const winAt = Math.floor(bestOf / 2) + 1;
+  const out = [];
+  for (let loser = 0; loser < winAt; loser++) {
+    if (winAt + loser > bestOf) continue;
+    out.push([winAt, loser]);
+  }
+  const scores = [];
+  for (const [w, l] of out) scores.push({ home: w, away: l });
+  const drawLegs = bestOf / 2;
+  if (Number.isInteger(drawLegs)) scores.push({ home: drawLegs, away: drawLegs });
+  for (const [w, l] of out.slice().reverse()) scores.push({ home: l, away: w });
+  return scores;
+}
+
 // Score one prediction against an actual result
 function scorePick(pred, actual) {
   if (!actual) return 0;
@@ -134,6 +169,16 @@ export default function Predictions({ data, scriptUrl }) {
   function setScore(key, side, val) {
     const v = val === "" ? "" : Math.max(0, Math.min(20, Number(val)));
     setPicks((p) => ({ ...p, [key]: { ...p[key], [side]: v } }));
+    setSubmitted(false);
+  }
+
+  function setScoreline(key, value) {
+    if (value === "") {
+      setPicks((p) => ({ ...p, [key]: { ...p[key], homeScore: "", awayScore: "" } }));
+    } else {
+      const [h, a] = value.split("-").map(Number);
+      setPicks((p) => ({ ...p, [key]: { ...p[key], homeScore: h, awayScore: a } }));
+    }
     setSubmitted(false);
   }
 
@@ -332,6 +377,9 @@ export default function Predictions({ data, scriptUrl }) {
                     <span className="rounded-full bg-odcGold/15 px-2.5 py-1 text-[10px] font-semibold text-odcGold">
                       {divFixtures.length} {divFixtures.length === 1 ? "game" : "games"}
                     </span>
+                    <span className="rounded-full border border-odcGold/25 px-2.5 py-1 text-[10px] font-semibold text-odcCream/70">
+                      Best of {bestOfForDivision(division)} legs · first to {Math.floor(bestOfForDivision(division) / 2) + 1}
+                    </span>
                   </span>
                   <span className="flex items-center gap-3">
                     {openCount > 0 && (
@@ -362,35 +410,32 @@ export default function Predictions({ data, scriptUrl }) {
                           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                             <span className="text-sm font-semibold">{f.home}</span>
                             <div className="flex items-center justify-center gap-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max="20"
-                                disabled={locked}
-                                value={locked ? actual?.homeScore ?? "" : p.homeScore ?? ""}
-                                onChange={(e) => setScore(key, "homeScore", e.target.value)}
-                                placeholder="–"
-                                className={`h-11 w-11 rounded-xl border text-center text-lg font-semibold outline-none ${
-                                  (locked ? actual?.homeScore != null : p.homeScore !== "" && p.homeScore != null)
-                                    ? "border-transparent bg-odcGreen text-odcBlack"
-                                    : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
-                                }`}
-                              />
-                              <span className="text-xs font-semibold text-odcCream/40">–</span>
-                              <input
-                                type="number"
-                                min="0"
-                                max="20"
-                                disabled={locked}
-                                value={locked ? actual?.awayScore ?? "" : p.awayScore ?? ""}
-                                onChange={(e) => setScore(key, "awayScore", e.target.value)}
-                                placeholder="–"
-                                className={`h-11 w-11 rounded-xl border text-center text-lg font-semibold outline-none ${
-                                  (locked ? actual?.awayScore != null : p.awayScore !== "" && p.awayScore != null)
-                                    ? "border-transparent bg-odcGreen text-odcBlack"
-                                    : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
-                                }`}
-                              />
+                              {locked ? (
+                                <span className="rounded-xl bg-odcGreen px-4 py-2 text-lg font-semibold text-odcBlack">
+                                  {actual?.homeScore ?? "–"} – {actual?.awayScore ?? "–"}
+                                </span>
+                              ) : (
+                                <select
+                                  value={
+                                    p.homeScore !== "" && p.homeScore != null && p.awayScore !== "" && p.awayScore != null
+                                      ? `${p.homeScore}-${p.awayScore}`
+                                      : ""
+                                  }
+                                  onChange={(e) => setScoreline(key, e.target.value)}
+                                  className={`h-11 rounded-xl border px-3 text-center text-base font-semibold outline-none ${
+                                    p.homeScore !== "" && p.homeScore != null
+                                      ? "border-transparent bg-odcGreen text-odcBlack"
+                                      : "border-odcGold/30 bg-odcBlack/60 text-odcCream"
+                                  }`}
+                                >
+                                  <option value="">– pick score –</option>
+                                  {validScorelines(bestOfForDivision(division)).map(({ home, away }) => (
+                                    <option key={`${home}-${away}`} value={`${home}-${away}`}>
+                                      {home} – {away}{home === away ? " (draw)" : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
                             </div>
                             <span className="text-right text-sm font-semibold">{f.away}</span>
                           </div>
