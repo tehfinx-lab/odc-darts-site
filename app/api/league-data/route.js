@@ -11,7 +11,7 @@ const DUO_STANDINGS_TAB = "Standings";
 const DUO_KNOCKOUT_TAB = "Knockout";
 const KNOCKOUT_GID = "831104526";
 
-const CURRENT_WEEK = 1;
+const CURRENT_WEEK = 13;
 const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
@@ -147,7 +147,7 @@ async function fetchCsvRows(sheetId, gid, label = "Sheet") {
 }
 
 async function fetchCsvRowsByName(sheetId, sheetName, label = "Sheet") {
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&headers=0&sheet=${encodeURIComponent(sheetName)}`;
   const res = await fetch(csvUrl, { cache: "no-store" });
 
   if (!res.ok) {
@@ -667,13 +667,26 @@ function buildKnockoutData(rows) {
 
 export async function GET() {
   try {
-    const [matchRows, fixtureRows, duoRows, knockoutRows, eventRows] = await Promise.all([
+    const [matchRows, fixtureRows, eventRows] = await Promise.all([
       fetchSheetRows(MATCHES_GID, "Matches"),
       fetchSheetRows(FIXTURES_GID, "Fixtures"),
-      fetchCsvRowsByName(DUO_SHEET_ID, DUO_STANDINGS_TAB, "Duo League"),
-      fetchCsvRowsByName(DUO_SHEET_ID, DUO_KNOCKOUT_TAB, "Knockout"),
       fetchSheetRows(EVENTS_GID, "Events"),
     ]);
+
+    // Duo League lives in a separate spreadsheet — fetch it independently
+    // so a problem there can NEVER take down the rest of the site.
+    let duoRows = [];
+    let knockoutRows = [];
+    try {
+      duoRows = await fetchCsvRowsByName(DUO_SHEET_ID, DUO_STANDINGS_TAB, "Duo League");
+    } catch (error) {
+      console.error("Duo League standings fetch failed:", error);
+    }
+    try {
+      knockoutRows = await fetchCsvRowsByName(DUO_SHEET_ID, DUO_KNOCKOUT_TAB, "Knockout");
+    } catch (error) {
+      console.error("Duo League knockout fetch failed:", error);
+    }
 
     let rosterRows = [];
     try {
