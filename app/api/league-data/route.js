@@ -553,7 +553,13 @@ function buildDuoLeagueData(rows) {
       continue;
     }
     if (!currentGroup) continue;
-    if (!a || /^team$/i.test(a)) continue; // blank rows / header row
+    if (/^team$/i.test(a)) continue; // header row
+    if (!a) {
+      // First blank row after the teams ends the block, so footer notes
+      // (tie-breaker text etc.) can never be mistaken for a team.
+      if (groups[currentGroup].length) currentGroup = null;
+      continue;
+    }
 
     const legsFor = num(row[5]);
     const legsAgainst = num(row[6]);
@@ -666,6 +672,9 @@ function buildKnockoutData(rows) {
   };
 }
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const [matchRows, fixtureRows, eventRows] = await Promise.all([
@@ -710,6 +719,7 @@ export async function GET() {
 
     return Response.json(
       {
+        apiVersion: "duo-gid-v4",
         ...matchData,
         fixtures,
         duoLeague,
