@@ -11,7 +11,7 @@ const DUO_STANDINGS_TAB = "Standings";
 const DUO_KNOCKOUT_TAB = "Knockout";
 const KNOCKOUT_GID = "831104526";
 
-const CURRENT_WEEK = 13;
+const CURRENT_WEEK = 1;
 const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
