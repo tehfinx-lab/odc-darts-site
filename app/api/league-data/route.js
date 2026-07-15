@@ -5,11 +5,13 @@ const MASTER_STATS_GID = "1607751142";
 const PLAYERS_GID = "1263320039";
 const EVENTS_GID = "1053162197";
 
-const DUO_SHEET_ID = "1nN_dbDGg482nZTB1ghwLgxvKJ5My-3PG";
-const DUO_GID = "1207445903";
+const DUO_SHEET_ID = "1sEBXQpn2ZaGNJSiExjiKtt4Vc1nJbdFt2qqaPnAOVUQ";
+// New duo sheet is fetched by TAB NAME (gviz) so no gids are needed.
+const DUO_STANDINGS_TAB = "Standings";
+const DUO_KNOCKOUT_TAB = "Knockout";
 const KNOCKOUT_GID = "831104526";
 
-const CURRENT_WEEK = 1;
+const CURRENT_WEEK = 13;
 const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
@@ -129,6 +131,23 @@ function bestLegRank(value) {
 
 async function fetchCsvRows(sheetId, gid, label = "Sheet") {
   const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  const res = await fetch(csvUrl, { cache: "no-store" });
+
+  if (!res.ok) {
+    throw new Error(`${label} fetch failed: ${res.status}`);
+  }
+
+  const csv = await res.text();
+
+  if (csv.toLowerCase().includes("<html") || csv.toLowerCase().includes("sign in")) {
+    throw new Error(`${label} is not publicly readable as CSV`);
+  }
+
+  return parseCsv(csv);
+}
+
+async function fetchCsvRowsByName(sheetId, sheetName, label = "Sheet") {
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
   const res = await fetch(csvUrl, { cache: "no-store" });
 
   if (!res.ok) {
@@ -517,85 +536,60 @@ function buildMasterStats(rows) {
 }
 
 function buildDuoLeagueData(rows) {
-  const groups = {
-    "Group A": [],
-    "Group B": [],
-    "Group C": [],
-  };
+  // New DDL sheet ("Standings" tab): each group is a block —
+  //   [Group X] label in col A, then a "Team" header row, then the
+  //   already-sorted display table in columns A-I:
+  //   Team | MP | W | D | L | Legs For | Legs Against | Leg Diff | Points
+  const groups = {};
+  let currentGroup = null;
 
-  const groupConfig = [
-    { group: "Group A", firstMatchId: "A1" },
-    { group: "Group B", firstMatchId: "B1" },
-    { group: "Group C", firstMatchId: "C1" },
-  ];
+  for (const row of rows) {
+    const a = text(row?.[0]);
 
-  const DUO_COL = {
-    matchId: 0,
-    team: 9,
-    teamAvg: 10,
-    played: 11,
-    wins: 12,
-    draws: 13,
-    losses: 14,
-    legsFor: 15,
-    legsAgainst: 16,
-    legDiff: 17,
-    points: 18,
-    sortKey: 19,
-    rank: 20,
-    status: 21,
-  };
-
-  for (const config of groupConfig) {
-    const startRow = rows.findIndex((row) => text(row[DUO_COL.matchId]) === config.firstMatchId);
-
-    if (startRow === -1) continue;
-
-    for (let r = startRow; r < startRow + 4; r++) {
-      const row = rows[r] || [];
-      const team = text(row[DUO_COL.team]);
-
-      if (!team) continue;
-
-      const legsFor = num(row[DUO_COL.legsFor]);
-      const legsAgainst = num(row[DUO_COL.legsAgainst]);
-
-      groups[config.group].push({
-        group: config.group,
-        team,
-        teamAvg: num(row[DUO_COL.teamAvg]),
-        played: num(row[DUO_COL.played]),
-        wins: num(row[DUO_COL.wins]),
-        draws: num(row[DUO_COL.draws]),
-        losses: num(row[DUO_COL.losses]),
-        legsFor,
-        legsAgainst,
-        legDiff: text(row[DUO_COL.legDiff]) || String(legsFor - legsAgainst),
-        points: num(row[DUO_COL.points]),
-        rank: num(row[DUO_COL.rank]) || groups[config.group].length + 1,
-        status: text(row[DUO_COL.status]),
-      });
+    if (/^Group\s+[A-Z]$/i.test(a)) {
+      currentGroup = a.replace(/^group/i, "Group");
+      groups[currentGroup] = [];
+      continue;
     }
+    if (!currentGroup) continue;
+    if (!a || /^team$/i.test(a)) continue; // blank rows / header row
 
-    groups[config.group].sort((a, b) => {
-      return (
-        a.rank - b.rank ||
-        b.points - a.points ||
-        Number(b.legDiff) - Number(a.legDiff) ||
-        b.legsFor - a.legsFor ||
-        b.teamAvg - a.teamAvg ||
-        a.team.localeCompare(b.team)
-      );
+    const legsFor = num(row[5]);
+    const legsAgainst = num(row[6]);
+    groups[currentGroup].push({
+      group: currentGroup,
+      team: a,
+      teamAvg: 0, // new sheet doesn't track a team average
+      played: num(row[1]),
+      wins: num(row[2]),
+      draws: num(row[3]),
+      losses: num(row[4]),
+      legsFor,
+      legsAgainst,
+      legDiff: text(row[7]) || String(legsFor - legsAgainst),
+      points: num(row[8]),
+      rank: groups[currentGroup].length + 1, // sheet rows arrive pre-sorted
+      status: "",
     });
   }
 
-  return {
-    groups,
-    thirdPlace: [],
-    qualifiers: [],
-  };
-}
+  // Drop empty groups (e.g. before the draw is done)
+  for (const name of Object.keys(groups)) {
+    if (!groups[name].length) delete groups[name];
+  }
 
+  // Top 2 qualify for the knockout — badge them once the group is complete
+  // (double round robin: each team plays 2 * (teams - 1) games)
+  for (const teams of Object.values(groups)) {
+    const gamesEach = (teams.length - 1) * 2;
+    const complete = teams.length > 1 && teams.every((t) => t.played >= gamesEach);
+    if (complete) {
+      teams.slice(0, 2).forEach((t) => { t.status = "QUALIFIED"; });
+    }
+  }
+
+  return groups;
+}
 function buildEventsData(rows) {
   const events = [];
 
@@ -623,69 +617,50 @@ function buildEventsData(rows) {
 }
 
 function buildKnockoutData(rows) {
-  // Google Sheets CSV merges the entire title/header section into the first row alongside QF1,
-  // so we can't rely on row offsets. Instead find matches by their ID in col A.
-  const qfEntries = [];
-  const sfEntries = [];
-  let finalRow = null;
+  // New DDL sheet ("Knockout" tab), clean columns:
+  //   A Round | B Match | C Team 1 | D Score 1 | E Score 2 | F Team 2 | G Winner
+  const makeMatch = (id, row) => ({
+    id,
+    home: text(row?.[2] ?? ""),
+    away: text(row?.[5] ?? ""),
+    homeScore: text(row?.[3] ?? ""),
+    awayScore: text(row?.[4] ?? ""),
+    winner: text(row?.[6] ?? ""),
+  });
+
+  const byId = {};
   let champion = "";
-  let matchHeaderCount = 0;
 
   for (const row of rows) {
-    const colA = text(row[0]);
-
-    if (/^QF\d+$/i.test(colA)) {
-      // Clean QF row (QF2, QF3, QF4)
-      qfEntries.push({ id: colA.toUpperCase(), row, special: false });
-    } else if (/QF\d+$/i.test(colA)) {
-      // QF1 is merged into the big header blob — col B/C have "Home Team X" / "Away Team X" prefixes
-      const m = colA.match(/QF(\d+)$/i);
-      qfEntries.push({ id: `QF${m[1]}`, row, special: true });
-    } else if (/^SF\d+$/i.test(colA)) {
-      sfEntries.push({ id: colA.toUpperCase(), row, special: false });
-    } else if (/^Final$/i.test(colA) && matchHeaderCount >= 2) {
-      // Only accept "Final" as a match row after the second "Match" column-header row
-      finalRow = row;
-    } else if (/^Match$/i.test(colA)) {
-      matchHeaderCount++;
-    } else if (/^Winner$/i.test(colA)) {
-      champion = text(row[1] ?? "");
+    const matchId = text(row?.[1]);
+    if (/^QF\d+$/i.test(matchId) || /^SF\d+$/i.test(matchId) || /^FINAL$/i.test(matchId)) {
+      byId[matchId.toUpperCase()] = row;
+    }
+    // champion banner cell, e.g. "Champion: Team X"
+    const a = text(row?.[0]);
+    if (/^champion/i.test(a)) {
+      const m = a.match(/^champion[:\s]*(.+)$/i);
+      if (m && m[1] && !/tbd/i.test(m[1])) champion = m[1].trim();
     }
   }
 
-  qfEntries.sort((a, b) => a.id.localeCompare(b.id));
+  // Fall back to the FINAL row's winner column
+  if (!champion && byId["FINAL"]) {
+    const w = text(byId["FINAL"][6] ?? "");
+    if (w && !/tbd/i.test(w)) champion = w;
+  }
 
-  const stripPrefix = (val, prefix) => {
-    const s = text(val);
-    return s.startsWith(prefix) ? s.slice(prefix.length).trim() : s;
-  };
-
-  const makeMatch = (id, row, special) => {
-    if (!row) return { id, home: "", away: "", homeScore: "", awayScore: "", winner: "" };
-    return {
-      id,
-      home:      special ? stripPrefix(row[1], "Home Team")                              : text(row[1] ?? ""),
-      away:      special ? stripPrefix(row[2], "Away Team")                              : text(row[2] ?? ""),
-      homeScore: special ? text(row[3] ?? "").replace(/^Home Score\s*/i, "").trim()      : text(row[3] ?? ""),
-      awayScore: special ? text(row[4] ?? "").replace(/^Away Score\s*/i, "").trim()      : text(row[4] ?? ""),
-      winner:    special ? text(row[5] ?? "").replace(/^Winner\s*/i, "").trim()          : text(row[5] ?? ""),
-    };
-  };
-
-  const quarterFinals = Array.from({ length: 4 }, (_, i) => {
-    const e = qfEntries[i];
-    return e ? makeMatch(e.id, e.row, e.special) : { id: `QF${i + 1}`, home: "", away: "", homeScore: "", awayScore: "", winner: "" };
-  });
-
-  const semiFinals = Array.from({ length: 2 }, (_, i) => {
-    const e = sfEntries[i];
-    return e ? makeMatch(e.id, e.row, false) : { id: `SF${i + 1}`, home: "", away: "", homeScore: "", awayScore: "", winner: "" };
-  });
+  const quarterFinals = Array.from({ length: 4 }, (_, i) =>
+    makeMatch(`QF${i + 1}`, byId[`QF${i + 1}`])
+  );
+  const semiFinals = Array.from({ length: 2 }, (_, i) =>
+    makeMatch(`SF${i + 1}`, byId[`SF${i + 1}`])
+  );
 
   return {
     quarterFinals,
     semiFinals,
-    final: [makeMatch("Final", finalRow, false)],
+    final: [makeMatch("Final", byId["FINAL"])],
     champion,
   };
 }
@@ -695,8 +670,8 @@ export async function GET() {
     const [matchRows, fixtureRows, duoRows, knockoutRows, eventRows] = await Promise.all([
       fetchSheetRows(MATCHES_GID, "Matches"),
       fetchSheetRows(FIXTURES_GID, "Fixtures"),
-      fetchCsvRows(DUO_SHEET_ID, DUO_GID, "Duo League"),
-      fetchCsvRows(DUO_SHEET_ID, KNOCKOUT_GID, "Knockout"),
+      fetchCsvRowsByName(DUO_SHEET_ID, DUO_STANDINGS_TAB, "Duo League"),
+      fetchCsvRowsByName(DUO_SHEET_ID, DUO_KNOCKOUT_TAB, "Knockout"),
       fetchSheetRows(EVENTS_GID, "Events"),
     ]);
 
