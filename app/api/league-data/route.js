@@ -6,12 +6,13 @@ const PLAYERS_GID = "1263320039";
 const EVENTS_GID = "1053162197";
 
 const DUO_SHEET_ID = "1sEBXQpn2ZaGNJSiExjiKtt4Vc1nJbdFt2qqaPnAOVUQ";
-// New duo sheet is fetched by TAB NAME (gviz) so no gids are needed.
-const DUO_STANDINGS_TAB = "Standings";
-const DUO_KNOCKOUT_TAB = "Knockout";
+const DUO_STANDINGS_GID = "1043835234"; // "Standings" tab
+// Knockout stage disabled for now — re-enable by restoring the fetch below
+// and setting the Knockout tab's gid here when the knockouts start.
+// const DUO_KNOCKOUT_GID = "";
 const KNOCKOUT_GID = "831104526";
 
-const CURRENT_WEEK = 13;
+const CURRENT_WEEK = 1;
 const MVP_WEEK = CURRENT_WEEK - 1;
 
 const MATCH_COL = {
@@ -676,16 +677,11 @@ export async function GET() {
     // Duo League lives in a separate spreadsheet — fetch it independently
     // so a problem there can NEVER take down the rest of the site.
     let duoRows = [];
-    let knockoutRows = [];
+    const knockoutRows = []; // knockout stage not running yet
     try {
-      duoRows = await fetchCsvRowsByName(DUO_SHEET_ID, DUO_STANDINGS_TAB, "Duo League");
+      duoRows = await fetchCsvRows(DUO_SHEET_ID, DUO_STANDINGS_GID, "Duo League");
     } catch (error) {
       console.error("Duo League standings fetch failed:", error);
-    }
-    try {
-      knockoutRows = await fetchCsvRowsByName(DUO_SHEET_ID, DUO_KNOCKOUT_TAB, "Knockout");
-    } catch (error) {
-      console.error("Duo League knockout fetch failed:", error);
     }
 
     let rosterRows = [];
