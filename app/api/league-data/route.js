@@ -677,37 +677,41 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    const [matchRows, fixtureRows, eventRows] = await Promise.all([
-      fetchSheetRows(MATCHES_GID, "Matches"),
-      fetchSheetRows(FIXTURES_GID, "Fixtures"),
-      fetchSheetRows(EVENTS_GID, "Events"),
-    ]);
+    // Fetch EVERY sheet in parallel — one round-trip of latency total.
+    // Matches/Fixtures/Events are required; the rest degrade gracefully.
+    const [matchRes, fixtureRes, eventRes, duoRes, rosterRes, masterRes] =
+      await Promise.allSettled([
+        fetchSheetRows(MATCHES_GID, "Matches"),
+        fetchSheetRows(FIXTURES_GID, "Fixtures"),
+        fetchSheetRows(EVENTS_GID, "Events"),
+        fetchCsvRows(DUO_SHEET_ID, DUO_STANDINGS_GID, "Duo League"),
+        fetchSheetRows(PLAYERS_GID, "Players"),
+        fetchSheetRows(MASTER_STATS_GID, "Master Stats"),
+      ]);
 
-    // Duo League lives in a separate spreadsheet — fetch it independently
-    // so a problem there can NEVER take down the rest of the site.
-    let duoRows = [];
-    const knockoutRows = []; // knockout stage not running yet
-    try {
-      duoRows = await fetchCsvRows(DUO_SHEET_ID, DUO_STANDINGS_GID, "Duo League");
-    } catch (error) {
-      console.error("Duo League standings fetch failed:", error);
+    for (const [label, r] of [["Matches", matchRes], ["Fixtures", fixtureRes], ["Events", eventRes]]) {
+      if (r.status === "rejected") throw new Error(`${label} fetch failed: ${r.reason?.message || r.reason}`);
     }
+    const matchRows = matchRes.value;
+    const fixtureRows = fixtureRes.value;
+    const eventRows = eventRes.value;
+
+    const knockoutRows = []; // knockout stage not running yet
+
+    let duoRows = [];
+    if (duoRes.status === "fulfilled") duoRows = duoRes.value;
+    else console.error("Duo League standings fetch failed:", duoRes.reason);
 
     let rosterRows = [];
-    try {
-      rosterRows = await fetchSheetRows(PLAYERS_GID, "Players");
-    } catch (error) {
-      console.error("Players roster failed (site falls back to matches-only):", error);
-    }
+    if (rosterRes.status === "fulfilled") rosterRows = rosterRes.value;
+    else console.error("Players roster failed (site falls back to matches-only):", rosterRes.reason);
 
     let masterRows = [];
     let masterStatsError = "";
-
-    try {
-      masterRows = await fetchSheetRows(MASTER_STATS_GID, "Master Stats");
-    } catch (error) {
-      masterStatsError = error.message || "Master Stats failed";
-      console.error("Master Stats failed:", error);
+    if (masterRes.status === "fulfilled") masterRows = masterRes.value;
+    else {
+      masterStatsError = masterRes.reason?.message || "Master Stats failed";
+      console.error("Master Stats failed:", masterRes.reason);
     }
 
     const matchData  = buildMatchesData(matchRows, rosterRows);
@@ -719,7 +723,7 @@ export async function GET() {
 
     return Response.json(
       {
-        apiVersion: "duo-gid-v4",
+        apiVersion: "sw-fix-v5",
         ...matchData,
         fixtures,
         duoLeague,
