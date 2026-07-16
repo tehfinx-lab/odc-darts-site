@@ -1,7 +1,7 @@
 // ODC Service Worker — enables installability + fast repeat loads.
 // Simple, safe caching: app shell cached, data always fresh from network.
 
-const CACHE = "odc-v1";
+const CACHE = "odc-v2";
 const SHELL = [
   "/",
   "/odc-logo.png",
@@ -36,9 +36,10 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
 
-  // Never cache the live data API
+  // Never touch the live data API — let the browser handle it natively.
+  // (Previously a failed fetch here was masked as an empty "{}" response,
+  // which made every page silently render 0 players / no duo data.)
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(fetch(request).catch(() => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     return;
   }
 
