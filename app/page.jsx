@@ -52,7 +52,7 @@ const pages = [
   { id: "mvps", label: "MVPs", icon: Award },
   { id: "events", label: "Events", icon: CalendarDays },
   { id: "archive", label: "Archive", icon: Archive },
-  { id: "wrapped", label: "Wrapped", icon: Sparkles },
+  
 ];
 
 // ⬇️ PASTE YOUR GOOGLE APPS SCRIPT WEB-APP URL HERE (the one ending in /exec)
