@@ -54,11 +54,9 @@ const NAME_ALIASES = {
 
 function canon(name = "") {
   let s = String(name).toLowerCase();
-  // strip nicknames wrapped in quotes: Ash 'The Enforcer' Thorley, Ryan 'Razz' Chalkley
-  s = s.replace(/['\u2018\u2019][^'\u2018\u2019]*['\u2018\u2019]/g, " ");
   // strip accents (Alföldi -> alfoldi, Marić -> maric) and Polish ł
   s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u0142/g, "l");
-  // drop everything that isn't a-z or 0-9 (spaces, dashes, underscores, dots)
+  // drop everything that isn't a-z or 0-9 (apostrophes, spaces, dashes, dots)
   s = s.replace(/[^a-z0-9]/g, "");
   return NAME_ALIASES[s] || s;
 }
