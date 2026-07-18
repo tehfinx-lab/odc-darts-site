@@ -35,6 +35,35 @@ function outcome(h, a) {
 }
 
 // ---------------------------------------------------------------
+// NAME MATCHING — results are typed into the sheet with slightly
+// different spellings than the fixtures (nicknames, spaces,
+// accents, sponsor tags). canon() normalises both sides so a
+// prediction still matches its result. Add to NAME_ALIASES when a
+// player's result-sheet name is genuinely different from their
+// fixture name (left side = canon form of the variant, right side
+// = canon form of the fixture name).
+// ---------------------------------------------------------------
+const NAME_ALIASES = {
+  makaveli: "maka",                       // "Makaveli" -> "M a K a"
+  maric: "cromaric",                      // "Marić" -> "CroMaric"
+  bighitterjohnn: "johnmassey",           // "Bighitterjohnn" -> "John massey"
+  rossisouth: "rosssouth",                // "Rossisouth" -> "Ross South"
+  matthewlowe: "thomassmith0110",         // "Matthew Lowe" -> "thomassmith0110"
+  goobsterbarsportsupplies: "goobster",   // "Goobster - BarSport Supplies" -> "Goobster"
+};
+
+function canon(name = "") {
+  let s = String(name).toLowerCase();
+  // strip nicknames wrapped in quotes: Ash 'The Enforcer' Thorley, Ryan 'Razz' Chalkley
+  s = s.replace(/['\u2018\u2019][^'\u2018\u2019]*['\u2018\u2019]/g, " ");
+  // strip accents (Alföldi -> alfoldi, Marić -> maric) and Polish ł
+  s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u0142/g, "l");
+  // drop everything that isn't a-z or 0-9 (spaces, dashes, underscores, dots)
+  s = s.replace(/[^a-z0-9]/g, "");
+  return NAME_ALIASES[s] || s;
+}
+
+// ---------------------------------------------------------------
 // MATCH FORMATS per division ("best of N legs", first to majority,
 // draw when legs split evenly). Change the numbers here if formats
 // change season to season.
@@ -110,7 +139,7 @@ export default function Predictions({ data, scriptUrl }) {
   const resultMap = useMemo(() => {
     const m = {};
     results.forEach((r) => {
-      const key = `${r.home}|${r.away}|${r.week}`.toLowerCase();
+      const key = `${canon(r.home)}|${canon(r.away)}|${r.week}`;
       const parts = String(r.score).split("-").map((x) => Number(x.trim()));
       m[key] = { homeScore: parts[0], awayScore: parts[1] };
     });
@@ -123,7 +152,7 @@ export default function Predictions({ data, scriptUrl }) {
     for (const w of weeks) {
       const wkFix = fixtures.filter((f) => Number(f.week) === w);
       const anyOpen = wkFix.some(
-        (f) => !resultMap[`${f.home}|${f.away}|${w}`.toLowerCase()]
+        (f) => !resultMap[`${canon(f.home)}|${canon(f.away)}|${w}`]
       );
       if (anyOpen) return w;
     }
@@ -160,7 +189,7 @@ export default function Predictions({ data, scriptUrl }) {
   }
 
   function fixKey(f) {
-    return `${f.home}|${f.away}|${currentWeek}`.toLowerCase();
+    return `${canon(f.home)}|${canon(f.away)}|${currentWeek}`;
   }
   function isLocked(f) {
     return !!resultMap[fixKey(f)];
@@ -276,7 +305,7 @@ export default function Predictions({ data, scriptUrl }) {
     const totals = {};
     scope.forEach((p) => {
       const wkNum = wkOf(p.week);
-      const actual = resultMap[`${p.home}|${p.away}|${wkNum}`.toLowerCase()];
+      const actual = resultMap[`${canon(p.home)}|${canon(p.away)}|${wkNum}`];
       const pts = scorePick(p, actual);
       // Ensure every predictor appears, even on 0 points
       totals[p.player] = (totals[p.player] || 0) + pts;
