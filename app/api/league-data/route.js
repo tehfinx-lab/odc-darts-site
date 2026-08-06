@@ -698,9 +698,30 @@ export async function GET() {
 
     const knockoutRows = []; // knockout stage not running yet
 
+    // Duo standings: use the gid result if it actually contains group
+    // data; a deleted/recreated tab silently changes the gid, so fall
+    // back to fetching the tab by NAME when the gid path comes up empty.
+    const duoLooksValid = (rows) =>
+      Array.isArray(rows) &&
+      rows.some((r) => /^group\s+[a-z]$/i.test(String(r?.[0] || "").trim()));
+
     let duoRows = [];
-    if (duoRes.status === "fulfilled") duoRows = duoRes.value;
-    else console.error("Duo League standings fetch failed:", duoRes.reason);
+    if (duoRes.status === "fulfilled" && duoLooksValid(duoRes.value)) {
+      duoRows = duoRes.value;
+    } else {
+      if (duoRes.status === "rejected") {
+        console.error("Duo League gid fetch failed - trying by tab name:", duoRes.reason);
+      } else {
+        console.error("Duo League gid fetch returned no group data - trying by tab name");
+      }
+      try {
+        const byName = await fetchCsvRowsByName(DUO_SHEET_ID, "Standings", "Duo League");
+        if (duoLooksValid(byName)) duoRows = byName;
+        else console.error("Duo League by-name fetch also returned no group data");
+      } catch (error) {
+        console.error("Duo League by-name fetch failed:", error);
+      }
+    }
 
     let rosterRows = [];
     if (rosterRes.status === "fulfilled") rosterRows = rosterRes.value;
@@ -723,7 +744,7 @@ export async function GET() {
 
     return Response.json(
       {
-        apiVersion: "sw-fix-v5",
+        apiVersion: "duo-fallback-v6",
         ...matchData,
         fixtures,
         duoLeague,
