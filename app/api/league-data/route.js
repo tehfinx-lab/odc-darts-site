@@ -738,13 +738,13 @@ export async function GET() {
     const matchData  = buildMatchesData(matchRows, rosterRows);
     const fixtures   = buildFixturesData(fixtureRows);
     const masterStats = buildMasterStats(masterRows);
-    const duoLeague  = buildDuoLeagueData(duoRows);
+    const duoLeague  = { groups: buildDuoLeagueData(duoRows) };  // page expects duoLeague.groups
     const events     = buildEventsData(eventRows);
     const knockout   = buildKnockoutData(knockoutRows);
 
     return Response.json(
       {
-        apiVersion: "duo-fallback-v6",
+        apiVersion: "duo-shape-v7",
         ...matchData,
         fixtures,
         duoLeague,
