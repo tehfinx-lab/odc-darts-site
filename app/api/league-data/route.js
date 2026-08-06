@@ -7,6 +7,7 @@ const EVENTS_GID = "1053162197";
 
 const DUO_SHEET_ID = "1sEBXQpn2ZaGNJSiExjiKtt4Vc1nJbdFt2qqaPnAOVUQ";
 const DUO_STANDINGS_GID = "1043835234"; // "Standings" tab
+const DUO_KNOCKOUT_GID = "1613451969"; // "Knockout" tab
 // Knockout stage disabled for now — re-enable by restoring the fetch below
 // and setting the Knockout tab's gid here when the knockouts start.
 // const DUO_KNOCKOUT_GID = "";
@@ -696,17 +697,26 @@ export async function GET() {
     const fixtureRows = fixtureRes.value;
     const eventRows = eventRes.value;
 
-    // Knockout bracket: fetched by tab NAME so a recreated tab can't break it
+    // Knockout bracket: gid first (proven fetch path), by-name backup
+    const koLooksValid = (rows) =>
+      Array.isArray(rows) &&
+      rows.some((r) => /^QF\d+$/i.test(String(r?.[1] || "").trim()));
     let knockoutRows = [];
     try {
-      const ko = await fetchCsvRowsByName(DUO_SHEET_ID, "Knockout", "Knockout");
-      if (Array.isArray(ko) && ko.some((r) => /^QF\d+$/i.test(String(r?.[1] || "").trim()))) {
-        knockoutRows = ko;
-      } else {
-        console.error("Knockout fetch returned no QF rows");
-      }
+      const ko = await fetchCsvRows(DUO_SHEET_ID, DUO_KNOCKOUT_GID, "Knockout");
+      if (koLooksValid(ko)) knockoutRows = ko;
+      else console.error("Knockout gid fetch returned no QF rows - trying by tab name");
     } catch (error) {
-      console.error("Knockout fetch failed:", error);
+      console.error("Knockout gid fetch failed - trying by tab name:", error);
+    }
+    if (!knockoutRows.length) {
+      try {
+        const ko = await fetchCsvRowsByName(DUO_SHEET_ID, "Knockout", "Knockout");
+        if (koLooksValid(ko)) knockoutRows = ko;
+        else console.error("Knockout by-name fetch also returned no QF rows");
+      } catch (error) {
+        console.error("Knockout by-name fetch failed:", error);
+      }
     }
 
     // Duo standings: use the gid result if it actually contains group
@@ -755,7 +765,7 @@ export async function GET() {
 
     return Response.json(
       {
-        apiVersion: "knockout-v8",
+        apiVersion: "knockout-gid-v9",
         ...matchData,
         fixtures,
         duoLeague,
