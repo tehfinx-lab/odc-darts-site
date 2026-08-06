@@ -645,9 +645,9 @@ function buildKnockoutData(rows) {
     }
     // champion banner cell, e.g. "Champion: Team X"
     const a = text(row?.[0]);
-    if (/^champion/i.test(a)) {
-      const m = a.match(/^champion[:\s]*(.+)$/i);
-      if (m && m[1] && !/tbd/i.test(m[1])) champion = m[1].trim();
+    if (/^champion\s*:/i.test(a)) {
+      const m = a.match(/^champion\s*:\s*(.+)$/i);
+      if (m && m[1] && !/tbd|will appear/i.test(m[1])) champion = m[1].trim();
     }
   }
 
@@ -696,7 +696,18 @@ export async function GET() {
     const fixtureRows = fixtureRes.value;
     const eventRows = eventRes.value;
 
-    const knockoutRows = []; // knockout stage not running yet
+    // Knockout bracket: fetched by tab NAME so a recreated tab can't break it
+    let knockoutRows = [];
+    try {
+      const ko = await fetchCsvRowsByName(DUO_SHEET_ID, "Knockout", "Knockout");
+      if (Array.isArray(ko) && ko.some((r) => /^QF\d+$/i.test(String(r?.[1] || "").trim()))) {
+        knockoutRows = ko;
+      } else {
+        console.error("Knockout fetch returned no QF rows");
+      }
+    } catch (error) {
+      console.error("Knockout fetch failed:", error);
+    }
 
     // Duo standings: use the gid result if it actually contains group
     // data; a deleted/recreated tab silently changes the gid, so fall
@@ -744,7 +755,7 @@ export async function GET() {
 
     return Response.json(
       {
-        apiVersion: "duo-shape-v7",
+        apiVersion: "knockout-v8",
         ...matchData,
         fixtures,
         duoLeague,
