@@ -2164,6 +2164,7 @@ export default function App() {
       <PlayerProfile
         player={selectedPlayer}
         masterStats={data.masterStats || {}}
+        profiles={data.profiles || {}}
         matches={data.allResults || []}
         onClose={() => setSelectedPlayer(null)}
       />
