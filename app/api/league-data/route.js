@@ -3,6 +3,7 @@ const MATCHES_GID = "257719632";
 const FIXTURES_GID = "573028301";
 const MASTER_STATS_GID = "1607751142";
 const PLAYERS_GID = "1263320039";
+const PROFILES_GID = "";   // set to the Profiles tab gid; blank = fetch by name
 const EVENTS_GID = "1053162197";
 
 const DUO_SHEET_ID = "1sEBXQpn2ZaGNJSiExjiKtt4Vc1nJbdFt2qqaPnAOVUQ";
@@ -684,7 +685,7 @@ export async function GET() {
   try {
     // Fetch EVERY sheet in parallel — one round-trip of latency total.
     // Matches/Fixtures/Events are required; the rest degrade gracefully.
-    const [matchRes, fixtureRes, eventRes, duoRes, rosterRes, masterRes] =
+    const [matchRes, fixtureRes, eventRes, duoRes, rosterRes, masterRes, profileRes] =
       await Promise.allSettled([
         fetchSheetRows(MATCHES_GID, "Matches"),
         fetchSheetRows(FIXTURES_GID, "Fixtures"),
@@ -692,6 +693,9 @@ export async function GET() {
         fetchCsvRows(DUO_SHEET_ID, DUO_STANDINGS_GID, "Duo League"),
         fetchSheetRows(PLAYERS_GID, "Players"),
         fetchSheetRows(MASTER_STATS_GID, "Master Stats"),
+        PROFILES_GID
+          ? fetchSheetRows(PROFILES_GID, "Profiles")
+          : fetchCsvRowsByName(SHEET_ID, "Profiles", "Profiles"),
       ]);
 
     for (const [label, r] of [["Matches", matchRes], ["Fixtures", fixtureRes], ["Events", eventRes]]) {
@@ -752,6 +756,55 @@ export async function GET() {
     if (rosterRes.status === "fulfilled") rosterRows = rosterRes.value;
     else console.error("Players roster failed (site falls back to matches-only):", rosterRes.reason);
 
+    // Player profiles from /createprofile - keyed on lowercased name.
+    const profiles = {};
+    if (profileRes.status === "fulfilled" && Array.isArray(profileRes.value)) {
+      const rows = profileRes.value;
+      const headers = (rows[0] || []).map((h) => text(h).toLowerCase());
+      const idx = (want) => headers.findIndex((h) => h === want.toLowerCase());
+      const cols = {
+        player: idx("Player"),
+        nationality: idx("Nationality"),
+        nickname: idx("Darts Nickname"),
+        threeDa: idx("3DA"),
+        nineDa: idx("9DA"),
+        highCheckout: idx("Highest Checkout"),
+        oneEighties: idx("180S"),
+        favFinish: idx("Fav Finish (170 etc)"),
+        favDouble: idx("Fav Double"),
+        handedness: idx("Handedness"),
+        darts: idx("Darts"),
+        weight: idx("Weight"),
+        favPro: idx("Fav Pro Player"),
+        walkOn: idx("Walk on Song"),
+        dartcounter: idx("Dartcounter Profile"),
+      };
+      for (const row of rows.slice(1)) {
+        const name = cols.player >= 0 ? text(row[cols.player]) : "";
+        if (!name) continue;
+        const pick = (k) => (cols[k] >= 0 ? text(row[cols[k]]) : "");
+        profiles[name.toLowerCase()] = {
+          player: name,
+          nationality: pick("nationality"),
+          nickname: pick("nickname"),
+          threeDa: pick("threeDa"),
+          nineDa: pick("nineDa"),
+          highCheckout: pick("highCheckout"),
+          oneEighties: pick("oneEighties"),
+          favFinish: pick("favFinish"),
+          favDouble: pick("favDouble"),
+          handedness: pick("handedness"),
+          darts: pick("darts"),
+          weight: pick("weight"),
+          favPro: pick("favPro"),
+          walkOn: pick("walkOn"),
+          dartcounter: pick("dartcounter"),
+        };
+      }
+    } else if (profileRes.status === "rejected") {
+      console.error("Profiles fetch failed:", profileRes.reason);
+    }
+
     let masterRows = [];
     let masterStatsError = "";
     if (masterRes.status === "fulfilled") masterRows = masterRes.value;
@@ -769,11 +822,12 @@ export async function GET() {
 
     return Response.json(
       {
-        apiVersion: "mvp-no-ff-v10",
+        apiVersion: "profiles-v11",
         ...matchData,
         fixtures,
         duoLeague,
         masterStats,
+        profiles,
         masterStatsError,
         currentWeek: CURRENT_WEEK,
         mvpWeek: MVP_WEEK,
