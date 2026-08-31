@@ -83,10 +83,11 @@ function FormGraph({ data }) {
   );
 }
 
-export default function PlayerProfile({ player, masterStats, matches, onClose, onShare }) {
+export default function PlayerProfile({ player, masterStats, matches, profiles, onClose, onShare }) {
   if (!player) return null;
 
   const master = masterStats?.[player.name.toLowerCase()] || {};
+  const profile = profiles?.[player.name.toLowerCase()] || {};
 
   const playerMatches = useMemo(
     () => (matches || []).filter((m) => m.home === player.name || m.away === player.name),
@@ -244,6 +245,69 @@ export default function PlayerProfile({ player, masterStats, matches, onClose, o
                   </span>
                 );
               })}
+            </div>
+          )}
+
+          {Object.keys(profile).length > 0 && (
+            <div className="mb-6 rounded-xl border border-odcCream/10 bg-white/[0.03] p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="mono text-xs font-semibold uppercase tracking-[0.18em] text-odcCream/50">
+                  Player Profile
+                </p>
+                {profile.nickname ? (
+                  <p className="text-sm font-semibold text-odcRed">&ldquo;{profile.nickname}&rdquo;</p>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  ["Nationality", profile.nationality],
+                  ["Throws", profile.handedness],
+                  ["Darts", profile.darts],
+                  ["Weight", profile.weight],
+                  ["Fav Double", profile.favDouble],
+                  ["Fav Finish", profile.favFinish],
+                  ["Fav Player", profile.favPro],
+                  ["Career High C/O", profile.highCheckout],
+                ]
+                  .filter(([, v]) => v)
+                  .map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-lg border border-odcCream/10 bg-odcBlack/40 px-3 py-2"
+                    >
+                      <p className="mono text-[10px] uppercase tracking-[0.12em] text-odcCream/45">
+                        {label}
+                      </p>
+                      <p className="mt-1 truncate text-sm font-semibold text-odcCream" title={value}>
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+
+              {(profile.walkOn || profile.dartcounter) && (
+                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+                  {profile.walkOn ? (
+                    <p className="text-sm text-odcCream/70">
+                      <span className="mono text-[10px] uppercase tracking-[0.12em] text-odcCream/45">
+                        Walk on&nbsp;
+                      </span>
+                      <span className="font-semibold text-odcCream">{profile.walkOn}</span>
+                    </p>
+                  ) : null}
+                  {profile.dartcounter ? (
+                    <a
+                      href={profile.dartcounter}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mono text-xs font-semibold uppercase tracking-[0.12em] text-odcRed transition hover:text-odcCream"
+                    >
+                      DartCounter &rarr;
+                    </a>
+                  ) : null}
+                </div>
+              )}
             </div>
           )}
 
