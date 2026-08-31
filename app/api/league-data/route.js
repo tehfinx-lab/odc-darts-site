@@ -693,9 +693,19 @@ export async function GET() {
         fetchCsvRows(DUO_SHEET_ID, DUO_STANDINGS_GID, "Duo League"),
         fetchSheetRows(PLAYERS_GID, "Players"),
         fetchSheetRows(MASTER_STATS_GID, "Master Stats"),
-        PROFILES_GID
-          ? fetchSheetRows(PROFILES_GID, "Profiles")
-          : fetchCsvRowsByName(SHEET_ID, "Profiles", "Profiles"),
+        (async () => {
+          // gid first when we have one, then by tab name as a backup.
+          if (PROFILES_GID) {
+            try {
+              const rows = await fetchSheetRows(PROFILES_GID, "Profiles");
+              if (Array.isArray(rows) && rows.length > 1) return rows;
+              console.error("Profiles gid fetch returned nothing - trying by name");
+            } catch (e) {
+              console.error("Profiles gid fetch failed - trying by name:", e);
+            }
+          }
+          return fetchCsvRowsByName(SHEET_ID, "Profiles", "Profiles");
+        })(),
       ]);
 
     for (const [label, r] of [["Matches", matchRes], ["Fixtures", fixtureRes], ["Events", eventRes]]) {
@@ -801,6 +811,7 @@ export async function GET() {
           dartcounter: pick("dartcounter"),
         };
       }
+      console.log(`Profiles loaded: ${Object.keys(profiles).length}`);
     } else if (profileRes.status === "rejected") {
       console.error("Profiles fetch failed:", profileRes.reason);
     }
@@ -822,7 +833,7 @@ export async function GET() {
 
     return Response.json(
       {
-        apiVersion: "profiles-v11",
+        apiVersion: "profiles-v12",
         ...matchData,
         fixtures,
         duoLeague,
