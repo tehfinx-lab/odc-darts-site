@@ -3,7 +3,7 @@ const MATCHES_GID = "257719632";
 const FIXTURES_GID = "573028301";
 const MASTER_STATS_GID = "1607751142";
 const PLAYERS_GID = "1263320039";
-const PROFILES_GID = "";   // set to the Profiles tab gid; blank = fetch by name
+const PROFILES_GID = "2104645416";   // Profiles tab
 const EVENTS_GID = "1053162197";
 
 const DUO_SHEET_ID = "1sEBXQpn2ZaGNJSiExjiKtt4Vc1nJbdFt2qqaPnAOVUQ";
@@ -833,7 +833,7 @@ export async function GET() {
 
     return Response.json(
       {
-        apiVersion: "profiles-v12",
+        apiVersion: "profiles-v13",
         ...matchData,
         fixtures,
         duoLeague,
