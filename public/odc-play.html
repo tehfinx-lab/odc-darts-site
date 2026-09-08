@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ODC Play — Online Darts Circuit</title>
+<meta name="theme-color" content="#0A1710" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Archivo:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<style>
+  :root{
+    /* Palette taken off a real board under club lighting: sisal, wire,
+       board red and green, brass. Nothing here is a UI grey. */
+    --night:#0A1710;
+    --felt:#0F1F16;
+    --felt-2:#13251B;
+    --edge:rgba(233,239,231,.13);
+    --edge-2:rgba(233,239,231,.22);
+    --sisal:#E9EFE7;
+    --wire:#7D9183;
+    --red:#E63329;
+    --green:#23A566;
+    --brass:#D9B45B;
+
+    --display:"Big Shoulders Display","Arial Narrow",sans-serif;
+    --body:"Archivo",system-ui,-apple-system,sans-serif;
+    --mono:"Spline Sans Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--night);
+    color:var(--sisal);
+    font-family:var(--body);
+    font-size:15px;
+    line-height:1.5;
+    overscroll-behavior:none;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:var(--mono)}
+  .wrap{max-width:540px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+  button{font-family:inherit}
+  :focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;align-items:center;gap:12px;padding:12px 18px;
+    border-bottom:1px solid var(--edge);position:sticky;top:0;z-index:20;
+    background:rgba(22,18,14,.93);backdrop-filter:blur(10px);
+  }
+  .mark{
+    width:34px;height:34px;border-radius:50%;flex:none;
+    border:2px solid var(--red);display:grid;place-items:center;
+    font-family:var(--display);font-weight:800;font-size:14px;letter-spacing:.02em;
+  }
+  .wordmark{font-family:var(--display);font-weight:700;font-size:23px;letter-spacing:.01em;line-height:1}
+  .wordmark small{
+    display:block;font-family:var(--body);font-weight:400;font-size:10.5px;
+    letter-spacing:.14em;color:var(--wire);margin-top:2px;text-transform:uppercase;
+  }
+  .spacer{flex:1}
+  .me{display:flex;align-items:center;gap:9px;text-align:right}
+  .me .nm{font-size:13px;font-weight:500;line-height:1.25;max-width:120px;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .me .sub{font-size:11px;color:var(--wire);line-height:1.2}
+  .av{width:34px;height:34px;border-radius:50%;flex:none;object-fit:cover;
+      background:var(--felt-2);border:1px solid var(--edge-2)}
+  .av.ph{display:grid;place-items:center;font-family:var(--display);
+         font-weight:700;font-size:15px;color:var(--wire)}
+
+  main{flex:1;padding:18px;padding-bottom:104px}
+
+  /* ---------- scoreboard: the number is the design ---------- */
+  .oche{
+    display:grid;grid-template-columns:1fr 1px 1fr;
+    background:var(--felt);border:1px solid var(--edge);
+    border-radius:6px;overflow:hidden;margin-bottom:14px;
+  }
+  .divider{background:var(--edge)}
+  .side{padding:16px 14px 13px;text-align:center;position:relative}
+  .side .who{
+    font-size:13.5px;font-weight:600;letter-spacing:.005em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    color:var(--wire);
+  }
+  .side.up .who{color:var(--sisal)}
+  .side .tally{
+    font-family:var(--display);font-weight:800;
+    font-size:74px;line-height:.86;letter-spacing:-.01em;
+    margin:8px 0 4px;font-variant-numeric:tabular-nums;
+  }
+  .side.up .tally{color:var(--sisal)}
+  .side:not(.up) .tally{color:var(--wire)}
+  .side .avg{font-family:var(--mono);font-size:11.5px;color:var(--wire)}
+  .pips{display:flex;gap:5px;justify-content:center;margin-top:9px;min-height:7px}
+  .pip{width:7px;height:7px;border-radius:50%;background:var(--edge-2)}
+  .pip.won{background:var(--brass)}
+  /* active player marked by a brass rule, not a box */
+  .side.up::after{
+    content:"";position:absolute;left:14px;right:14px;bottom:0;
+    height:2px;background:var(--brass);
+  }
+
+  .route{
+    text-align:center;font-family:var(--mono);font-size:12.5px;
+    color:var(--brass);min-height:19px;margin-bottom:12px;letter-spacing:.01em;
+  }
+
+  .visit{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .slot{
+    background:var(--felt);border:1px solid var(--edge);border-radius:5px;
+    padding:13px 0;text-align:center;color:var(--wire);
+    font-family:var(--display);font-weight:700;font-size:26px;line-height:1;
+  }
+  .slot.in{color:var(--sisal);border-color:var(--edge-2);background:var(--felt-2)}
+
+  /* ---------- keypad ---------- */
+  .pad{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+  .k{
+    background:var(--felt);border:1px solid var(--edge);color:var(--sisal);
+    border-radius:5px;padding:16px 0;cursor:pointer;user-select:none;
+    font-family:var(--display);font-weight:700;font-size:21px;line-height:1;
+    transition:background .12s,transform .06s;
+  }
+  .k:active{transform:scale(.95);background:var(--felt-2)}
+  .k.mode{font-family:var(--body);font-weight:600;font-size:13px;letter-spacing:.02em;
+          background:var(--felt-2)}
+  .k.mode.on{background:var(--red);border-color:var(--red);color:#fff}
+  .k.span2{grid-column:span 2}
+  .k.go{background:var(--red);border-color:var(--red);color:#fff;
+        font-size:15px;font-family:var(--body);font-weight:600;letter-spacing:.01em}
+
+  /* ---------- generic surfaces ---------- */
+  .panel{background:var(--felt);border:1px solid var(--edge);border-radius:6px;
+         padding:17px;margin-bottom:14px}
+  h2{font-family:var(--display);font-weight:700;font-size:25px;letter-spacing:.01em;
+     margin:0 0 3px;line-height:1}
+  .lede{font-size:13px;color:var(--wire);margin:0 0 15px;line-height:1.5}
+  .lede:last-child{margin-bottom:0}
+
+  .figures{display:grid;grid-template-columns:1fr 1fr;gap:1px;
+           background:var(--edge);border:1px solid var(--edge);border-radius:6px;overflow:hidden}
+  .fig{background:var(--felt);padding:14px}
+  .fig .n{font-family:var(--display);font-weight:800;font-size:33px;line-height:1;
+          font-variant-numeric:tabular-nums}
+  .fig .t{font-size:12px;color:var(--wire);margin-top:4px}
+  .meter{height:3px;background:var(--felt-2);border-radius:2px;overflow:hidden;margin-top:9px}
+  .meter>i{display:block;height:100%;background:var(--brass)}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{font-size:12px;font-weight:500;color:var(--wire);text-align:left;
+     padding:0 4px 7px;border-bottom:1px solid var(--edge)}
+  td{padding:9px 4px;border-bottom:1px solid var(--edge)}
+  tr:last-child td{border-bottom:0}
+  td.num{text-align:right;font-family:var(--mono);font-size:12.5px}
+
+  .field{display:block;margin-bottom:11px}
+  .field span{display:block;font-size:12.5px;color:var(--wire);margin-bottom:5px}
+  input,select{
+    background:var(--felt-2);border:1px solid var(--edge);color:var(--sisal);
+    border-radius:5px;padding:11px 12px;font-family:var(--body);font-size:15px;width:100%;
+  }
+  input:focus,select:focus{border-color:var(--edge-2);outline:none}
+  .btn{
+    background:var(--red);border:1px solid var(--red);color:#fff;border-radius:5px;
+    padding:13px 18px;font-family:var(--body);font-weight:600;font-size:14.5px;
+    cursor:pointer;width:100%;letter-spacing:.01em;
+  }
+  .btn.quiet{background:var(--felt-2);border-color:var(--edge);color:var(--sisal)}
+  .btn.discord{background:#5865F2;border-color:#5865F2;display:flex;
+               align-items:center;justify-content:center;gap:9px}
+  .btn:active{transform:scale(.99)}
+  .stack{display:grid;gap:9px}
+  .hide{display:none!important}
+
+  /* ---------- profile head ---------- */
+  .profile{display:flex;align-items:center;gap:15px;margin-bottom:16px}
+  .profile .big{width:66px;height:66px;border-radius:50%;flex:none;object-fit:cover;
+                border:2px solid var(--edge-2);background:var(--felt-2)}
+  .profile .big.ph{display:grid;place-items:center;font-family:var(--display);
+                   font-weight:800;font-size:27px;color:var(--wire)}
+  .profile h3{font-family:var(--display);font-weight:700;font-size:27px;
+              margin:0;line-height:1.05}
+  .profile p{margin:3px 0 0;font-size:12.5px;color:var(--wire)}
+
+  /* ---------- camera ---------- */
+  .lens{position:relative;border-radius:6px;overflow:hidden;background:#000;
+        margin:12px 0;aspect-ratio:1/1;border:1px solid var(--edge)}
+  .lens canvas{width:100%;height:100%;display:block}
+  #ovl{position:absolute;inset:0}
+  .slide{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+  .slide label{font-size:12.5px;color:var(--wire);min-width:82px}
+  .slide output{font-family:var(--mono);font-size:12.5px;min-width:42px;text-align:right}
+  input[type=range]{flex:1;padding:0;background:none;border:0;accent-color:var(--red)}
+  .flag{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);
+        font-size:11px;padding:4px 9px;border-radius:20px;
+        border:1px solid var(--edge);color:var(--wire)}
+  .flag.live{border-color:var(--green);color:var(--green)}
+  .flag.warn{border-color:var(--brass);color:var(--brass)}
+  .status{font-size:12.5px;color:var(--wire);margin:9px 0 0;line-height:1.5}
+  .status.ok{color:var(--green)}
+  .status.bad{color:var(--red)}
+
+  /* ---------- nav ---------- */
+  nav{
+    position:fixed;bottom:0;left:0;right:0;display:flex;z-index:20;
+    background:rgba(30,25,18,.97);backdrop-filter:blur(12px);
+    border-top:1px solid var(--edge);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav button{
+    flex:1;background:none;border:0;color:var(--wire);padding:11px 0 12px;
+    font-size:11px;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:5px;letter-spacing:.01em;
+  }
+  nav button.on{color:var(--sisal)}
+  nav svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7}
+
+  /* ---------- misc ---------- */
+  .shout{
+    position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(8px);
+    background:var(--red);color:#fff;padding:11px 22px;border-radius:4px;
+    font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:.01em;
+    z-index:50;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;
+    white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;
+  }
+  .shout.up{opacity:1;transform:translateX(-50%) translateY(0)}
+  #pip{
+    position:fixed;right:12px;bottom:78px;width:118px;height:118px;z-index:30;
+    border:1px solid var(--brass);border-radius:5px;overflow:hidden;background:#000;
+    box-shadow:0 8px 24px rgba(0,0,0,.6);cursor:pointer;
+  }
+  #pip canvas{width:100%;height:100%;display:block}
+  #pipTag{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);
+          font-family:var(--mono);font-size:10px;text-align:center;padding:3px 0}
+  .empty{text-align:center;padding:26px 10px;color:var(--wire);font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark">ODC</div>
+    <div class="wordmark">ODC Play<small>Online Darts Circuit</small></div>
+    <div class="spacer"></div>
+    <div class="me">
+      <div>
+        <div class="nm" id="hdrName">Guest</div>
+        <div class="sub" id="hdrSub">Not signed in</div>
+      </div>
+      <div class="av ph" id="hdrAv">?</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ================= PLAY ================= -->
+    <section id="v-play">
+      <div class="panel hide" id="fixtureBar"
+           style="padding:12px 15px;margin-bottom:14px;border-color:var(--edge-2)">
+        <div style="font-family:var(--display);font-weight:700;font-size:19px;line-height:1.1"
+             id="fxTitle"></div>
+        <div style="font-size:12.5px;color:var(--wire);margin-top:3px" id="fxMeta"></div>
+      </div>
+
+      <div class="oche">
+        <div class="side up" id="side0">
+          <div class="who" id="who0">Player 1</div>
+          <div class="tally" id="tally0">501</div>
+          <div class="avg"><span id="avg0">0.00</span> average</div>
+          <div class="pips" id="pips0"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="side" id="side1">
+          <div class="who" id="who1">Player 2</div>
+          <div class="tally" id="tally1">501</div>
+          <div class="avg"><span id="avg1">0.00</span> average</div>
+          <div class="pips" id="pips1"></div>
+        </div>
+      </div>
+
+      <div class="route" id="route"></div>
+
+      <div class="visit">
+        <div class="slot" id="slot0">–</div>
+        <div class="slot" id="slot1">–</div>
+        <div class="slot" id="slot2">–</div>
+      </div>
+
+      <div class="pad" id="pad"></div>
+
+      <div class="panel" style="margin-top:14px">
+        <div class="figures">
+          <div class="fig"><div class="n" id="legDarts">0</div><div class="t">Darts this leg</div></div>
+          <div class="fig"><div class="n" id="legAvg">0.00</div><div class="t">Leg average</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= STATS ================= -->
+    <section id="v-stats" class="hide">
+      <div class="panel">
+        <h2>This match</h2>
+        <p class="lede">Resets when you start a new match.</p>
+        <div class="figures">
+          <div class="fig"><div class="n" id="m3da">0.00</div><div class="t">Three-dart average</div></div>
+          <div class="fig"><div class="n" id="mF9">0.00</div><div class="t">First nine</div></div>
+          <div class="fig"><div class="n" id="mCo">0%</div><div class="t">Checkouts hit</div>
+            <div class="meter"><i id="mCoBar" style="width:0%"></i></div></div>
+          <div class="fig"><div class="n" id="mBest">–</div><div class="t">Best leg</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Career</h2>
+        <p class="lede" id="careerWho">Kept on this device.</p>
+        <div class="figures">
+          <div class="fig"><div class="n" id="cAvg">0.00</div><div class="t">Lifetime average</div></div>
+          <div class="fig"><div class="n" id="cLegs">0</div><div class="t">Legs won</div></div>
+          <div class="fig"><div class="n" id="c180">0</div><div class="t">180s</div></div>
+          <div class="fig"><div class="n" id="cBest">–</div><div class="t">Best leg ever</div></div>
+          <div class="fig"><div class="n" id="cHigh">–</div><div class="t">Highest checkout</div></div>
+          <div class="fig"><div class="n" id="cDarts">0</div><div class="t">Darts thrown</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Scoring</h2>
+        <p class="lede">Where your visits land.</p>
+        <table><thead><tr><th>Band</th><th>Visits</th><th class="num">Share</th></tr></thead>
+          <tbody id="bandRows"></tbody></table>
+      </div>
+
+      <div class="panel">
+        <h2>Recent legs</h2>
+        <table><tbody id="legRows"></tbody></table>
+      </div>
+    </section>
+
+    <!-- ================= HEATMAP ================= -->
+    <section id="v-heat" class="hide">
+      <div class="panel">
+        <h2>Where they land</h2>
+        <p class="lede">Every dart this session, hottest first.</p>
+        <div style="display:grid;place-items:center;padding:4px 0">
+          <svg id="board" viewBox="0 0 400 400" style="width:100%;max-width:330px;height:auto"></svg>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Most hit</h2>
+        <table><tbody id="hotRows"></tbody></table>
+      </div>
+    </section>
+
+    <!-- ================= CAMERA ================= -->
+    <section id="v-cam" class="hide">
+      <div class="panel">
+        <h2>Camera scoring</h2>
+        <p class="lede" id="camStep">Point a phone at the board and it scores for you.</p>
+        <div><span class="flag" id="detFlag">Detector starting</span></div>
+
+        <div class="lens">
+          <video id="vid" playsinline muted style="display:none"></video>
+          <canvas id="disp"></canvas>
+          <canvas id="ovl"></canvas>
+        </div>
+
+        <div class="slide">
+          <label for="zoom">Zoom</label>
+          <input type="range" id="zoom" min="10" max="40" value="10" />
+          <output id="zoomVal">1.0x</output>
+        </div>
+        <div class="slide hide" id="sensRow">
+          <label for="sens" id="sensLbl">Sensitivity</label>
+          <input type="range" id="sens" min="12" max="48" value="26" />
+          <output id="sensVal">26</output>
+        </div>
+        <div class="slide hide" id="rotRow">
+          <label for="rot">Rotate</label>
+          <input type="range" id="rot" min="-180" max="180" value="0" />
+          <output id="rotVal">0°</output>
+        </div>
+
+        <div class="stack" style="margin-top:12px">
+          <button class="btn" id="camStart">Start camera</button>
+          <button class="btn quiet hide" id="camAuto">Find the board</button>
+          <button class="btn quiet hide" id="camCal">Tap the four points myself</button>
+          <p class="status hide" id="camVerify"></p>
+          <button class="btn quiet hide" id="camRef">Capture the empty board</button>
+          <button class="btn hide" id="camGo">Start scoring</button>
+          <button class="btn quiet hide" id="camPull">Darts pulled, next visit</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Picked up</h2>
+        <div class="visit">
+          <div class="slot" id="cam0">–</div>
+          <div class="slot" id="cam1">–</div>
+          <div class="slot" id="cam2">–</div>
+        </div>
+        <p class="lede" style="margin:6px 0 0">
+          Stand the phone above or beside the board so the whole board is in
+          frame and nothing will knock it. Mark the outer double edge at
+          20, 6, 3 and 11 to calibrate.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= PROFILE ================= -->
+    <section id="v-me" class="hide">
+      <div class="panel">
+        <div class="profile">
+          <div class="big ph" id="meAv">?</div>
+          <div>
+            <h3 id="meName">Guest</h3>
+            <p id="meTag">Sign in to keep your stats</p>
+          </div>
+        </div>
+
+        <div class="stack" id="signedOut">
+          <button class="btn discord" id="loginBtn">
+            <svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor" aria-hidden="true"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.6.5a41 41 0 0 0-1.9 3.8 54.1 54.1 0 0 0-16.2 0A40 40 0 0 0 25.6.5 58.3 58.3 0 0 0 11 4.9C1.8 18.6-.7 32 .5 45.2a58.9 58.9 0 0 0 17.8 9 43.4 43.4 0 0 0 3.8-6.2 38.2 38.2 0 0 1-6-2.9l1.5-1.2a42 42 0 0 0 36 0l1.5 1.2a38.1 38.1 0 0 1-6 2.9 43 43 0 0 0 3.8 6.2 58.7 58.7 0 0 0 17.8-9c1.4-15.3-2.4-28.6-10.6-40.3ZM23.7 37.1c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.5 3.3 6.4 7.2 0 4-2.8 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.5 3.3 6.4 7.2 0 4-2.8 7.2-6.4 7.2Z"/></svg>
+            Sign in with Discord
+          </button>
+          <p class="status" id="loginHint">Uses your Discord name and picture. Nothing is posted on your behalf.</p>
+        </div>
+
+        <div class="stack hide" id="signedIn">
+          <button class="btn quiet" id="logoutBtn">Sign out</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Your details</h2>
+        <p class="lede">Shown on the scoreboard and saved on this device.</p>
+        <label class="field"><span>Name on the board</span>
+          <input id="fName" placeholder="How you want to be listed" maxlength="24" /></label>
+        <label class="field"><span>Tagline</span>
+          <input id="fTag" placeholder="Nickname, walk-on song, anything" maxlength="48" /></label>
+        <label class="field"><span>Home board</span>
+          <input id="fBoard" placeholder="Where you throw" maxlength="32" /></label>
+        <label class="field"><span>Favourite double</span>
+          <select id="fDouble"></select></label>
+        <button class="btn" id="saveProfile">Save details</button>
+      </div>
+
+      <div class="panel">
+        <h2>Match setup</h2>
+        <div class="stack">
+          <label class="field" style="margin:0"><span>Player one</span>
+            <input id="inP0" value="Player 1" maxlength="24" /></label>
+          <label class="field" style="margin:0"><span>Player two</span>
+            <input id="inP1" value="Player 2" maxlength="24" /></label>
+          <label class="field" style="margin:0"><span>Starting score</span>
+            <select id="inStart">
+              <option value="501">501</option><option value="301">301</option>
+              <option value="701">701</option></select></label>
+          <label class="field" style="margin:0"><span>Match length</span>
+            <select id="inLegs">
+              <option value="3">Best of 3</option>
+              <option value="5" selected>Best of 5</option>
+              <option value="7">Best of 7</option>
+              <option value="9">Best of 9</option></select></label>
+          <label style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--wire)">
+            <input type="checkbox" id="inSound" checked style="width:auto;accent-color:var(--red)" />
+            Call out big scores
+          </label>
+          <button class="btn" id="newMatch">Start new match</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Stored data</h2>
+        <p class="lede">
+          Your profile and career stats live in this browser only. Clearing site
+          data, or switching phone, starts them again from zero.
+        </p>
+        <button class="btn quiet" id="wipe">Clear my stats</button>
+      </div>
+    </section>
+  </main>
+
+  <nav>
+    <button class="on" data-v="play" aria-label="Play">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/></svg>Play</button>
+    <button data-v="stats" aria-label="Stats">
+      <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</button>
+    <button data-v="heat" aria-label="Heatmap">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>Board</button>
+    <button data-v="cam" aria-label="Camera">
+      <svg viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.6"/></svg>Camera</button>
+    <button data-v="me" aria-label="Profile">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>You</button>
+  </nav>
+</div>
+
+<div id="pip" class="hide"><canvas id="pipCv"></canvas><div id="pipTag" class="mono">Scoring</div></div>
+<div class="shout" id="shout"></div>
+
+<script>
+/* ============================================================
+   ODC PLAY
+   Static page. No server. Discord sign-in uses the implicit
+   OAuth flow, which needs only a public client ID — never put
+   a client secret in this file.
+   ============================================================ */
+
+/* -------- SET THIS -------- */
+const DISCORD_CLIENT_ID = "";   // paste your Discord application's Client ID
+/* -------------------------- */
+
+const $ = id => document.getElementById(id);
+const shout = (msg)=>{
+  const el=$("shout"); el.textContent=msg; el.classList.add("up");
+  clearTimeout(shout._t); shout._t=setTimeout(()=>el.classList.remove("up"),1500);
+};
+
+/* ---------- storage: real localStorage where allowed, memory otherwise ---------- */
+const Store = (()=>{
+  let ok=true;
+  try{ const k="__odc"; localStorage.setItem(k,"1"); localStorage.removeItem(k); }
+  catch(e){ ok=false; }
+  const mem={};
+  return {
+    ok,
+    get(k){ try{ return ok? localStorage.getItem(k) : (mem[k]??null); }catch(e){ return mem[k]??null; } },
+    set(k,v){ try{ ok? localStorage.setItem(k,v) : (mem[k]=v); }catch(e){ mem[k]=v; } },
+    del(k){ try{ ok? localStorage.removeItem(k) : delete mem[k]; }catch(e){ delete mem[k]; } }
+  };
+})();
+
+/* ---------- state ---------- */
+const S = {
+  start:501, bestOf:5, sound:true,
+  names:["Player 1","Player 2"],
+  score:[501,501], legs:[0,0], turn:0,
+  visit:[], dartsThisLeg:[0,0], scoredThisLeg:[0,0],
+  history:[], darts:[], legDarts:[],
+  checkouts:[0,0], coAttempts:[0,0], first9:[[],[]],
+  mult:1,
+  user:null,                 // {id,username,global_name,avatar}
+  profile:{name:"",tag:"",board:"",dbl:""},
+  career:null
+};
+
+function blankCareer(){
+  return {darts:0,points:0,legsWon:0,oneEighties:0,tons:0,
+          bestLeg:null,highCheckout:null,coHit:0,coAtt:0,legLog:[]};
+}
+function storeKey(){ return "odc:v2:"+(S.user? S.user.id : "guest"); }
+
+function loadLocal(){
+  try{
+    const raw=Store.get(storeKey());
+    if(raw){
+      const d=JSON.parse(raw);
+      S.profile=Object.assign({name:"",tag:"",board:"",dbl:""}, d.profile||{});
+      S.career=Object.assign(blankCareer(), d.career||{});
+    } else {
+      S.profile={name:"",tag:"",board:"",dbl:""};
+      S.career=blankCareer();
+    }
+  }catch(e){ S.profile={name:"",tag:"",board:"",dbl:""}; S.career=blankCareer(); }
+}
+function saveLocal(){
+  try{ Store.set(storeKey(), JSON.stringify({profile:S.profile,career:S.career})); }
+  catch(e){}
+}
+
+/* ---------- sound ---------- */
+let actx;
+function chime(kind){
+  if(!S.sound) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const seq = kind==="180" ? [[880,0],[1108,.09],[1318,.18],[1760,.3]]
+             : kind==="big"  ? [[660,0],[880,.1]]
+             : kind==="out"  ? [[523,0],[784,.1],[1046,.22]]
+             : [[440,0]];
+    seq.forEach(([f,t])=>{
+      const o=actx.createOscillator(), g=actx.createGain();
+      o.type="triangle"; o.frequency.value=f;
+      g.gain.setValueAtTime(.0001, actx.currentTime+t);
+      g.gain.exponentialRampToValueAtTime(.24, actx.currentTime+t+.02);
+      g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime+t+.22);
+      o.connect(g).connect(actx.destination);
+      o.start(actx.currentTime+t); o.stop(actx.currentTime+t+.25);
+    });
+  }catch(e){}
+}
+
+/* ---------- checkout routes ---------- */
+const OUTS = {170:"T20 T20 Bull",167:"T20 T19 Bull",164:"T20 T18 Bull",161:"T20 T17 Bull",
+160:"T20 T20 D20",158:"T20 T20 D19",157:"T20 T19 D20",156:"T20 T20 D18",155:"T20 T19 D19",
+154:"T20 T18 D20",153:"T20 T19 D18",152:"T20 T20 D16",151:"T20 T17 D20",150:"T20 T18 D18",
+149:"T20 T19 D16",148:"T20 T16 D20",147:"T20 T17 D18",146:"T20 T18 D16",145:"T20 T15 D20",
+144:"T20 T20 D12",143:"T20 T17 D16",142:"T20 T14 D20",141:"T20 T19 D12",140:"T20 T20 D10",
+139:"T20 T13 D20",138:"T20 T18 D12",137:"T20 T19 D10",136:"T20 T20 D8",135:"T20 T17 D12",
+134:"T20 T14 D16",133:"T20 T19 D8",132:"T20 T16 D12",131:"T20 T13 D16",130:"T20 T18 D8",
+129:"T19 T16 D12",128:"T18 T14 D16",127:"T20 T17 D8",126:"T19 T19 D6",125:"T20 T19 D4",
+124:"T20 T16 D8",123:"T19 T16 D9",122:"T18 T20 D4",121:"T20 T11 D14",120:"T20 20 D20",
+119:"T19 T10 D16",118:"T20 18 D20",117:"T20 17 D20",116:"T20 16 D20",115:"T20 15 D20",
+114:"T20 14 D20",113:"T20 13 D20",112:"T20 12 D20",111:"T20 11 D20",110:"T20 10 D20",
+109:"T20 9 D20",108:"T20 16 D16",107:"T19 18 D16",106:"T20 10 D18",105:"T20 13 D16",
+104:"T18 18 D16",103:"T19 10 D18",102:"T20 10 D16",101:"T17 18 D16",100:"T20 D20",
+99:"T19 10 D16",98:"T20 D19",97:"T19 D20",96:"T20 D18",95:"T19 D19",94:"T18 D20",
+93:"T19 D18",92:"T20 D16",91:"T17 D20",90:"T18 D18",89:"T19 D16",88:"T20 D14",
+87:"T17 D18",86:"T18 D16",85:"T15 D20",84:"T20 D12",83:"T17 D16",82:"Bull D16",
+81:"T19 D12",80:"T20 D10",79:"T19 D11",78:"T18 D12",77:"T19 D10",76:"T20 D8",
+75:"T17 D12",74:"T14 D16",73:"T19 D8",72:"T16 D12",71:"T13 D16",70:"T18 D8",
+69:"T19 D6",68:"T20 D4",67:"T17 D8",66:"T10 D18",65:"T19 D4",64:"T16 D8",
+63:"T13 D12",62:"T10 D16",61:"T15 D8",60:"20 D20",59:"19 D20",58:"18 D20",
+57:"17 D20",56:"16 D20",55:"15 D20",54:"14 D20",53:"13 D20",52:"12 D20",
+51:"11 D20",50:"Bull",49:"9 D20",48:"16 D16",47:"15 D16",46:"6 D20",
+45:"13 D16",44:"12 D16",43:"11 D16",42:"10 D16",41:"9 D16",40:"D20",
+39:"7 D16",38:"D19",37:"5 D16",36:"D18",35:"3 D16",34:"D17",33:"1 D16",
+32:"D16",31:"15 D8",30:"D15",29:"13 D8",28:"D14",27:"11 D8",26:"D13",
+25:"9 D8",24:"D12",23:"7 D8",22:"D11",21:"5 D8",20:"D10",19:"3 D8",
+18:"D9",17:"1 D8",16:"D8",15:"7 D4",14:"D7",13:"5 D4",12:"D6",
+11:"3 D4",10:"D5",9:"1 D4",8:"D4",7:"3 D2",6:"D3",5:"1 D2",4:"D2",2:"D1"};
+
+/* ---------- board geometry ---------- */
+const RING=[20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+function segCentre(label){
+  const cx=200, cy=200;
+  if(label==="BULL") return {x:cx,y:cy};
+  if(label==="25")   return {x:cx,y:cy-15};
+  let mult=1,num=0;
+  if(label[0]==="T"){mult=3;num=+label.slice(1);}
+  else if(label[0]==="D"){mult=2;num=+label.slice(1);}
+  else num=+label;
+  const i=RING.indexOf(num);
+  if(!num||i<0) return {x:cx,y:cy};
+  const a=(i*18-90)*Math.PI/180;
+  const r=mult===3?106:mult===2?166:76;
+  return {x:cx+Math.cos(a)*r, y:cy+Math.sin(a)*r};
+}
+function drawHeat(){
+  const svg=$("board"); if(!svg) return;
+  const cx=200,cy=200;
+  let out=`<circle cx="${cx}" cy="${cy}" r="188" fill="#0A1710" stroke="rgba(233,239,231,.14)"/>`;
+  for(let i=0;i<20;i++){
+    const a0=(i*18-99)*Math.PI/180, a1=((i+1)*18-99)*Math.PI/180;
+    const light=i%2===0;
+    const seg=(r0,r1,fill)=>{
+      const p=(r,a)=>`${cx+Math.cos(a)*r},${cy+Math.sin(a)*r}`;
+      return `<path d="M ${p(r0,a0)} L ${p(r1,a0)} A ${r1} ${r1} 0 0 1 ${p(r1,a1)} L ${p(r0,a1)} A ${r0} ${r0} 0 0 0 ${p(r0,a0)} Z" fill="${fill}"/>`;
+    };
+    out+=seg(27,94, light?"#132318":"#E9EFE7");
+    out+=seg(94,118, light?"#23A566":"#E63329");
+    out+=seg(118,156, light?"#132318":"#E9EFE7");
+    out+=seg(156,178, light?"#23A566":"#E63329");
+  }
+  out+=`<circle cx="${cx}" cy="${cy}" r="27" fill="#23A566"/>`;
+  out+=`<circle cx="${cx}" cy="${cy}" r="11" fill="#E63329"/>`;
+  const counts={};
+  S.darts.forEach(d=>{counts[d.label]=(counts[d.label]||0)+1;});
+  const max=Math.max(1,...Object.values(counts));
+  Object.entries(counts).forEach(([label,n])=>{
+    if(label==="MISS") return;
+    const {x,y}=segCentre(label);
+    const t=n/max;
+    const col = t>.66?"#D9B45B" : t>.33?"#E9EFE7" : "#7D9183";
+    out+=`<circle cx="${x}" cy="${y}" r="${6+t*13}" fill="${col}" opacity="${.3+t*.5}"/>`;
+  });
+  svg.innerHTML=out;
+
+  const rows=Object.entries(counts).filter(([l])=>l!=="MISS")
+    .sort((a,b)=>b[1]-a[1]).slice(0,8)
+    .map(([l,n])=>`<tr><td>${l}</td><td class="num">${n}</td></tr>`).join("");
+  $("hotRows").innerHTML = rows || `<tr><td class="empty">Nothing thrown yet.</td></tr>`;
+}
+
+/* ---------- keypad ---------- */
+function buildPad(){
+  const pad=$("pad"); pad.innerHTML="";
+  const mk=(txt,cls,fn,label)=>{
+    const b=document.createElement("button");
+    b.className="k "+(cls||""); b.textContent=txt;
+    if(label) b.setAttribute("aria-label",label);
+    b.onclick=fn; pad.appendChild(b); return b;
+  };
+  mk("Single","mode on",e=>setMult(1,e.currentTarget));
+  mk("Double","mode",e=>setMult(2,e.currentTarget));
+  mk("Treble","mode",e=>setMult(3,e.currentTarget));
+  mk("Miss","mode",()=>addDart(0,"MISS"));
+  mk("Undo","mode",undoDart);
+  for(let n=1;n<=20;n++) mk(String(n),"",()=>addDart(n));
+  mk("25","",()=>addDart(25,"25"));
+  mk("Bull","",()=>addDart(50,"BULL"));
+  mk("Next player","span2 go",endVisit);
+}
+function setMult(m,el){
+  S.mult=m;
+  document.querySelectorAll(".k.mode").forEach(b=>{
+    if(["Single","Double","Treble"].includes(b.textContent)) b.classList.remove("on");
+  });
+  if(el) el.classList.add("on");
+}
+function addDart(n,forced){
+  if(S.visit.length>=3){ shout("Three darts thrown"); return; }
+  let val,label;
+  if(forced==="MISS"){ val=0; label="MISS"; }
+  else if(forced==="BULL"){ val=50; label="BULL"; }
+  else if(forced==="25"){ val=25; label="25"; }
+  else { val=n*S.mult; label=(S.mult===3?"T":S.mult===2?"D":"")+n; }
+  S.visit.push({score:val,label});
+  S.darts.push({label});
+  setMult(1, document.querySelector(".k.mode"));
+  render();
+  if(S.visit.length===3) setTimeout(endVisit,220);
+}
+function undoDart(){
+  if(!S.visit.length) return;
+  S.visit.pop(); S.darts.pop(); render();
+}
+
+function endVisit(){
+  if(!S.visit.length){ S.turn=1-S.turn; render(); return; }
+  const p=S.turn;
+  const sum=S.visit.reduce((a,d)=>a+d.score,0);
+  const before=S.score[p];
+  const after=before-sum;
+  const last=S.visit[S.visit.length-1];
+  const onDouble = last.label[0]==="D" || last.label==="BULL";
+  const mine = isMe(p);
+
+  S.dartsThisLeg[p]+=S.visit.length;
+  if(before<=170){ S.coAttempts[p]++; if(mine) S.career.coAtt++; }
+  if(mine){ S.career.darts+=S.visit.length; }
+
+  if(after===0 && onDouble){
+    S.scoredThisLeg[p]+=sum;
+    S.checkouts[p]++; S.legs[p]++;
+    S.legDarts.push({p,darts:S.dartsThisLeg[p],name:S.names[p]});
+    if(mine){
+      S.career.points+=sum; S.career.legsWon++; S.career.coHit++;
+      const d=S.dartsThisLeg[p];
+      if(S.career.bestLeg===null||d<S.career.bestLeg) S.career.bestLeg=d;
+      if(S.career.highCheckout===null||before>S.career.highCheckout) S.career.highCheckout=before;
+      S.career.legLog.unshift({darts:d,out:before,when:Date.now()});
+      S.career.legLog=S.career.legLog.slice(0,15);
+      saveLocal();
+    }
+    chime("out");
+    shout("Game shot, "+S.names[p]);
+    resetLeg();
+  } else if(after<2 || (after===0 && !onDouble)){
+    shout("Bust");
+    chime();
+  } else {
+    S.score[p]=after;
+    S.scoredThisLeg[p]+=sum;
+    if(S.first9[p].length<3) S.first9[p].push(sum);
+    if(mine){
+      S.career.points+=sum;
+      if(sum===180) S.career.oneEighties++;
+      if(sum>=100) S.career.tons++;
+      saveLocal();
+    }
+    if(sum===180){ chime("180"); shout("One hundred and eighty"); }
+    else if(sum>=140){ chime("big"); shout(String(sum)); }
+    else if(sum>=100){ chime("big"); }
+  }
+  S.history.push({p,score:sum,darts:S.visit.length});
+  S.visit=[];
+  S.turn=1-S.turn;
+  render();
+}
+/* Career stats only count the player who is signed in. Player one is
+   assumed to be you unless the names say otherwise. */
+function isMe(p){
+  if(!S.user) return p===0;
+  const mine=(S.profile.name||S.user.global_name||S.user.username||"").toLowerCase();
+  const n=(S.names[p]||"").toLowerCase();
+  return mine? n===mine : p===0;
+}
+
+function resetLeg(){
+  S.score=[S.start,S.start];
+  S.dartsThisLeg=[0,0]; S.scoredThisLeg=[0,0]; S.visit=[];
+  const need=Math.ceil(S.bestOf/2);
+  if(S.legs[0]>=need||S.legs[1]>=need){
+    const w=S.legs[0]>=need?0:1;
+    setTimeout(()=>shout(S.names[w]+" takes the match"),400);
+  }
+}
+
+function newMatch(){
+  S.start=+$("inStart").value; S.bestOf=+$("inLegs").value;
+  S.sound=$("inSound").checked;
+  S.names=[$("inP0").value.trim()||"Player 1", $("inP1").value.trim()||"Player 2"];
+  S.score=[S.start,S.start]; S.legs=[0,0]; S.turn=0; S.visit=[];
+  S.dartsThisLeg=[0,0]; S.scoredThisLeg=[0,0];
+  S.history=[]; S.darts=[]; S.legDarts=[];
+  S.checkouts=[0,0]; S.coAttempts=[0,0]; S.first9=[[],[]];
+  show("play"); render(); shout("New match");
+}
+
+/* ---------- render ---------- */
+function render(){
+  for(let p=0;p<2;p++){
+    $("who"+p).textContent=S.names[p];
+    $("tally"+p).textContent=S.score[p];
+    const d=S.dartsThisLeg[p]||0;
+    $("avg"+p).textContent=(d? S.scoredThisLeg[p]/d*3 : 0).toFixed(2);
+    $("side"+p).classList.toggle("up", S.turn===p);
+    const need=Math.ceil(S.bestOf/2);
+    let pips=""; for(let i=0;i<need;i++) pips+=`<span class="pip ${i<S.legs[p]?"won":""}"></span>`;
+    $("pips"+p).innerHTML=pips;
+  }
+  for(let i=0;i<3;i++){
+    const d=S.visit[i], el=$("slot"+i);
+    el.textContent = d? (d.label==="MISS"?"0":d.label) : "–";
+    el.classList.toggle("in", !!d);
+  }
+  const left=S.score[S.turn]-S.visit.reduce((a,d)=>a+d.score,0);
+  $("route").textContent = OUTS[left] ? left+" — "+OUTS[left] : "";
+  $("legDarts").textContent=S.dartsThisLeg[S.turn];
+  const dt=S.dartsThisLeg[S.turn];
+  $("legAvg").textContent = dt? (S.scoredThisLeg[S.turn]/dt*3).toFixed(2):"0.00";
+  renderStats(); drawHeat();
+}
+
+function renderStats(){
+  const all=S.history;
+  const pts=all.reduce((a,h)=>a+h.score,0);
+  const darts=all.reduce((a,h)=>a+h.darts,0);
+  $("m3da").textContent = darts? (pts/darts*3).toFixed(2):"0.00";
+  const f9=S.first9.flat();
+  $("mF9").textContent = f9.length? (f9.reduce((a,b)=>a+b,0)/f9.length).toFixed(2):"0.00";
+  const att=S.coAttempts[0]+S.coAttempts[1], hit=S.checkouts[0]+S.checkouts[1];
+  const pc=att? Math.round(hit/att*100):0;
+  $("mCo").textContent=pc+"%"; $("mCoBar").style.width=pc+"%";
+  const best=S.legDarts.length? Math.min(...S.legDarts.map(l=>l.darts)):null;
+  $("mBest").textContent = best? best:"–";
+
+  const C=S.career||blankCareer();
+  $("cAvg").textContent = C.darts? (C.points/C.darts*3).toFixed(2):"0.00";
+  $("cLegs").textContent=C.legsWon;
+  $("c180").textContent=C.oneEighties;
+  $("cBest").textContent=C.bestLeg??"–";
+  $("cHigh").textContent=C.highCheckout??"–";
+  $("cDarts").textContent=C.darts;
+  $("careerWho").textContent = S.user
+    ? "Signed in as "+(S.user.global_name||S.user.username)+". Kept in this browser."
+    : "Kept in this browser. Sign in to tie these to your Discord account.";
+
+  const bands=[["180",v=>v===180],["140 and up",v=>v>=140&&v<180],
+               ["100 and up",v=>v>=100&&v<140],["60 and up",v=>v>=60&&v<100],
+               ["Under 60",v=>v<60]];
+  const n=all.length||1;
+  $("bandRows").innerHTML = all.length
+    ? bands.map(([label,fn])=>{
+        const c=all.filter(h=>fn(h.score)).length;
+        return `<tr><td>${label}</td><td class="num">${c}</td><td class="num">${Math.round(c/n*100)}%</td></tr>`;
+      }).join("")
+    : `<tr><td class="empty" colspan="3">Throw some darts and this fills in.</td></tr>`;
+
+  const log=(S.career&&S.career.legLog)||[];
+  $("legRows").innerHTML = log.length
+    ? log.map(l=>`<tr><td>${l.darts} darts</td><td class="num">${l.out} out</td></tr>`).join("")
+    : `<tr><td class="empty">No legs won yet.</td></tr>`;
+}
+
+/* ---------- navigation ---------- */
+function show(v){
+  ["play","stats","heat","cam","me"].forEach(x=>$("v-"+x).classList.toggle("hide", x!==v));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
+  if(v==="heat") drawHeat();
+  updatePip(v);
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.v));
+
+/* ============================================================
+   DISCORD SIGN-IN
+   Implicit grant: the browser is sent to Discord, comes back with a
+   token in the URL fragment, and that token is used once to read the
+   account name and picture. Scope is 'identify' only.
+   ============================================================ */
+function avatarUrl(u){
+  if(!u) return null;
+  if(u.avatar) return `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=128`;
+  const i=(BigInt(u.id)>>22n)%6n;
+  return `https://cdn.discordapp.com/embed/avatars/${i}.png`;
+}
+function paintIdentity(){
+  const u=S.user;
+  const shown = S.profile.name || (u? (u.global_name||u.username) : "Guest");
+  const initial = shown.trim()[0] ? shown.trim()[0].toUpperCase() : "?";
+  const url = avatarUrl(u);
+
+  $("hdrName").textContent = shown;
+  $("hdrSub").textContent = u? "Signed in" : "Not signed in";
+  const hdr=$("hdrAv");
+  if(url){ hdr.outerHTML=`<img class="av" id="hdrAv" src="${url}" alt="" />`; }
+  else   { hdr.outerHTML=`<div class="av ph" id="hdrAv">${initial}</div>`; }
+
+  $("meName").textContent = shown;
+  $("meTag").textContent = S.profile.tag
+    || (u? "@"+u.username : "Sign in to keep your stats");
+  const big=$("meAv");
+  if(url){ big.outerHTML=`<img class="big" id="meAv" src="${url}" alt="" />`; }
+  else   { big.outerHTML=`<div class="big ph" id="meAv">${initial}</div>`; }
+
+  $("signedOut").classList.toggle("hide", !!u);
+  $("signedIn").classList.toggle("hide", !u);
+
+  $("fName").value=S.profile.name||"";
+  $("fTag").value=S.profile.tag||"";
+  $("fBoard").value=S.profile.board||"";
+  $("fDouble").value=S.profile.dbl||"";
+
+  if(S.profile.name && $("inP0").value==="Player 1") $("inP0").value=S.profile.name;
+}
+
+async function readToken(){
+  if(!location.hash || location.hash.indexOf("access_token")<0) return false;
+  const p=new URLSearchParams(location.hash.slice(1));
+  const token=p.get("access_token");
+  // clear the token out of the address bar straight away
+  history.replaceState(null,"",location.pathname+location.search);
+  if(!token) return false;
+  try{
+    const r=await fetch("https://discord.com/api/users/@me",
+      {headers:{Authorization:"Bearer "+token}});
+    if(!r.ok) throw new Error(r.status);
+    const u=await r.json();
+    S.user={id:u.id,username:u.username,global_name:u.global_name,avatar:u.avatar};
+    Store.set("odc:v2:session", JSON.stringify(S.user));
+    loadLocal(); paintIdentity(); render();
+    shout("Signed in");
+    return true;
+  }catch(e){
+    shout("Discord sign-in failed");
+    return false;
+  }
+}
+
+$("loginBtn").onclick=()=>{
+  if(!DISCORD_CLIENT_ID){
+    $("loginHint").className="status bad";
+    $("loginHint").textContent="No Discord client ID set in this page yet. "
+      +"Create an application at discord.com/developers, then paste its Client ID "
+      +"into DISCORD_CLIENT_ID near the top of the script.";
+    return;
+  }
+  const redirect=encodeURIComponent(location.origin+location.pathname);
+  location.href="https://discord.com/oauth2/authorize"
+    +"?client_id="+DISCORD_CLIENT_ID
+    +"&redirect_uri="+redirect
+    +"&response_type=token&scope=identify";
+};
+$("logoutBtn").onclick=()=>{
+  S.user=null;
+  Store.del("odc:v2:session");
+  loadLocal(); paintIdentity(); render();
+  shout("Signed out");
+};
+
+$("saveProfile").onclick=()=>{
+  S.profile.name=$("fName").value.trim();
+  S.profile.tag=$("fTag").value.trim();
+  S.profile.board=$("fBoard").value.trim();
+  S.profile.dbl=$("fDouble").value;
+  saveLocal(); paintIdentity(); render();
+  shout("Details saved");
+};
+$("wipe").onclick=()=>{
+  S.career=blankCareer(); saveLocal(); render();
+  shout("Stats cleared");
+};
+$("newMatch").onclick=newMatch;
+
+/* ============================================================
+   CAMERA SCORING
+   Model first (odc_dart.onnx), motion differencing as a fallback.
+   ============================================================ */
+const CAM = {
+  stream:null, video:null, ovl:null, work:document.createElement("canvas"),
+  ref:null, H:null, calPts:[], mode:"idle", running:false,
+  seen:[], cand:null, stable:0, visit:[], candList:[],
+  zoom:1, track:null, nativeZoom:null, disp:null, rafId:null,
+  ellipse:null, bull:null, rot:0, sens:26, locPts:null, busy:false
+};
+const ML = {
+  session:null, ready:false, tried:false, size:640,
+  CLS_DART:0, conf:0.35, LOC_ANGLES:[0,90,180,270], lastDet:[]
+};
+
+function detFlag(txt,cls){
+  const el=$("detFlag"); if(!el) return;
+  el.textContent=txt; el.className="flag"+(cls?" "+cls:"");
+}
+
+async function mlLoad(){
+  if(ML.tried) return ML.ready;
+  ML.tried=true;
+  try{
+    if(typeof ort==="undefined") throw new Error("runtime missing");
+    ort.env.wasm.numThreads=1;
+    ML.session=await ort.InferenceSession.create("./odc_dart.onnx",
+      {executionProviders:["wasm"], graphOptimizationLevel:"all"});
+    ML.ready=true; detFlag("Using the trained model","live");
+  }catch(e){
+    ML.ready=false; detFlag("Using motion detection","warn");
+  }
+  return ML.ready;
+}
+
+const mlCv=document.createElement("canvas");
+function mlTensor(){
+  const N=ML.size;
+  if(mlCv.width!==N){ mlCv.width=N; mlCv.height=N; }
+  const cr=cropRect();
+  const ctx=mlCv.getContext("2d",{willReadFrequently:true});
+  ctx.drawImage(CAM.video, cr.x,cr.y,cr.w,cr.h, 0,0,N,N);
+  const d=ctx.getImageData(0,0,N,N).data;
+  const n=N*N, f=new Float32Array(n*3);
+  for(let p=0,i=0;p<n;p++,i+=4){
+    f[p]=d[i]/255; f[p+n]=d[i+1]/255; f[p+2*n]=d[i+2]/255;
+  }
+  return new ort.Tensor("float32", f, [1,3,N,N]);
+}
+function iou(a,b){
+  const ax0=a.x-a.w/2, ay0=a.y-a.h/2, ax1=a.x+a.w/2, ay1=a.y+a.h/2;
+  const bx0=b.x-b.w/2, by0=b.y-b.h/2, bx1=b.x+b.w/2, by1=b.y+b.h/2;
+  const iw=Math.max(0,Math.min(ax1,bx1)-Math.max(ax0,bx0));
+  const ih=Math.max(0,Math.min(ay1,by1)-Math.max(ay0,by0));
+  const inter=iw*ih, uni=a.w*a.h+b.w*b.h-inter;
+  return uni>0? inter/uni : 0;
+}
+function nms(list,thr){
+  const out=[]; list.sort((p,q)=>q.score-p.score);
+  for(const d of list){
+    let keep=true;
+    for(const o of out){ if(o.cls===d.cls && iou(o,d)>thr){ keep=false; break; } }
+    if(keep) out.push(d);
+  }
+  return out;
+}
+async function mlDetect(){
+  if(!ML.ready||!CAM.video||!CAM.video.videoWidth) return null;
+  const feeds={}; feeds[ML.session.inputNames[0]]=mlTensor();
+  const out=await ML.session.run(feeds);
+  const o=out[ML.session.outputNames[0]], dims=o.dims;
+  if(dims.length!==3) return null;
+  const nc=dims[1]-4, na=dims[2], D=o.data;
+  const s=cropRect().w/ML.size;
+  const res=[];
+  for(let i=0;i<na;i++){
+    let bc=-1,bs=0;
+    for(let c=0;c<nc;c++){ const v=D[(4+c)*na+i]; if(v>bs){bs=v;bc=c;} }
+    if(bs<ML.conf) continue;
+    res.push({cls:bc,score:bs,x:D[i]*s,y:D[na+i]*s,w:D[2*na+i]*s,h:D[3*na+i]*s});
+  }
+  ML.lastDet=nms(res,0.45);
+  return ML.lastDet;
+}
+function lineCross(p1,p2,p3,p4){
+  const d=(p1[0]-p2[0])*(p3[1]-p4[1])-(p1[1]-p2[1])*(p3[0]-p4[0]);
+  if(Math.abs(d)<1e-9) return null;
+  const a=p1[0]*p2[1]-p1[1]*p2[0], b=p3[0]*p4[1]-p3[1]*p4[0];
+  return [(a*(p3[0]-p4[0])-(p1[0]-p2[0])*b)/d,
+          (a*(p3[1]-p4[1])-(p1[1]-p2[1])*b)/d];
+}
+async function mlCalibrate(){
+  const det=await mlDetect();
+  if(!det) return false;
+  const locs=[null,null,null,null];
+  for(const d of det){
+    if(d.cls>=1&&d.cls<=4){ const k=d.cls-1; if(!locs[k]||d.score>locs[k].score) locs[k]=d; }
+  }
+  if(locs.some(l=>!l)) return false;
+  CAM.locPts=locs.map(l=>[l.x,l.y]);
+  return applyAuto();
+}
+
+function cropRect(){
+  const v=CAM.video, z=CAM.zoom||1;
+  const vw=v.videoWidth||640, vh=v.videoHeight||480;
+  const side=Math.min(vw,vh)/z;
+  return {x:(vw-side)/2, y:(vh-side)/2, w:side, h:side};
+}
+const B={rIn:6.35,rOut:15.9,rTIn:99,rTOut:107,rDIn:162,rDOut:170,order:RING};
+
+function solveLin(M,b){
+  const n=b.length, m=M.map((r,i)=>[...r,b[i]]);
+  for(let c=0;c<n;c++){
+    let p=c; for(let r=c+1;r<n;r++) if(Math.abs(m[r][c])>Math.abs(m[p][c])) p=r;
+    [m[c],m[p]]=[m[p],m[c]];
+    const d=m[c][c]; if(Math.abs(d)<1e-12) continue;
+    for(let k=c;k<=n;k++) m[c][k]/=d;
+    for(let r=0;r<n;r++){ if(r===c)continue; const f=m[r][c]; if(!f)continue;
+      for(let k=c;k<=n;k++) m[r][k]-=f*m[c][k]; }
+  }
+  return m.map(r=>r[n]);
+}
+function homography(src,dst){
+  const A=[],b=[];
+  for(let i=0;i<4;i++){
+    const [x,y]=src[i],[u,v]=dst[i];
+    A.push([x,y,1,0,0,0,-u*x,-u*y]); b.push(u);
+    A.push([0,0,0,x,y,1,-v*x,-v*y]); b.push(v);
+  }
+  const h=solveLin(A,b);
+  return [[h[0],h[1],h[2]],[h[3],h[4],h[5]],[h[6],h[7],1]];
+}
+function applyH(H,x,y){
+  const d=H[2][0]*x+H[2][1]*y+H[2][2];
+  return [(H[0][0]*x+H[0][1]*y+H[0][2])/d,(H[1][0]*x+H[1][1]*y+H[1][2])/d];
+}
+function scoreAt(x,y){
+  const r=Math.hypot(x,y);
+  if(r<=B.rIn) return {value:50,label:"BULL"};
+  if(r<=B.rOut) return {value:25,label:"25"};
+  if(r>B.rDOut) return {value:0,label:"MISS"};
+  let a=Math.atan2(x,-y)*180/Math.PI; if(a<0)a+=360;
+  const num=B.order[Math.floor(((a+9)%360)/18)];
+  let m=1,pre="";
+  if(r>=B.rTIn&&r<=B.rTOut){m=3;pre="T";}
+  else if(r>=B.rDIn){m=2;pre="D";}
+  return {value:num*m,label:pre+num};
+}
+
+function grab(w){
+  const v=CAM.video,c=CAM.work,cr=cropRect();
+  const h=Math.round(w*(cr.h/cr.w||0.75));
+  c.width=w;c.height=h;
+  const ctx=c.getContext("2d",{willReadFrequently:true});
+  ctx.drawImage(v,cr.x,cr.y,cr.w,cr.h,0,0,w,h);
+  const im=ctx.getImageData(0,0,w,h), g=new Uint8Array(w*h);
+  for(let i=0,p=0;i<im.data.length;i+=4,p++)
+    g[p]=(im.data[i]*.299+im.data[i+1]*.587+im.data[i+2]*.114)|0;
+  const o=new Uint8Array(g.length);
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    let s=0; for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++) s+=g[(y+dy)*w+(x+dx)];
+    o[y*w+x]=(s/9)|0;
+  }
+  return {g:o,width:w,height:h};
+}
+function detectTip(){
+  if(!CAM.ref) return null;
+  const cur=grab(CAM.ref.width), w=cur.width, h=cur.height;
+  let inside=null;
+  if(CAM.ellipse){
+    const cr=cropRect(), s=w/cr.w, E=CAM.ellipse;
+    const cx=E.cx*s, cy=E.cy*s, RX=E.rx*s*1.02, RY=E.ry*s*1.02;
+    const cp=Math.cos(-E.phi), sp=Math.sin(-E.phi);
+    inside=new Uint8Array(w*h);
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const ox=x-cx, oy=y-cy;
+      const px=ox*cp-oy*sp, py=ox*sp+oy*cp;
+      if((px*px)/(RX*RX)+(py*py)/(RY*RY)<=1) inside[y*w+x]=1;
+    }
+  }
+  let sum=0,cnt=0;
+  for(let i=0;i<cur.g.length;i+=7){
+    if(inside&&!inside[i]) continue;
+    sum+=cur.g[i]-CAM.ref.g[i]; cnt++;
+  }
+  const bias=cnt?sum/cnt:0;
+  const m=new Uint8Array(w*h);
+  let changed=0,total=0;
+  for(let i=0;i<m.length;i++){
+    if(inside&&!inside[i]) continue;
+    total++;
+    if(Math.abs((cur.g[i]-bias)-CAM.ref.g[i])>(CAM.sens||26)){ m[i]=1; changed++; }
+  }
+  if(total&&changed/total>0.18) return null;
+  const e=new Uint8Array(m.length);
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    const i=y*w+x; if(!m[i])continue; let n=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++) n+=m[(y+dy)*w+(x+dx)];
+    if(n>=6) e[i]=1;
+  }
+  const seen=new Uint8Array(m.length); let best=null; const st=[];
+  for(let s0=0;s0<e.length;s0++){
+    if(!e[s0]||seen[s0])continue;
+    st.length=0; st.push(s0); seen[s0]=1; const px=[];
+    while(st.length){
+      const i=st.pop(); px.push(i);
+      const x=i%w,y=(i/w)|0;
+      if(x>0&&e[i-1]&&!seen[i-1]){seen[i-1]=1;st.push(i-1);}
+      if(x<w-1&&e[i+1]&&!seen[i+1]){seen[i+1]=1;st.push(i+1);}
+      if(y>0&&e[i-w]&&!seen[i-w]){seen[i-w]=1;st.push(i-w);}
+      if(y<h-1&&e[i+w]&&!seen[i+w]){seen[i+w]=1;st.push(i+w);}
+    }
+    if(px.length>=40&&(!best||px.length>best.length)) best=px;
+  }
+  if(!best||best.length>4000) return null;
+  let sx=0,sy=0;
+  const pts=best.map(i=>{const x=i%w,y=(i/w)|0;sx+=x;sy+=y;return [x,y];});
+  const cx=sx/pts.length, cy=sy/pts.length;
+  let sxx=0,syy=0,sxy=0;
+  for(const [x,y] of pts){const dx=x-cx,dy=y-cy;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;}
+  const n=pts.length; sxx/=n;syy/=n;sxy/=n;
+  const th=.5*Math.atan2(2*sxy,sxx-syy), ux=Math.cos(th), uy=Math.sin(th);
+  let lo=Infinity,hi=-Infinity,pa=null,pb=null;
+  for(const [x,y] of pts){const t=(x-cx)*ux+(y-cy)*uy;
+    if(t<lo){lo=t;pa=[x,y];} if(t>hi){hi=t;pb=[x,y];}}
+  if(hi-lo<8) return null;
+  const scale=cropRect().w/w;
+  let tip=pa[1]>=pb[1]?pa:pb, other=tip===pa?pb:pa;
+  if(CAM.H){
+    const inBoard=p=>{
+      const [bx,by]=applyH(CAM.H,p[0]*scale,p[1]*scale);
+      return Math.hypot(bx,by)<=172;
+    };
+    if(!inBoard(tip)&&inBoard(other)) tip=other;
+  }
+  return {x:tip[0]*scale,y:tip[1]*scale};
+}
+
+function paint(){
+  const v=CAM.video,c=CAM.disp;
+  if(c&&v&&v.videoWidth){
+    const cr=cropRect();
+    if(c.width!==Math.round(cr.w)||c.height!==Math.round(cr.h)){
+      c.width=Math.round(cr.w); c.height=Math.round(cr.h);
+    }
+    c.getContext("2d").drawImage(v,cr.x,cr.y,cr.w,cr.h,0,0,c.width,c.height);
+    const pc=$("pipCv");
+    if(pc&&!$("pip").classList.contains("hide")){
+      if(pc.width!==236){ pc.width=236; pc.height=236; }
+      pc.getContext("2d").drawImage(v,cr.x,cr.y,cr.w,cr.h,0,0,236,236);
+    }
+  }
+  CAM.rafId=requestAnimationFrame(paint);
+}
+
+function detectEllipse(){
+  const v=CAM.video,c=CAM.work,cr=cropRect();
+  const w=320,h=Math.round(w*(cr.h/cr.w||0.75));
+  c.width=w;c.height=h;
+  const ctx=c.getContext("2d",{willReadFrequently:true});
+  ctx.drawImage(v,cr.x,cr.y,cr.w,cr.h,0,0,w,h);
+  const d=ctx.getImageData(0,0,w,h).data;
+  const m=new Uint8Array(w*h);
+  for(let i=0,p=0;i<d.length;i+=4,p++){
+    const r=d[i],g=d[i+1],b=d[i+2];
+    const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+    if(mx<55) continue;
+    if((mx-mn)/mx<0.34) continue;
+    const isRed=r===mx&&(r-g)>70&&(r-b)>55;
+    const isGreen=g===mx&&(g-r)>38&&(g-b)>18;
+    if(isRed||isGreen) m[p]=1;
+  }
+  let sx=0,sy=0,n=0;
+  for(let i=0;i<m.length;i++){ if(m[i]){ sx+=i%w; sy+=(i/w)|0; n++; } }
+  if(n<300) return null;
+  const cx0=sx/n, cy0=sy/n;
+  const pts=[], maxR=Math.hypot(w,h)/2;
+  for(let k=0;k<180;k++){
+    const a=k/180*Math.PI*2, dx=Math.cos(a), dy=Math.sin(a);
+    for(let r=maxR;r>8;r-=1.5){
+      const x=Math.round(cx0+dx*r), y=Math.round(cy0+dy*r);
+      if(x<0||y<0||x>=w||y>=h) continue;
+      if(m[y*w+x]){ pts.push([x,y]); break; }
+    }
+  }
+  if(pts.length<40) return null;
+  let mx2=0,my2=0; for(const [x,y] of pts){mx2+=x;my2+=y;}
+  mx2/=pts.length; my2/=pts.length;
+  let s=0; for(const [x,y] of pts) s+=Math.hypot(x-mx2,y-my2);
+  s=s/pts.length||1;
+  const N=5, M=Array.from({length:N},()=>new Array(N).fill(0)), rhs=new Array(N).fill(0);
+  for(const [X,Y] of pts){
+    const x=(X-mx2)/s, y=(Y-my2)/s;
+    const row=[x*x,x*y,y*y,x,y];
+    for(let i=0;i<N;i++){ rhs[i]+=row[i];
+      for(let j=0;j<N;j++) M[i][j]+=row[i]*row[j]; }
+  }
+  const v5=solveLin(M,rhs); if(!v5) return null;
+  const [A_,B_,C_,D_,E_]=v5, F_=-1;
+  const disc=B_*B_-4*A_*C_; if(disc>=0) return null;
+  const ecx=(2*C_*D_-B_*E_)/disc, ecy=(2*A_*E_-B_*D_)/disc;
+  const up=2*(A_*ecx*ecx+B_*ecx*ecy+C_*ecy*ecy-F_);
+  const term=Math.sqrt((A_-C_)*(A_-C_)+B_*B_);
+  const d1=(A_+C_)+term, d2=(A_+C_)-term;
+  if(d1<=0||d2<=0) return null;
+  const a1=Math.sqrt(Math.abs(up/d1)), a2=Math.sqrt(Math.abs(up/d2));
+  const phi=0.5*Math.atan2(B_,A_-C_);
+  const scale=cr.w/w;
+  const E={cx:(ecx*s+mx2)*scale, cy:(ecy*s+my2)*scale,
+           rx:Math.max(a1,a2)*s*scale, ry:Math.min(a1,a2)*s*scale,
+           phi:a1>=a2?phi:phi+Math.PI/2};
+  return (E.ry/E.rx<0.22)? null : E;
+}
+function detectBull(E){
+  const v=CAM.video,c=CAM.work,cr=cropRect();
+  const w=320,h=Math.round(w*(cr.h/cr.w||0.75));
+  c.width=w;c.height=h;
+  const ctx=c.getContext("2d",{willReadFrequently:true});
+  ctx.drawImage(v,cr.x,cr.y,cr.w,cr.h,0,0,w,h);
+  const d=ctx.getImageData(0,0,w,h).data;
+  const sc=w/cr.w, ex=E.cx*sc, ey=E.cy*sc;
+  const rr=Math.min(E.rx,E.ry)*sc*0.34;
+  let rx=0,ry=0,rn=0,gx=0,gy=0,gn=0;
+  for(let y=Math.max(0,(ey-rr)|0);y<Math.min(h,ey+rr);y++){
+    for(let x=Math.max(0,(ex-rr)|0);x<Math.min(w,ex+rr);x++){
+      if(Math.hypot(x-ex,y-ey)>rr) continue;
+      const i=(y*w+x)*4, R=d[i],G=d[i+1],Bb=d[i+2];
+      const mx=Math.max(R,G,Bb),mn=Math.min(R,G,Bb);
+      if(mx<50||(mx-mn)/mx<0.3) continue;
+      if(R===mx&&(R-G)>65&&(R-Bb)>50){ rx+=x; ry+=y; rn++; }
+      else if(G===mx&&(G-R)>35&&(G-Bb)>15){ gx+=x; gy+=y; gn++; }
+    }
+  }
+  if(rn>=6) return [rx/rn/sc, ry/rn/sc];
+  if(gn>=10) return [gx/gn/sc, gy/gn/sc];
+  return [E.cx,E.cy];
+}
+function rayHitsEllipse(E,Bp,dx,dy){
+  const cp=Math.cos(-E.phi), sp=Math.sin(-E.phi);
+  const ox=Bp[0]-E.cx, oy=Bp[1]-E.cy;
+  const px=ox*cp-oy*sp, py=ox*sp+oy*cp;
+  const vx=dx*cp-dy*sp, vy=dx*sp+dy*cp;
+  const a=(vx*vx)/(E.rx*E.rx)+(vy*vy)/(E.ry*E.ry);
+  const b=2*((px*vx)/(E.rx*E.rx)+(py*vy)/(E.ry*E.ry));
+  const c=(px*px)/(E.rx*E.rx)+(py*py)/(E.ry*E.ry)-1;
+  const disc=b*b-4*a*c; if(disc<0) return null;
+  const t=(-b+Math.sqrt(disc))/(2*a);
+  const hx=px+vx*t, hy=py+vy*t;
+  const cp2=Math.cos(E.phi), sp2=Math.sin(E.phi);
+  return [E.cx+hx*cp2-hy*sp2, E.cy+hx*sp2+hy*cp2];
+}
+function autoPoints(E,Bp,rot){
+  const dirs=[0,90,180,270].map(a=>(a+rot)*Math.PI/180);
+  const out=[];
+  for(const a of dirs){
+    const p=rayHitsEllipse(E,Bp,Math.sin(a),-Math.cos(a));
+    if(!p) return null;
+    out.push(p);
+  }
+  return out;
+}
+function ellipsePt(E,t){
+  const ct=Math.cos(t),st=Math.sin(t),cp=Math.cos(E.phi),sp=Math.sin(E.phi);
+  return [E.cx+E.rx*ct*cp-E.ry*st*sp, E.cy+E.rx*ct*sp+E.ry*st*cp];
+}
+function snapToEllipse(x,y){
+  if(!CAM.ellipse) return [x,y];
+  let best=null;
+  for(let t=0;t<Math.PI*2;t+=0.004){
+    const p=ellipsePt(CAM.ellipse,t);
+    const d=Math.hypot(p[0]-x,p[1]-y);
+    if(!best||d<best.d) best={d,p};
+  }
+  return best.d<90? best.p : [x,y];
+}
+
+function drawOverlay(){
+  const c=CAM.ovl,v=CAM.video; if(!c||!v||!v.videoWidth) return;
+  const cr=cropRect();
+  c.width=Math.round(cr.w); c.height=Math.round(cr.h);
+  const g=c.getContext("2d"); g.clearRect(0,0,c.width,c.height);
+  if(CAM.ellipse&&!CAM.locPts){
+    g.strokeStyle="rgba(217,180,91,.8)"; g.lineWidth=2; g.beginPath();
+    for(let t=0;t<=Math.PI*2+0.01;t+=0.05){
+      const p=ellipsePt(CAM.ellipse,t);
+      t===0?g.moveTo(p[0],p[1]):g.lineTo(p[0],p[1]);
+    }
+    g.stroke();
+  }
+  if(CAM.bull){
+    g.strokeStyle="#D9B45B"; g.lineWidth=2;
+    g.beginPath(); g.arc(CAM.bull[0],CAM.bull[1],7,0,7); g.stroke();
+    CAM.calPts.forEach(p=>{
+      g.strokeStyle="rgba(217,180,91,.3)"; g.lineWidth=1;
+      g.beginPath(); g.moveTo(CAM.bull[0],CAM.bull[1]); g.lineTo(p[0],p[1]); g.stroke();
+    });
+  }
+  const names=["20","6","3","11"];
+  CAM.calPts.forEach((p,i)=>{
+    g.strokeStyle="#E63329"; g.lineWidth=3;
+    g.beginPath(); g.arc(p[0],p[1],13,0,7); g.stroke();
+    g.fillStyle="#E63329"; g.font="bold 21px sans-serif";
+    g.fillText(names[i], p[0]+18, p[1]+7);
+  });
+  if(ML.ready&&CAM.running){
+    const cols=["#23A566","#D9B45B","#E63329","#6FA8DC","#B58BD9"];
+    ML.lastDet.forEach(d=>{
+      g.strokeStyle=cols[d.cls%5]; g.lineWidth=2;
+      g.strokeRect(d.x-d.w/2,d.y-d.h/2,d.w,d.h);
+      g.fillStyle=cols[d.cls%5]; g.font="bold 14px sans-serif";
+      g.fillText(d.cls+" "+d.score.toFixed(2), d.x-d.w/2, d.y-d.h/2-4);
+    });
+  }
+}
+
+async function camStart(){
+  try{
+    CAM.video=$("vid"); CAM.ovl=$("ovl");
+    CAM.stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:"environment",width:{ideal:1280}},audio:false});
+    CAM.video.srcObject=CAM.stream; await CAM.video.play();
+    CAM.disp=$("disp");
+    CAM.track=CAM.stream.getVideoTracks()[0];
+    try{
+      const caps=CAM.track.getCapabilities?CAM.track.getCapabilities():{};
+      if(caps&&caps.zoom){
+        CAM.nativeZoom=caps.zoom;
+        const z=$("zoom");
+        z.min=Math.round(caps.zoom.min*10);
+        z.max=Math.round(Math.min(caps.zoom.max,4)*10);
+        z.value=Math.round((caps.zoom.min||1)*10);
+      }
+    }catch(e){}
+    if(CAM.rafId) cancelAnimationFrame(CAM.rafId);
+    paint();
+    $("camStart").classList.add("hide");
+    $("camCal").classList.remove("hide");
+    $("camAuto").classList.remove("hide");
+    await mlLoad();
+    setTimeout(async()=>{
+      if(ML.ready && await mlCalibrate()){
+        $("camStep").textContent="Board found. Rotate until the marks sit on 20, 6, 3 and 11.";
+        return;
+      }
+      const E=detectEllipse();
+      if(E){
+        CAM.ellipse=E; CAM.bull=detectBull(E);
+        if(applyAuto()) $("camStep").textContent="Board found. Rotate until the marks sit on 20, 6, 3 and 11.";
+        else drawOverlay();
+      } else {
+        $("camStep").textContent="Board not found. Tap the four points yourself.";
+      }
+    },900);
+    $("camStep").textContent="Mark the outer double edge at 20, 6, 3 and 11.";
+    CAM.mode="calibrating"; CAM.calPts=[];
+  }catch(e){ $("camStep").textContent="Camera blocked. Allow camera access and try again."; }
+}
+
+function camTap(ev){
+  if(CAM.mode!=="calibrating"||CAM.calPts.length>=4) return;
+  const r=CAM.ovl.getBoundingClientRect();
+  const t=ev.touches?ev.touches[0]:ev;
+  const cr=cropRect();
+  const x=(t.clientX-r.left)/r.width*cr.w;
+  const y=(t.clientY-r.top)/r.height*cr.h;
+  CAM.calPts.push(snapToEllipse(x,y));
+  drawOverlay();
+  if(CAM.calPts.length===4){
+    CAM.locPts=CAM.calPts.slice();
+    CAM.rot=0; $("rot").value=0; $("rotVal").textContent="0°";
+    applyAuto();
+  } else {
+    $("camStep").textContent="Tap "+["20 at the top","6 on the right","3 at the bottom","11 on the left"][CAM.calPts.length]+".";
+  }
+}
+function camReference(){
+  CAM.ref=grab(320);
+  $("camGo").classList.remove("hide");
+  $("camStep").textContent="Ready. Start scoring and throw.";
+}
+function camRun(){
+  if(!CAM.H){ $("camStep").textContent="Calibrate the board first."; return; }
+  CAM.running=!CAM.running;
+  $("camGo").textContent=CAM.running?"Pause scoring":"Start scoring";
+  updatePip("cam");
+  $("camPull").classList.toggle("hide",!CAM.running);
+  if(CAM.running){
+    $("camStep").textContent="Scoring. Throw your darts.";
+    ML.ready? mlLoop() : loop();
+  }
+}
+function camPulled(){
+  if(!ML.ready) CAM.ref=grab(320);
+  CAM.seen=[]; CAM.visit=[]; CAM.cand=null; CAM.stable=0; CAM.candList=[];
+  for(let i=0;i<3;i++){ $("cam"+i).textContent="–"; $("cam"+i).classList.remove("in"); }
+}
+function acceptDart(x,y){
+  const [bx,by]=applyH(CAM.H,x,y);
+  const s=scoreAt(bx,by);
+  CAM.seen.push({x,y});
+  CAM.visit.push(s);
+  const i=CAM.visit.length-1;
+  if(i<3){ $("cam"+i).textContent=s.label; $("cam"+i).classList.add("in"); }
+  const tag=$("pipTag"); if(tag) tag.textContent=s.label+" for "+s.value;
+  S.visit.push({score:s.value,label:s.label});
+  S.darts.push({label:s.label});
+  render();
+  chime(s.value===60?"big":"");
+  shout(s.label+" for "+s.value);
+  if(S.visit.length===3) setTimeout(()=>{ endVisit(); camPulled(); },800);
+}
+async function mlLoop(){
+  if(!CAM.running) return;
+  if(!CAM.busy){
+    CAM.busy=true;
+    try{
+      const det=await mlDetect();
+      if(det){
+        const onBoard=det.filter(d=>{
+          if(d.cls!==ML.CLS_DART) return false;
+          const [bx,by]=applyH(CAM.H,d.x,d.y);
+          return Math.hypot(bx,by)<=B.rDOut*1.05;
+        });
+        detFlag(onBoard.length+" on the board of "+det.length+" seen","live");
+        const next=[];
+        for(const d of onBoard){
+          if(CAM.visit.length>=3) break;
+          if(!CAM.seen.every(s=>Math.hypot(s.x-d.x,s.y-d.y)>18)) continue;
+          const prev=CAM.candList.find(c=>Math.hypot(c.x-d.x,c.y-d.y)<15);
+          const n=(prev?prev.n:0)+1;
+          if(n>=2) acceptDart(d.x,d.y); else next.push({x:d.x,y:d.y,n});
+        }
+        CAM.candList=next;
+        drawOverlay();
+      }
+    }catch(e){}
+    CAM.busy=false;
+  }
+  setTimeout(mlLoop,120);
+}
+function loop(){
+  if(!CAM.running) return;
+  const tip=detectTip();
+  if(tip){
+    const isNew=CAM.seen.every(s=>Math.hypot(s.x-tip.x,s.y-tip.y)>20);
+    if(isNew){
+      if(CAM.cand&&Math.hypot(CAM.cand.x-tip.x,CAM.cand.y-tip.y)<12) CAM.stable++;
+      else { CAM.cand=tip; CAM.stable=1; }
+      if(CAM.stable>=4){
+        CAM.cand=null; CAM.stable=0;
+        acceptDart(tip.x,tip.y);
+        CAM.ref=grab(320);   // re-baseline so the next dart is what changed
+      }
+    }
+  } else CAM.stable=0;
+  setTimeout(loop,90);
+}
+
+function applyAuto(){
+  const R=170;
+  let pts=null;
+  if(CAM.locPts){
+    pts=CAM.locPts;
+    const dst=pts.map((p,i)=>{
+      const a=(ML.LOC_ANGLES[i]+CAM.rot)*Math.PI/180;
+      return [R*Math.sin(a), -R*Math.cos(a)];
+    });
+    CAM.calPts=pts.slice();
+    CAM.H=homography(CAM.calPts,dst);
+    CAM.bull=lineCross(pts[0],pts[2],pts[1],pts[3])||CAM.bull;
+  } else {
+    const E=CAM.ellipse, Bp=CAM.bull;
+    if(!E||!Bp) return false;
+    pts=autoPoints(E,Bp,CAM.rot);
+    if(!pts) return false;
+    CAM.calPts=pts;
+    CAM.H=homography(pts,[[0,-R],[R,0],[0,R],[-R,0]]);
+  }
+  drawOverlay();
+  const el=$("camVerify"); el.classList.remove("hide");
+  if(CAM.bull){
+    const [bx,by]=applyH(CAM.H,CAM.bull[0],CAM.bull[1]);
+    const chk=scoreAt(bx,by);
+    const good=chk.label==="BULL"||chk.label==="25";
+    el.className="status "+(good?"ok":"bad");
+    el.textContent = good
+      ? "Centre reads "+chk.label+". Rotate until the marks sit on 20, 6, 3 and 11."
+      : "Centre reads "+chk.label+", which is wrong. Find the board again or tap the points yourself.";
+  } else {
+    el.className="status";
+    el.textContent="Calibrated. Rotate until the marks sit on 20, 6, 3 and 11.";
+  }
+  CAM.mode="ready";
+  $("rotRow").classList.remove("hide");
+  $("sensRow").classList.remove("hide");
+  if(ML.ready){
+    $("sensLbl").textContent="Confidence";
+    const sl=$("sens"); sl.min=10; sl.max=90; sl.value=Math.round(ML.conf*100);
+    $("sensVal").textContent=ML.conf.toFixed(2);
+    $("camGo").classList.remove("hide");
+  } else {
+    $("camRef").classList.remove("hide");
+  }
+  return true;
+}
+
+function setZoom(v){
+  CAM.zoom=v;
+  $("zoomVal").textContent=v.toFixed(1)+"x";
+  if(CAM.nativeZoom&&CAM.track&&CAM.track.applyConstraints){
+    const z=Math.max(CAM.nativeZoom.min,Math.min(CAM.nativeZoom.max,v));
+    CAM.track.applyConstraints({advanced:[{zoom:z}]}).catch(()=>{});
+    CAM.zoom=1;
+  }
+  drawOverlay();
+  if(CAM.calPts.length===4||CAM.ref){
+    CAM.calPts=[]; CAM.H=null; CAM.ref=null; CAM.locPts=null; CAM.bull=null;
+    $("camGo").classList.add("hide"); $("camPull").classList.add("hide");
+    CAM.running=false; CAM.mode="calibrating";
+    $("camStep").textContent="Zoom changed. Find the board again.";
+  }
+}
+$("zoom").oninput=e=>setZoom(+e.target.value/10);
+$("sens").oninput=e=>{
+  if(ML.ready){ ML.conf=+e.target.value/100; $("sensVal").textContent=ML.conf.toFixed(2); }
+  else { CAM.sens=+e.target.value; $("sensVal").textContent=CAM.sens; }
+};
+$("rot").oninput=e=>{
+  CAM.rot=+e.target.value; $("rotVal").textContent=CAM.rot+"°"; applyAuto();
+};
+$("camAuto").onclick=async()=>{
+  CAM.rot=0; $("rot").value=0; $("rotVal").textContent="0°"; CAM.locPts=null;
+  if(ML.ready && await mlCalibrate()){
+    $("camStep").textContent="Board found. Rotate until the marks sit on 20, 6, 3 and 11.";
+    return;
+  }
+  const E=detectEllipse();
+  if(!E){ $("camStep").textContent="Board not found. More light, or fill more of the frame."; return; }
+  CAM.ellipse=E; CAM.bull=detectBull(E);
+  if(applyAuto()) $("camStep").textContent="Board found. Rotate until the marks sit on 20, 6, 3 and 11.";
+  else { CAM.calPts=[]; CAM.mode="calibrating"; $("camStep").textContent="Tap 20 at the top."; }
+};
+$("camStart").onclick=camStart;
+$("camCal").onclick=()=>{
+  CAM.mode="calibrating"; CAM.calPts=[]; CAM.locPts=null; drawOverlay();
+  $("camStep").textContent="Tap 20 at the top.";
+};
+$("camRef").onclick=camReference;
+$("camGo").onclick=camRun;
+$("camPull").onclick=camPulled;
+$("ovl").addEventListener("click",camTap);
+$("pip").onclick=()=>show("cam");
+
+function updatePip(view){
+  const pip=$("pip"); if(!pip) return;
+  pip.classList.toggle("hide", !(CAM.stream&&CAM.running&&view!=="cam"));
+}
+
+/* ---------- league fixture, when opened from a bot link ---------- */
+/* odc-play.html?m=ABC123 — the bot writes that id into the fixtures
+   sheet at /confirm time, and /api/match turns it back into a fixture. */
+async function loadFixture(){
+  const id=(new URLSearchParams(location.search).get("m")||"").trim();
+  if(!id) return;
+  const bar=$("fixtureBar");
+  bar.classList.remove("hide");
+  $("fxTitle").textContent="Loading match "+id.toUpperCase();
+  $("fxMeta").textContent="";
+  try{
+    const r=await fetch("/api/match?m="+encodeURIComponent(id),{cache:"no-store"});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d && d.error ? d.error : "Match not found");
+
+    S.names=[d.home,d.away];
+    $("inP0").value=d.home;
+    $("inP1").value=d.away;
+    S.match=d;
+
+    $("fxTitle").textContent=d.home+" v "+d.away;
+    const bits=[];
+    if(d.division) bits.push(d.division);
+    if(d.week) bits.push("Week "+d.week);
+    if(d.date) bits.push(d.date);
+    $("fxMeta").textContent=bits.join(" \u00b7 ") || "League match";
+    render();
+  }catch(e){
+    $("fxTitle").textContent="Match "+id.toUpperCase()+" not found";
+    $("fxMeta").textContent="Score it manually, or check the link in Discord.";
+  }
+}
+
+/* ---------- boot ---------- */
+(function boot(){
+  const sel=$("fDouble");
+  sel.innerHTML='<option value="">No preference</option>'
+    + [20,16,18,12,10,8,4,2,1,14,6,'Bull'].map(d=>{
+        const v=(d==='Bull')?'Bull':'D'+d;
+        return `<option value="${v}">${v}</option>`;
+      }).join("");
+
+  try{
+    const raw=Store.get("odc:v2:session");
+    if(raw) S.user=JSON.parse(raw);
+  }catch(e){}
+  loadLocal();
+  buildPad();
+  paintIdentity();
+  render();
+  readToken();
+  loadFixture();
+
+  if(!Store.ok){
+    $("loginHint").className="status warn";
+    $("loginHint").textContent="This browser is blocking stored data, so stats will not survive a reload.";
+  }
+})();
+</script>
+</body>
+</html>
