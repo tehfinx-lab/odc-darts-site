@@ -95,6 +95,116 @@ function invert3(M) {
           [C / det, (b * g - a * h) / det, (a * e - b * d) / det]];
 }
 
+
+/* ================= finding the board again, without leaving this page =======
+   Same method as the calibration page: the doubles and trebles are the only
+   strongly red and green things in view, so find those, then fit a squashed
+   circle round the outside of them. ========================================= */
+function redGreenMask(data, w, h) {
+  const m = new Uint8Array(w * h);
+  for (let i = 0, p = 0; p < w * h; p++, i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx < 55) continue;
+    if ((mx - mn) / mx < 0.34) continue;
+    if ((r === mx && r - g > 70 && r - b > 55) || (g === mx && g - r > 38 && g - b > 18)) m[p] = 1;
+  }
+  return m;
+}
+function fitEllipseTo(pts) {
+  if (pts.length < 40) return null;
+  let mx = 0, my = 0;
+  for (const [x, y] of pts) { mx += x; my += y; }
+  mx /= pts.length; my /= pts.length;
+  let sc = 0;
+  for (const [x, y] of pts) sc += Math.hypot(x - mx, y - my);
+  sc = sc / pts.length || 1;
+  const N = 5, M = Array.from({ length: N }, () => new Array(N).fill(0)), rhs = new Array(N).fill(0);
+  for (const [X, Y] of pts) {
+    const x = (X - mx) / sc, y = (Y - my) / sc;
+    const row = [x * x, x * y, y * y, x, y];
+    for (let i = 0; i < N; i++) { rhs[i] += row[i]; for (let j = 0; j < N; j++) M[i][j] += row[i] * row[j]; }
+  }
+  const v = solveLin(M, rhs);
+  if (!v || v.some((n) => !isFinite(n))) return null;
+  const [A_, B_, C_, D_, E_] = v, F_ = -1;
+  const disc = B_ * B_ - 4 * A_ * C_;
+  if (disc >= 0) return null;
+  const ecx = (2 * C_ * D_ - B_ * E_) / disc, ecy = (2 * A_ * E_ - B_ * D_) / disc;
+  const up = 2 * (A_ * ecx * ecx + B_ * ecx * ecy + C_ * ecy * ecy - F_);
+  const term = Math.sqrt((A_ - C_) * (A_ - C_) + B_ * B_);
+  const d1 = A_ + C_ + term, d2 = A_ + C_ - term;
+  if (d1 <= 0 || d2 <= 0) return null;
+  const a1 = Math.sqrt(Math.abs(up / d1)), a2 = Math.sqrt(Math.abs(up / d2));
+  const phi = 0.5 * Math.atan2(B_, A_ - C_);
+  const E = { cx: ecx * sc + mx, cy: ecy * sc + my,
+              rx: Math.max(a1, a2) * sc, ry: Math.min(a1, a2) * sc,
+              phi: a1 >= a2 ? phi : phi + Math.PI / 2 };
+  if (!isFinite(E.rx) || !isFinite(E.ry) || E.ry / E.rx < 0.3) return null;
+  return E;
+}
+function findBoard(data, w, h) {
+  const m = redGreenMask(data, w, h);
+  let sx = 0, sy = 0, n = 0;
+  for (let p = 0; p < m.length; p++) if (m[p]) { sx += p % w; sy += (p / w) | 0; n++; }
+  if (n < 300) return { ok: false, why: "Cannot see enough red and green. Is the board lit and in view?" };
+  const cx0 = sx / n, cy0 = sy / n, pts = [], maxR = Math.hypot(w, h) / 2;
+  for (let k = 0; k < 360; k++) {
+    const a = (k / 360) * Math.PI * 2, dx = Math.cos(a), dy = Math.sin(a);
+    for (let r = maxR; r > 8; r -= 1) {
+      const x = Math.round(cx0 + dx * r), y = Math.round(cy0 + dy * r);
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      if (m[y * w + x]) { pts.push([x, y]); break; }
+    }
+  }
+  const MG = 6;
+  let touching = 0;
+  for (const [x, y] of pts) if (x < MG || y < MG || x > w - MG || y > h - MG) touching++;
+  if (touching > 4) return { ok: false, why: "The board runs off the edge of the picture. Zoom out until there is a gap all the way round the numbers." };
+  const E = fitEllipseTo(pts);
+  if (!E) return { ok: false, why: "Could not fit a board shape." };
+  if (Math.max(E.rx, E.ry) < w * 0.22) return { ok: false, why: "Board too small in the picture. Zoom in a little." };
+  const rr = Math.min(E.rx, E.ry) * 0.34;
+  let rx = 0, ry = 0, rn = 0, gx = 0, gy = 0, gn = 0;
+  for (let y = Math.max(0, (E.cy - rr) | 0); y < Math.min(h, E.cy + rr); y++) {
+    for (let x = Math.max(0, (E.cx - rr) | 0); x < Math.min(w, E.cx + rr); x++) {
+      if (Math.hypot(x - E.cx, y - E.cy) > rr) continue;
+      const i = (y * w + x) * 4, R = data[i], G = data[i + 1], Bb = data[i + 2];
+      const mx2 = Math.max(R, G, Bb), mn2 = Math.min(R, G, Bb);
+      if (mx2 < 50 || (mx2 - mn2) / mx2 < 0.3) continue;
+      if (R === mx2 && R - G > 65 && R - Bb > 50) { rx += x; ry += y; rn++; }
+      else if (G === mx2 && G - R > 35 && G - Bb > 15) { gx += x; gy += y; gn++; }
+    }
+  }
+  const bull = rn >= 6 ? [rx / rn, ry / rn] : gn >= 10 ? [gx / gn, gy / gn] : [E.cx, E.cy];
+  return { ok: true, ellipse: E, bull, colourPixels: n };
+}
+function rayHitsEllipse(E, P, dx, dy) {
+  const cp = Math.cos(-E.phi), sp = Math.sin(-E.phi);
+  const ox = P[0] - E.cx, oy = P[1] - E.cy;
+  const px = ox * cp - oy * sp, py = ox * sp + oy * cp;
+  const vx = dx * cp - dy * sp, vy = dx * sp + dy * cp;
+  const a = (vx * vx) / (E.rx * E.rx) + (vy * vy) / (E.ry * E.ry);
+  const b = 2 * ((px * vx) / (E.rx * E.rx) + (py * vy) / (E.ry * E.ry));
+  const c = (px * px) / (E.rx * E.rx) + (py * py) / (E.ry * E.ry) - 1;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return null;
+  const t = (-b + Math.sqrt(disc)) / (2 * a);
+  const hx = px + vx * t, hy = py + vy * t;
+  const cp2 = Math.cos(E.phi), sp2 = Math.sin(E.phi);
+  return [E.cx + hx * cp2 - hy * sp2, E.cy + hx * sp2 + hy * cp2];
+}
+function autoPoints(E, bull, rotDeg) {
+  const out = [];
+  for (const base of [0, 90, 180, 270]) {
+    const a = ((base + rotDeg) * Math.PI) / 180;
+    const p = rayHitsEllipse(E, bull, Math.sin(a), -Math.cos(a));
+    if (!p) return null;
+    out.push(p);
+  }
+  return out;
+}
+
 /* ================= alignment (the thing that makes this work) ================= */
 const PROF = 340, PROF0 = (WORK - PROF) >> 1;
 
@@ -322,6 +432,8 @@ export default function DetectPage() {
   const [thr, setThr] = useState(26);
   const [zoom, setZoom] = useState(null);
   const [zoomWarn, setZoomWarn] = useState(null);
+  const [cams, setCams] = useState([]);
+  const [camId, setCamId] = useState("");
   const trackRef = useRef(null);
   const [lastBlobs, setLastBlobs] = useState([]);
 
@@ -339,6 +451,7 @@ export default function DetectPage() {
       });
       const Hn = homography(p.pts, p.manual ? dst : [[0, -B.doubleOut], [B.doubleOut, 0], [0, B.doubleOut], [-B.doubleOut, 0]]);
       setCal(p); setH(Hn);
+      void rot;
       const Hi = invert3(Hn);
       let ax = null;
       try { const s = window.localStorage.getItem(AXIS_KEY); if (s) ax = JSON.parse(s); } catch (e) {}
@@ -397,10 +510,13 @@ export default function DetectPage() {
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
 
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (deviceId) => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+        video: deviceId
+          ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+          : { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
       streamRef.current = s;
       trackRef.current = s.getVideoTracks()[0];
@@ -408,6 +524,12 @@ export default function DetectPage() {
       await videoRef.current.play();
       sourceRef.current = "camera";
       setSource("camera");
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        const vids = list.filter((d) => d.kind === "videoinput");
+        setCams(vids);
+        setCamId(trackRef.current?.getSettings?.().deviceId || deviceId || "");
+      } catch (e) { /* not fatal */ }
 
       // Match the zoom the calibration was locked at, or the board will not be
       // where the maths thinks it is.
@@ -431,6 +553,49 @@ export default function DetectPage() {
         : "Camera running. Clear the board completely, then tap Set baseline.");
     } catch (e) { setStatus("Camera would not start: " + (e?.name || e)); }
   }, [cal]);
+
+
+  /** Rebuild the transform and the "only look inside the board" mask. */
+  const applyPoints = useCallback((pts, rot, manual) => {
+    const dst = manual
+      ? [0, 90, 180, 270].map((base) => {
+          const a = ((base + rot) * Math.PI) / 180;
+          return [B.doubleOut * Math.sin(a), -B.doubleOut * Math.cos(a)];
+        })
+      : [[0, -B.doubleOut], [B.doubleOut, 0], [0, B.doubleOut], [-B.doubleOut, 0]];
+    const Hn = homography(pts, dst);
+    const inside = new Uint8Array(WORK * WORK);
+    for (let y = 0; y < WORK; y++) for (let x = 0; x < WORK; x++) {
+      const [mx, my] = applyH(Hn, x, y);
+      if (Math.hypot(mx, my) <= B.doubleOut * 1.08) inside[y * WORK + x] = 1;
+    }
+    insideRef.current = inside;
+    setH(Hn);
+    return Hn;
+  }, []);
+
+  /** Find the board again from the current camera view, keeping the rotation
+   *  that was set during calibration. Saves the result, so it sticks. */
+  const refindBoard = useCallback(() => {
+    const img = grab();
+    if (!img) { setStatus("No picture to work from yet."); return; }
+    const r = findBoard(img.data, WORK, WORK);
+    if (!r.ok) { setStatus(r.why); return; }
+    const rot = cal?.rot || 0;
+    const pts = autoPoints(r.ellipse, r.bull, rot);
+    if (!pts) { setStatus("Found the board but could not place the four points."); return; }
+    applyPoints(pts, rot, false);
+    const payload = { pts, rot, savedAt: Date.now(), manual: false,
+                      zoom: zoom ? zoom.value : (cal?.zoom ?? null), source: "camera" };
+    try { window.localStorage.setItem(CAL_KEY, JSON.stringify(payload)); } catch (e) {}
+    setCal(payload);
+    setZoomWarn(null);
+    baseRef.current = null; emptyRef.current = null;
+    setHasBaseline(false); setRunning(false);
+    seenRef.current = []; candRef.current = [];
+    setVisit([]); setPending(null); setLastBlobs([]);
+    setStatus(`Board found again from ${r.colourPixels.toLocaleString()} coloured pixels. Check the gold rings sit on the real ones, then clear the board and Set baseline.`);
+  }, [grab, cal, zoom, applyPoints]);
 
   /* ---------- overlay ---------- */
   const drawOverlay = useCallback(() => {
@@ -714,7 +879,7 @@ export default function DetectPage() {
 
           <div className="mt-3 flex flex-wrap gap-2">
             {source !== "camera" && (
-              <button onClick={startCamera} disabled={!H}
+              <button onClick={() => startCamera(camId || undefined)} disabled={!H}
                 className="flex-1 rounded-xl bg-odcGreen px-4 py-3 text-sm font-semibold text-odcBlack disabled:opacity-40">
                 Start camera
               </button>
@@ -755,6 +920,28 @@ export default function DetectPage() {
             <p className="mono mt-2 rounded-lg border border-odcGold/30 bg-odcGold/5 px-3 py-2 text-[11px] leading-relaxed text-odcGold">
               {zoomWarn}
             </p>
+          )}
+
+          {source === "camera" && (
+            <button onClick={refindBoard}
+              className="mt-2 w-full rounded-xl border border-odcGold/50 bg-odcGold/10 px-4 py-3 text-sm font-semibold text-odcGold active:scale-[0.98]">
+              Find the board again, here
+            </button>
+          )}
+
+          {cams.length > 1 && source === "camera" && (
+            <label className="mt-3 block">
+              <span className="mono text-[11px] uppercase tracking-wider text-odcCream/50">
+                Which lens
+              </span>
+              <select value={camId}
+                onChange={(e) => { setCamId(e.target.value); startCamera(e.target.value); }}
+                className="mono mt-1 w-full rounded-lg border border-odcCream/20 bg-odcPanel2 px-3 py-2 text-xs text-odcCream/85">
+                {cams.map((c, i) => (
+                  <option key={c.deviceId} value={c.deviceId}>{c.label || `camera ${i + 1}`}</option>
+                ))}
+              </select>
+            </label>
           )}
 
           <div className="mt-2 flex flex-wrap gap-2">
@@ -884,4 +1071,4 @@ export default function DetectPage() {
       </div>
     </main>
   );
-          }
+}
