@@ -320,6 +320,9 @@ export default function DetectPage() {
   const [showDebug, setShowDebug] = useState(true);
   const [pending, setPending] = useState(null);   // low-confidence dart awaiting a decision
   const [thr, setThr] = useState(26);
+  const [zoom, setZoom] = useState(null);
+  const [zoomWarn, setZoomWarn] = useState(null);
+  const trackRef = useRef(null);
   const [lastBlobs, setLastBlobs] = useState([]);
 
   /* ---------- restore calibration ---------- */
@@ -400,13 +403,34 @@ export default function DetectPage() {
         audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
       streamRef.current = s;
+      trackRef.current = s.getVideoTracks()[0];
       videoRef.current.srcObject = s;
       await videoRef.current.play();
       sourceRef.current = "camera";
       setSource("camera");
-      setStatus("Camera running. Clear the board completely, then tap Set baseline.");
+
+      // Match the zoom the calibration was locked at, or the board will not be
+      // where the maths thinks it is.
+      let caps = {};
+      try { caps = trackRef.current.getCapabilities?.() || {}; } catch (e) {}
+      if (caps.zoom) {
+        const want = cal?.zoom;
+        const start = want != null
+          ? Math.max(caps.zoom.min, Math.min(caps.zoom.max, want))
+          : (trackRef.current.getSettings?.().zoom ?? caps.zoom.min);
+        setZoom({ min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1, value: start });
+        try { await trackRef.current.applyConstraints({ advanced: [{ zoom: start }] }); } catch (e) {}
+        if (want != null) setZoomWarn(null);
+        else setZoomWarn("This calibration was saved without a zoom setting. Line the board up by eye, or calibrate again.");
+      } else if (cal?.zoom != null) {
+        setZoomWarn("This phone will not let the page set the zoom. Match it by hand to how it was when you calibrated.");
+      }
+
+      setStatus(cal?.source === "photo"
+        ? "Careful: that calibration was made from a loaded photo, not this camera. Calibrate again on the live view before scoring."
+        : "Camera running. Clear the board completely, then tap Set baseline.");
     } catch (e) { setStatus("Camera would not start: " + (e?.name || e)); }
-  }, []);
+  }, [cal]);
 
   /* ---------- overlay ---------- */
   const drawOverlay = useCallback(() => {
@@ -706,6 +730,33 @@ export default function DetectPage() {
             </button>
           </div>
 
+          {zoom && source === "camera" && (
+            <label className="mt-3 block">
+              <span className="mono text-[11px] uppercase tracking-wider text-odcCream/50">
+                Zoom · {Number(zoom.value).toFixed(1)}x
+                {cal?.zoom != null && Math.abs(zoom.value - cal.zoom) > 0.05 && (
+                  <span className="text-odcRed"> — calibrated at {Number(cal.zoom).toFixed(1)}x</span>
+                )}
+              </span>
+              <input type="range" min={zoom.min} max={zoom.max} step={zoom.step} value={zoom.value}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setZoom((z) => ({ ...z, value: v }));
+                  trackRef.current?.applyConstraints?.({ advanced: [{ zoom: v }] }).catch(() => {});
+                }}
+                className="mt-1 w-full accent-odcGold" />
+              <span className="mono mt-1 block text-[10px] leading-relaxed text-odcCream/45">
+                Changing the zoom moves the board, so set the baseline again afterwards.
+              </span>
+            </label>
+          )}
+
+          {zoomWarn && (
+            <p className="mono mt-2 rounded-lg border border-odcGold/30 bg-odcGold/5 px-3 py-2 text-[11px] leading-relaxed text-odcGold">
+              {zoomWarn}
+            </p>
+          )}
+
           <div className="mt-2 flex flex-wrap gap-2">
             <label className="mono cursor-pointer rounded-lg border border-odcCream/15 px-3 py-2 text-[11px] text-odcCream/60">
               test: empty-board photo
@@ -833,4 +884,4 @@ export default function DetectPage() {
       </div>
     </main>
   );
-  }
+          }
