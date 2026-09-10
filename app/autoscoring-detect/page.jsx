@@ -372,21 +372,35 @@ function distToSeg(p, a, b) {
   return Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy));
 }
 
-/* ================= which end is the point? ================= */
-function chooseTip(blob, axis) {
+/* ================= which end is the point? =================
+   Two independent rules: the end nearer the camera's axis, and the thinner end
+   (a dart is fat at the flight and thin at the point).
+
+   But the question only matters if the two ends would score DIFFERENTLY. When
+   the camera is nearly square-on the dart points at the lens, so it appears as
+   a short stub and both ends sit in the same bed. Asking then is pure noise.
+   So: work out the score at each end first, and only ask when they disagree. */
+function chooseTip(blob, axis, scoreOf) {
   const dA = Math.hypot(blob.a[0] - axis[0], blob.a[1] - axis[1]);
   const dB = Math.hypot(blob.b[0] - axis[0], blob.b[1] - axis[1]);
   const geo = dA < dB ? "a" : "b";                 // nearer the camera axis
   const thin = blob.wa < blob.wb ? "a" : "b";      // thinner end
   const ratio = Math.min(blob.wa, blob.wb) / Math.max(blob.wa, blob.wb, 1);
   const agree = geo === thin;
-  return {
-    tip: blob[geo], flight: blob[geo === "a" ? "b" : "a"],
-    other: blob[thin], geo, thin, agree,
-    // confident when both rules agree AND the two ends really are different widths
-    confidence: agree ? (ratio < 0.6 ? "high" : "medium") : "low",
-    widthRatio: ratio,
-  };
+
+  const tip = blob[geo];
+  const other = blob[geo === "a" ? "b" : "a"];
+  const tipScore = scoreOf ? scoreOf(tip) : null;
+  const otherScore = scoreOf ? scoreOf(other) : null;
+  const sameEitherWay = !!(tipScore && otherScore && tipScore.label === otherScore.label);
+
+  let confidence;
+  if (sameEitherWay) confidence = "high";           // nothing to argue about
+  else if (agree) confidence = ratio < 0.6 ? "high" : "medium";
+  else confidence = "low";
+
+  return { tip, flight: other, other, geo, thin, agree, confidence,
+           widthRatio: ratio, tipScore, otherScore, sameEitherWay };
 }
 
 export default function DetectPage() {
@@ -756,7 +770,8 @@ export default function DetectPage() {
         const prev = candRef.current.find((c) => Math.hypot(c.mid[0] - mid[0], c.mid[1] - mid[1]) < 7);
         const n = (prev?.n || 0) + 1;
         if (n >= 2) {
-          const pick = chooseTip(bl, axis || [WORK / 2, WORK / 2]);
+          const pick = chooseTip(bl, axis || [WORK / 2, WORK / 2],
+            (pt) => { const [mx, my] = applyH(H, pt[0], pt[1]); return scoreAt(mx, my); });
           // A blob far longer than a dart is probably two darts touching.
           const merged = bl.len > 95;
           if (pick.confidence === "low" || merged) {
@@ -1012,17 +1027,21 @@ export default function DetectPage() {
           <section className="mt-4 rounded-2xl border border-odcGold/50 bg-odcGold/10 p-4">
             <h2 className="text-lg text-odcGold">Not sure — which end is the point?</h2>
             <p className="mt-1.5 text-sm leading-relaxed text-odcCream/80">
-              The two ways of working this out disagreed on this dart, so it is asking
-              rather than guessing. On the picture, one end is circled green and one red.
+              {pending.merged
+                ? "This blob is long enough to be two darts touching. Pick the end the point is at."
+                : "The two ends of this dart would score differently, so it is asking rather than guessing."}
+              {" "}Pick by the score — that is quicker than squinting at the circles.
             </p>
             <div className="mt-3 flex gap-2">
               <button onClick={() => resolvePending("tip")}
-                className="flex-1 rounded-xl bg-odcGreen px-4 py-3 text-sm font-semibold text-odcBlack">
-                Green end
+                className="flex-1 rounded-xl bg-odcGreen px-4 py-3 text-odcBlack">
+                <span className="block text-xl font-bold">{pending.tipScore?.label || "green"}</span>
+                <span className="mono block text-[10px] opacity-70">green ring</span>
               </button>
               <button onClick={() => resolvePending("other")}
-                className="flex-1 rounded-xl bg-odcRed px-4 py-3 text-sm font-semibold text-white">
-                Red end
+                className="flex-1 rounded-xl bg-odcRed px-4 py-3 text-white">
+                <span className="block text-xl font-bold">{pending.otherScore?.label || "red"}</span>
+                <span className="mono block text-[10px] opacity-70">red ring</span>
               </button>
             </div>
           </section>
