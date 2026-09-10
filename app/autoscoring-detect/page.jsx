@@ -39,6 +39,7 @@ const B = { bull: 6.35, outerBull: 15.9, trebleIn: 99, trebleOut: 107, doubleIn:
 const WORK = 480;
 const CAL_KEY = "odc:autoscore:calibration:v1";
 const AXIS_KEY = "odc:autoscore:axispoint:v1";
+const DIR_KEY = "odc:autoscore:dartdirection:v1";
 
 function scoreAt(x, y) {
   const r = Math.hypot(x, y);
@@ -380,27 +381,42 @@ function distToSeg(p, a, b) {
    the camera is nearly square-on the dart points at the lens, so it appears as
    a short stub and both ends sit in the same bed. Asking then is pure noise.
    So: work out the score at each end first, and only ask when they disagree. */
-function chooseTip(blob, axis, scoreOf) {
+function chooseTip(blob, axis, scoreOf, learned) {
   const dA = Math.hypot(blob.a[0] - axis[0], blob.a[1] - axis[1]);
   const dB = Math.hypot(blob.b[0] - axis[0], blob.b[1] - axis[1]);
   const geo = dA < dB ? "a" : "b";                 // nearer the camera axis
   const thin = blob.wa < blob.wb ? "a" : "b";      // thinner end
   const ratio = Math.min(blob.wa, blob.wb) / Math.max(blob.wa, blob.wb, 1);
-  const agree = geo === thin;
+  let agree = geo === thin;
 
-  const tip = blob[geo];
-  const other = blob[geo === "a" ? "b" : "a"];
+  // The learned direction beats both of the above once it exists, because it
+  // comes from this camera, this board and this thrower rather than a guess.
+  let pickEnd = geo, learnedCos = 0, usedLearned = false;
+  if (learned && learned.n >= 1) {
+    const vx = blob.b[0] - blob.a[0], vy = blob.b[1] - blob.a[1];
+    const L = Math.hypot(vx, vy) || 1;
+    const cos = (vx / L) * learned.x + (vy / L) * learned.y;   // a -> b vs flight -> tip
+    learnedCos = cos;
+    if (Math.abs(cos) > 0.25) { pickEnd = cos > 0 ? "b" : "a"; usedLearned = true; }
+  }
+
+  const tip = blob[pickEnd];
+  const other = blob[pickEnd === "a" ? "b" : "a"];
+  if (usedLearned) agree = pickEnd === thin;
   const tipScore = scoreOf ? scoreOf(tip) : null;
   const otherScore = scoreOf ? scoreOf(other) : null;
   const sameEitherWay = !!(tipScore && otherScore && tipScore.label === otherScore.label);
 
   let confidence;
   if (sameEitherWay) confidence = "high";           // nothing to argue about
+  else if (usedLearned && Math.abs(learnedCos) > 0.55) confidence = "high";
+  else if (usedLearned) confidence = "medium";
   else if (agree) confidence = ratio < 0.6 ? "high" : "medium";
   else confidence = "low";
 
   return { tip, flight: other, other, geo, thin, agree, confidence,
-           widthRatio: ratio, tipScore, otherScore, sameEitherWay };
+           widthRatio: ratio, tipScore, otherScore, sameEitherWay,
+           usedLearned, learnedCos };
 }
 
 export default function DetectPage() {
@@ -425,6 +441,7 @@ export default function DetectPage() {
   const candRef = useRef([]);       // candidates awaiting stability
   const seenRef = useRef([]);       // darts already counted this visit
   const shaftsRef = useRef([]);     // for refining the camera axis point
+  const dirRef = useRef(null);      // learned flight -> point direction
 
   // Where the picture is coming from, kept in a ref as well as in state.
   // The state drives what is drawn; the ref is what grab() reads, because
@@ -469,6 +486,7 @@ export default function DetectPage() {
       const Hi = invert3(Hn);
       let ax = null;
       try { const s = window.localStorage.getItem(AXIS_KEY); if (s) ax = JSON.parse(s); } catch (e) {}
+      try { const d = window.localStorage.getItem(DIR_KEY); if (d) dirRef.current = JSON.parse(d); } catch (e) {}
       setAxis(ax || (Hi ? applyH(Hi, 0, 0) : [WORK / 2, WORK / 2]));
       setStatus("Calibration loaded. Start the camera, clear the board, then Set baseline.");
       // the region we look inside: the scoring area, plus a little for wire darts
@@ -526,12 +544,26 @@ export default function DetectPage() {
 
   const startCamera = useCallback(async (deviceId) => {
     try {
+      // Release the current camera first. Without this the phone simply keeps
+      // the lens it already has and the picker appears to do nothing.
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+        await new Promise((r) => setTimeout(r, 250));
+      }
       const s = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: deviceId
           ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
           : { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
+      // A different lens sees a different picture, so anything measured from
+      // the old one is void.
+      baseRef.current = null; emptyRef.current = null;
+      setHasBaseline(false); setRunning(false);
+      seenRef.current = []; candRef.current = [];
+      setVisit([]); setPending(null); setLastBlobs([]);
       streamRef.current = s;
       trackRef.current = s.getVideoTracks()[0];
       videoRef.current.srcObject = s;
@@ -670,7 +702,7 @@ export default function DetectPage() {
   }, [grab]);
 
   /* ---------- accept a dart ---------- */
-  const commitDart = useCallback((blob, pick, rebaseGray) => {
+  const commitDart = useCallback((blob, pick, rebaseGray, trusted) => {
     const [mx, my] = applyH(H, pick.tip[0], pick.tip[1]);
     const s = scoreAt(mx, my);
     const dart = {
@@ -682,6 +714,25 @@ export default function DetectPage() {
     };
     seenRef.current.push(pick.tip);
     shaftsRef.current.push([blob.a, blob.b]);
+
+    // Learn the flight-to-point direction, but ONLY from darts the user
+    // confirmed. Same thrower, same camera, same board, so it is the same
+    // direction every time and one answer is enough to stop it asking again.
+    // Learning from its own guesses would let a single early mistake poison
+    // every dart that followed.
+    if (trusted && pick.flight && pick.tip) {
+      const vx = pick.tip[0] - pick.flight[0], vy = pick.tip[1] - pick.flight[1];
+      const L = Math.hypot(vx, vy);
+      if (L > 8) {
+        const prev = dirRef.current;
+        const w = prev ? Math.min(prev.n, 8) : 0;
+        const nx = ((prev?.x || 0) * w + vx / L) / (w + 1);
+        const ny = ((prev?.y || 0) * w + vy / L) / (w + 1);
+        const nl = Math.hypot(nx, ny) || 1;
+        dirRef.current = { x: nx / nl, y: ny / nl, n: (prev?.n || 0) + 1 };
+        try { window.localStorage.setItem(DIR_KEY, JSON.stringify(dirRef.current)); } catch (e) {}
+      }
+    }
     // NOTE: we deliberately do NOT fold this dart into the reference picture.
     // Every frame is compared against the EMPTY board, so all the darts in the
     // board show up every time. A dart is stopped from being counted twice by
@@ -760,7 +811,9 @@ export default function DetectPage() {
       // 5. Which of these are darts we have not counted yet? A blob counts as
       //    already-seen if a point we have recorded lies on it.
       const fresh = blobs.filter((bl) =>
-        seenRef.current.every((t) => distToSeg(t, bl.a, bl.b) > 13));
+        seenRef.current.every((t) =>
+          Math.hypot(t[0] - bl.a[0], t[1] - bl.a[1]) > 12 &&
+          Math.hypot(t[0] - bl.b[0], t[1] - bl.b[1]) > 12));
 
       // 6. A blob must hold still across two looks before it counts, so a
       //    dart still quivering in the board is not measured mid-wobble.
@@ -771,7 +824,8 @@ export default function DetectPage() {
         const n = (prev?.n || 0) + 1;
         if (n >= 2) {
           const pick = chooseTip(bl, axis || [WORK / 2, WORK / 2],
-            (pt) => { const [mx, my] = applyH(H, pt[0], pt[1]); return scoreAt(mx, my); });
+            (pt) => { const [mx, my] = applyH(H, pt[0], pt[1]); return scoreAt(mx, my); },
+            dirRef.current);
           // A blob far longer than a dart is probably two darts touching.
           const merged = bl.len > 95;
           if (pick.confidence === "low" || merged) {
@@ -1121,8 +1175,22 @@ export default function DetectPage() {
               <dd className="text-right tabular-nums">{debug.counted}</dd>
               <dt className="text-odcCream/45">Time per look</dt>
               <dd className="text-right tabular-nums">{debug.ms.toFixed(0)} ms</dd>
+              <dt className="text-odcCream/45">Learned dart direction</dt>
+              <dd className="text-right tabular-nums">
+                {dirRef.current ? `from ${dirRef.current.n} darts` : "not yet"}
+              </dd>
             </dl>
           )}
+          {showDebug && dirRef.current && (
+            <button
+              onClick={() => { dirRef.current = null;
+                try { window.localStorage.removeItem(DIR_KEY); } catch (e) {}
+                setStatus("Forgotten which way round your darts sit. It will ask again on the next one."); }}
+              className="mono mt-3 text-xs text-odcCream/40 underline">
+              forget which way round my darts sit
+            </button>
+          )}
+
           {showDebug && (
             <label className="mt-3 block">
               <span className="mono text-[11px] uppercase tracking-wider text-odcCream/50">
