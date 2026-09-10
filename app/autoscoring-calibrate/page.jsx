@@ -621,7 +621,10 @@ export default function CalibratePage() {
   /* ---------- lock, save, restore ---------- */
   const lock = useCallback(() => {
     if (!H || !pts) return;
-    const payload = { pts, rot, savedAt: Date.now(), manual: manual.length === 4 };
+    // The zoom matters as much as the four points: calibrating zoomed in and
+    // then scoring zoomed out gives a board in completely the wrong place.
+    const payload = { pts, rot, savedAt: Date.now(), manual: manual.length === 4,
+                      zoom: zoom ? zoom.value : null, source };
     try { window.localStorage.setItem(CAL_KEY, JSON.stringify(payload)); } catch (e) {}
     // remember what the scene looked like, so we can spot the camera moving
     const img = grabWork();
@@ -635,7 +638,7 @@ export default function CalibratePage() {
     setMode("locked");
     setDrift({ dx: 0, dy: 0 });
     setMsg("Calibration locked and saved on this phone. Tap the board to test the scoring.");
-  }, [H, pts, rot, manual, grabWork]);
+  }, [H, pts, rot, manual, grabWork, zoom, source]);
 
   useEffect(() => {
     try {
@@ -874,4 +877,4 @@ export default function CalibratePage() {
       </div>
     </main>
   );
-}
+     }
