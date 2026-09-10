@@ -681,10 +681,9 @@ export default function DetectPage() {
         g.beginPath(); g.arc(p[0], p[1], 12, 0, 7); g.stroke();
       }
     }
-    if (axis && showDebug) {
-      g.strokeStyle = "rgba(43,191,119,.8)"; g.lineWidth = 1;
-      g.beginPath(); g.arc(axis[0], axis[1], 5, 0, 7); g.stroke();
-    }
+    // (The stray green dot that used to be drawn here was an internal marker
+    //  for where the camera's axis meets the board. It looked like a detected
+    //  dart and confused more than it helped, so it is gone.)
   }, [H, visit, pending, lastBlobs, axis, showDebug]);
 
   useEffect(() => { drawOverlay(); }, [drawOverlay]);
@@ -784,6 +783,14 @@ export default function DetectPage() {
                  blobs: blobs.length, ms: tMs,
                  candidates: candRef.current.length, counted: seenRef.current.length });
 
+      // 2b. The camera has been properly knocked, not merely flexed. Nothing
+      //     measured from here is trustworthy, so stop rather than score junk.
+      if (drift > 25) {
+        candRef.current = [];
+        setStatus(`Camera has moved ${drift.toFixed(0)} px — too far to correct. Tap "Find the board again, here", then Set baseline.`);
+        return;
+      }
+
       // 3. Something big is in the way — an arm reaching in, or the light
       //    changed. Do not try to score through it.
       if (changedPct > 16) {
@@ -856,7 +863,9 @@ export default function DetectPage() {
     if (!pending) return;
     const tip = which === "tip" ? pending.tip : pending.other;
     const other = which === "tip" ? pending.other : pending.tip;
-    commitDart(pending.blob, { ...pending, tip, other, flight: other, confidence: "confirmed" }, pending.gray);
+    // The `true` is what makes it learn from this. Your answer is the only
+    // trustworthy evidence of which way round a dart sits.
+    commitDart(pending.blob, { ...pending, tip, other, flight: other, confidence: "confirmed" }, pending.gray, true);
     // learn: once a few shafts are known, work out where the camera axis really is
     if (shaftsRef.current.length >= 4) {
       const A = [], b = [];
@@ -1080,6 +1089,9 @@ export default function DetectPage() {
         {pending && (
           <section className="mt-4 rounded-2xl border border-odcGold/50 bg-odcGold/10 p-4">
             <h2 className="text-lg text-odcGold">Not sure — which end is the point?</h2>
+            <p className="mono mt-1 text-[11px] uppercase tracking-wider text-odcRed">
+              Scoring is paused — answer this before you throw again
+            </p>
             <p className="mt-1.5 text-sm leading-relaxed text-odcCream/80">
               {pending.merged
                 ? "This blob is long enough to be two darts touching. Pick the end the point is at."
