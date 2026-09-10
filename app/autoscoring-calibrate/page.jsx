@@ -202,8 +202,24 @@ function findBoard(data, w, h) {
       if (m[y * w + x]) { pts.push([x, y]); break; }
     }
   }
+  // If the rings run off the edge of the picture the fit is guesswork, and a
+  // wrong calibration is worse than none — so refuse rather than quietly
+  // producing a board in the wrong place.
+  const M = 6;
+  let touching = 0;
+  for (const [x, y] of pts) if (x < M || y < M || x > w - M || y > h - M) touching++;
+  if (touching > 4) {
+    return { ok: false, cutOff: true,
+      why: "The board is running off the edge of the picture, so it cannot be measured properly. Zoom out until there is a clear gap all the way round the numbers." };
+  }
+
   const E = fitEllipseTo(pts);
   if (!E) return { ok: false, why: "Found colour, but could not fit a board shape to it." };
+
+  // Also too small to be accurate?
+  if (Math.max(E.rx, E.ry) < w * 0.22) {
+    return { ok: false, why: "The board is very small in the picture. Zoom in until it fills most of the square, then try again." };
+  }
 
   // Bull: the red or green blob nearest the middle.
   const rr = Math.min(E.rx, E.ry) * 0.34;
@@ -360,6 +376,8 @@ export default function CalibratePage() {
   const [tests] = useState(runGeometryTests);
   const [showTests, setShowTests] = useState(false);
   const [zoom, setZoom] = useState(null);
+  const [cams, setCams] = useState([]);
+  const [camId, setCamId] = useState("");
 
   const WORK = 480; // the square we do all the maths in
 
@@ -499,11 +517,13 @@ export default function CalibratePage() {
   useEffect(() => { if (source === "photo") paint(); }, [source, paint]);
 
   /* ---------- camera ---------- */
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (deviceId) => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: deviceId
+          ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+          : { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
       streamRef.current = s;
       trackRef.current = s.getVideoTracks()[0];
@@ -514,8 +534,14 @@ export default function CalibratePage() {
         const caps = trackRef.current.getCapabilities?.() || {};
         if (caps.zoom) setZoom({ min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1, value: caps.zoom.min });
       } catch (e) { /* no zoom control */ }
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        const vids = list.filter((d) => d.kind === "videoinput");
+        setCams(vids);
+        setCamId(trackRef.current?.getSettings?.().deviceId || deviceId || "");
+      } catch (e) { /* labels need permission; not fatal */ }
       setSource("camera");
-      setMsg("Camera running. Point it at the board, then tap Find the board.");
+      setMsg("Camera running. Zoom so the board fills the square with a gap round the numbers, then tap Find the board.");
     } catch (e) {
       setMsg("Could not open the camera: " + (e?.name || e) + ". You can still load a photo instead.");
     }
@@ -721,7 +747,7 @@ export default function CalibratePage() {
 
           <div className="mt-3 flex flex-wrap gap-2">
             {source !== "camera" && (
-              <button onClick={startCamera}
+              <button onClick={() => startCamera(camId || undefined)}
                 className="flex-1 rounded-xl bg-odcGreen px-4 py-3 text-sm font-semibold text-odcBlack active:scale-[0.98]">
                 Start camera
               </button>
@@ -746,6 +772,21 @@ export default function CalibratePage() {
               className="mono mt-2 text-xs text-odcCream/45 underline">
               or place the four points by hand
             </button>
+          )}
+
+          {cams.length > 1 && source === "camera" && (
+            <label className="mt-3 block">
+              <span className="mono text-[11px] uppercase tracking-wider text-odcCream/50">
+                Which lens — phones often have several, and the first is not always the best
+              </span>
+              <select value={camId}
+                onChange={(e) => { setCamId(e.target.value); startCamera(e.target.value); }}
+                className="mono mt-1 w-full rounded-lg border border-odcCream/20 bg-odcPanel2 px-3 py-2 text-xs text-odcCream/85">
+                {cams.map((c, i) => (
+                  <option key={c.deviceId} value={c.deviceId}>{c.label || `camera ${i + 1}`}</option>
+                ))}
+              </select>
+            </label>
           )}
 
           {zoom && source === "camera" && (
@@ -877,4 +918,4 @@ export default function CalibratePage() {
       </div>
     </main>
   );
-     }
+}
