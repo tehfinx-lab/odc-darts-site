@@ -863,6 +863,37 @@ export default function DetectPage() {
           </p>
         </header>
 
+        {/* Where you are up to. A greyed-out button should never be a mystery. */}
+        <ol className="mb-4 grid grid-cols-4 gap-1.5">
+          {[
+            { n: 1, label: "Calibration", done: !!H, hint: "from the calibrate page" },
+            { n: 2, label: "Camera on", done: source !== "none", hint: "tap Start camera" },
+            { n: 3, label: "Baseline", done: hasBaseline, hint: "clear the board first" },
+            { n: 4, label: "Scoring", done: running, hint: "tap Start scoring" },
+          ].map((st, i, all) => {
+            const isNext = !st.done && all.slice(0, i).every((x) => x.done);
+            return (
+              <li key={st.n}
+                className={`rounded-lg border px-2 py-2 text-center ${
+                  st.done ? "border-odcGreen/40 bg-odcGreen/10"
+                  : isNext ? "border-odcGold/50 bg-odcGold/10"
+                  : "border-odcCream/10 bg-odcNavy"}`}>
+                <p className={`mono text-[10px] ${
+                  st.done ? "text-odcGreenBright" : isNext ? "text-odcGold" : "text-odcCream/30"}`}>
+                  {st.done ? "done" : isNext ? "do this" : "step " + st.n}
+                </p>
+                <p className={`mt-0.5 text-[11px] leading-tight ${
+                  st.done ? "text-odcCream/70" : isNext ? "text-odcCream" : "text-odcCream/35"}`}>
+                  {st.label}
+                </p>
+                {isNext && (
+                  <p className="mono mt-1 text-[9px] leading-tight text-odcGold/80">{st.hint}</p>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+
         <section className="rounded-2xl border border-odcCream/10 bg-odcNavy p-3 shadow-raised">
           <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black">
             <video ref={videoRef} playsInline muted autoPlay className="hidden" />
@@ -876,6 +907,25 @@ export default function DetectPage() {
           </div>
 
           <p className="mono mt-2 text-[11px] leading-relaxed text-odcCream/60">{status}</p>
+
+          {!H && (
+            <p className="mono mt-2 rounded-lg border border-odcRed/40 bg-odcRed/10 px-3 py-2 text-[11px] leading-relaxed text-odcCream/85">
+              Everything here is greyed out because there is no calibration saved on
+              this phone yet. Go to /autoscoring-calibrate, line the board up and lock
+              it, then come back.
+            </p>
+          )}
+          {H && source === "none" && (
+            <p className="mono mt-2 text-[11px] leading-relaxed text-odcCream/45">
+              Set baseline and Start scoring stay greyed out until the camera is running.
+            </p>
+          )}
+          {H && source !== "none" && !hasBaseline && (
+            <p className="mono mt-2 text-[11px] leading-relaxed text-odcCream/45">
+              Start scoring stays greyed out until you have set a baseline. Take the
+              darts out of the board first, then tap Set baseline.
+            </p>
+          )}
 
           <div className="mt-3 flex flex-wrap gap-2">
             {source !== "camera" && (
