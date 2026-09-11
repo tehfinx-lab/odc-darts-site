@@ -146,6 +146,26 @@ function fitEllipseTo(pts) {
 }
 function findBoard(data, w, h) {
   const m = redGreenMask(data, w, h);
+  // Colour that runs off the edge of the picture is not the board: it is the
+  // surround (Winmau ones are bright red), or a coloured cast over the whole
+  // scene from the lighting. The scoring rings never touch the frame edge on a
+  // usable shot, so drop any patch of colour that does.
+  {
+    const q = new Int32Array(w * h);
+    let head = 0, tail = 0;
+    const push = (i) => { if (m[i] === 1) { m[i] = 2; q[tail++] = i; } };
+    for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+    while (head < tail) {
+      const i = q[head++], x = i % w, y = (i / w) | 0;
+      if (x > 0) push(i - 1);
+      if (x < w - 1) push(i + 1);
+      if (y > 0) push(i - w);
+      if (y < h - 1) push(i + w);
+    }
+    for (let i = 0; i < m.length; i++) if (m[i] === 2) m[i] = 0;
+  }
+
   let sx = 0, sy = 0, n = 0;
   for (let p = 0; p < m.length; p++) if (m[p]) { sx += p % w; sy += (p / w) | 0; n++; }
   if (n < 300) return { ok: false, why: "Cannot see enough red and green. Is the board lit and in view?" };
@@ -317,7 +337,8 @@ function detectBlobs(cur, ref, inside, thr) {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) d[i + dy * WORK + dx] = 1;
   }
 
-  const seen = new Uint8Array(m.length), out = [], stack = [];
+  // ---- gather connected lumps of changed pixels ----
+  const seen = new Uint8Array(m.length), comps = [], stack = [];
   for (let s0 = 0; s0 < d.length; s0++) {
     if (!d[s0] || seen[s0]) continue;
     stack.length = 0; stack.push(s0); seen[s0] = 1;
@@ -330,36 +351,88 @@ function detectBlobs(cur, ref, inside, thr) {
       if (y > 0 && d[i - WORK] && !seen[i - WORK]) { seen[i - WORK] = 1; stack.push(i - WORK); }
       if (y < WORK - 1 && d[i + WORK] && !seen[i + WORK]) { seen[i + WORK] = 1; stack.push(i + WORK); }
     }
-    if (px.length < 130 || px.length > 20000) continue;
+    if (px.length < 60 || px.length > 20000) continue;
+    comps.push(px);
+  }
 
+  /** Work out a lump's centre, its long axis, its two ends and how fat it is
+   *  at each end. */
+  const describe = (px) => {
     let sx = 0, sy = 0;
     const pts = px.map((i) => { const x = i % WORK, y = (i / WORK) | 0; sx += x; sy += y; return [x, y]; });
     const cx = sx / pts.length, cy = sy / pts.length;
     let sxx = 0, syy = 0, sxy = 0;
-    for (const [x, y] of pts) { const ddx = x - cx, ddy = y - cy; sxx += ddx * ddx; syy += ddy * ddy; sxy += ddx * ddy; }
+    for (const [x, y] of pts) { const dx = x - cx, dy = y - cy; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
     const n = pts.length; sxx /= n; syy /= n; sxy /= n;
     const th = 0.5 * Math.atan2(2 * sxy, sxx - syy);
     const ux = Math.cos(th), uy = Math.sin(th), px2 = -uy, py2 = ux;
     let lo = Infinity, hi = -Infinity, A = null, Bp = null;
     const ts = [], ss = [];
     for (const [x, y] of pts) {
-      const t = (x - cx) * ux + (y - cy) * uy, sPerp = (x - cx) * px2 + (y - cy) * py2;
-      ts.push(t); ss.push(sPerp);
+      const t = (x - cx) * ux + (y - cy) * uy, sp = (x - cx) * px2 + (y - cy) * py2;
+      ts.push(t); ss.push(sp);
       if (t < lo) { lo = t; A = [x, y]; }
       if (t > hi) { hi = t; Bp = [x, y]; }
     }
     const L = hi - lo;
-    if (L < 22) continue;
-    // how fat is each end? (the flight is fat, the point is thin)
     let aMin = Infinity, aMax = -Infinity, bMin = Infinity, bMax = -Infinity;
     for (let k = 0; k < ts.length; k++) {
       if (ts[k] <= lo + 0.22 * L) { aMin = Math.min(aMin, ss[k]); aMax = Math.max(aMax, ss[k]); }
       if (ts[k] >= hi - 0.22 * L) { bMin = Math.min(bMin, ss[k]); bMax = Math.max(bMax, ss[k]); }
     }
-    out.push({ a: A, b: Bp, len: L, area: pts.length, cx, cy,
-               wa: aMax - aMin, wb: bMax - bMin });
+    return { a: A, b: Bp, len: L, area: pts.length, cx, cy,
+             ux, uy, wa: aMax - aMin, wb: bMax - bMin, px };
+  };
+
+  // ---- JOIN UP BROKEN DARTS ----
+  // A long thin dart does not always survive as one lump: where the shaft
+  // crosses a wire, or passes over a light patch, the difference fades and the
+  // dart snaps into two or three pieces. Each piece then gets counted as its
+  // own dart, which is how one dart becomes "S12 S12 S20".
+  // So: join pieces that lie along the same line and are close end to end.
+  let desc = comps.map(describe);
+  const piecesBefore = desc.length;
+  let merged = true, guard = 0;
+  while (merged && guard++ < 8) {
+    merged = false;
+    outer:
+    for (let i = 0; i < desc.length; i++) {
+      for (let j = i + 1; j < desc.length; j++) {
+        const A = desc[i], Bd = desc[j];
+        // same direction? (axes are undirected, so compare |cos|)
+        const cos = Math.abs(A.ux * Bd.ux + A.uy * Bd.uy);
+        if (cos < 0.93) continue;                      // more than ~21 deg apart
+        // close, end to end?
+        let gap = Infinity, ga = null, gb = null;
+        for (const p of [A.a, A.b]) for (const q of [Bd.a, Bd.b]) {
+          const dd = Math.hypot(p[0] - q[0], p[1] - q[1]);
+          if (dd < gap) { gap = dd; ga = p; gb = q; }
+        }
+        if (gap > 30) continue;
+        // The join must run ALONG the shafts, not sideways across two darts
+        // lying next to each other. Skipped for pieces that are practically
+        // touching: over four or five pixels the direction of the join is just
+        // noise, and it was this test wrongly rejecting the obvious merges.
+        if (gap > 8) {
+          const jx = gb[0] - ga[0], jy = gb[1] - ga[1];
+          const jl = Math.hypot(jx, jy) || 1;
+          if (Math.abs((jx / jl) * A.ux + (jy / jl) * A.uy) < 0.7) continue;
+        }
+        comps[i] = comps[i].concat(comps[j]);
+        comps.splice(j, 1);
+        desc = comps.map(describe);
+        merged = true;
+        break outer;
+      }
+    }
   }
-  return { blobs: out, changedPct, bias };
+
+  const out = [];
+  for (const dsc of desc) {
+    if (dsc.area < 130 || dsc.len < 22) continue;
+    out.push(dsc);
+  }
+  return { blobs: out, changedPct, bias, piecesBefore, piecesAfter: desc.length };
 }
 
 /** How far a point is from a line segment — used to tell whether a blob
@@ -442,6 +515,7 @@ export default function DetectPage() {
   const seenRef = useRef([]);       // darts already counted this visit
   const shaftsRef = useRef([]);     // for refining the camera axis point
   const dirRef = useRef(null);      // learned flight -> point direction
+  const countedRef = useRef(null);  // coarse footprint of every dart counted
 
   // Where the picture is coming from, kept in a ref as well as in state.
   // The state drives what is drawn; the ref is what grab() reads, because
@@ -465,6 +539,8 @@ export default function DetectPage() {
   const [zoomWarn, setZoomWarn] = useState(null);
   const [cams, setCams] = useState([]);
   const [camId, setCamId] = useState("");
+  const [isVideo, setIsVideo] = useState(false);
+  const [vidPlaying, setVidPlaying] = useState(true);
   const trackRef = useRef(null);
   const [lastBlobs, setLastBlobs] = useState([]);
 
@@ -695,7 +771,7 @@ export default function DetectPage() {
     baseRef.current = { gray, prof: profiles(gray) };
     emptyRef.current = { gray };
     setHasBaseline(true);
-    candRef.current = []; seenRef.current = [];
+    candRef.current = []; seenRef.current = []; countedRef.current = null;
     setVisit([]); setPending(null); setLastBlobs([]);
     setStatus("Baseline set. Throw.");
   }, [grab]);
@@ -713,6 +789,12 @@ export default function DetectPage() {
     };
     seenRef.current.push(pick.tip);
     shaftsRef.current.push([blob.a, blob.b]);
+    // stamp this dart's footprint so it is not counted a second time as it settles
+    if (!countedRef.current) countedRef.current = new Uint8Array((WORK >> 2) * (WORK >> 2));
+    if (blob.px) for (const i of blob.px) {
+      const cx2 = ((i % WORK) >> 2), cy2 = (((i / WORK) | 0) >> 2);
+      countedRef.current[cy2 * (WORK >> 2) + cx2] = 1;
+    }
 
     // Learn the flight-to-point direction, but ONLY from darts the user
     // confirmed. Same thrower, same camera, same board, so it is the same
@@ -775,12 +857,12 @@ export default function DetectPage() {
 
       // 2. Compare against the EMPTY board — always. Every dart currently in
       //    the board shows up in this list, every time.
-      const { blobs, changedPct } = detectBlobs(gray, emptyRef.current.gray, insideRef.current, thr);
+      const { blobs, changedPct, piecesBefore, piecesAfter } = detectBlobs(gray, emptyRef.current.gray, insideRef.current, thr);
       setLastBlobs(blobs);
 
       const tMs = performance.now() - t0;
       setDebug({ dx, dy, drift, changedPct, inBoard: changedPct,
-                 blobs: blobs.length, ms: tMs,
+                 blobs: blobs.length, piecesBefore, piecesAfter, ms: tMs,
                  candidates: candRef.current.length, counted: seenRef.current.length });
 
       // 2b. The camera has been properly knocked, not merely flexed. Nothing
@@ -805,7 +887,7 @@ export default function DetectPage() {
         setHistory((h) => (visit.length
           ? [{ darts: visit, total: visit.reduce((a, d) => a + d.value, 0), at: Date.now() }, ...h].slice(0, 12)
           : h));
-        seenRef.current = []; candRef.current = [];
+        seenRef.current = []; candRef.current = []; countedRef.current = null;
         setVisit([]); setPending(null);
         emptyRef.current = { gray };
         baseRef.current = { gray, prof: profiles(gray) };
@@ -817,10 +899,28 @@ export default function DetectPage() {
 
       // 5. Which of these are darts we have not counted yet? A blob counts as
       //    already-seen if a point we have recorded lies on it.
-      const fresh = blobs.filter((bl) =>
-        seenRef.current.every((t) =>
-          Math.hypot(t[0] - bl.a[0], t[1] - bl.a[1]) > 12 &&
-          Math.hypot(t[0] - bl.b[0], t[1] - bl.b[1]) > 12));
+      // Which of these have we not counted yet?
+      //
+      // Matching on the ends of the dart does not work: as a dart settles and
+      // the difference against the empty board strengthens, its lump GROWS, so
+      // its ends move and the same dart looks like a new one. That is how one
+      // dart became three.
+      //
+      // Instead, remember the actual footprint of every dart counted, and call
+      // a lump already-seen when it mostly sits on top of one. A dart that has
+      // merely grown still covers its old footprint; a genuinely new dart
+      // crossing over an old one only clips it.
+      const fresh = blobs.filter((bl) => {
+        const mask = countedRef.current;
+        if (!mask) return true;
+        let hit = 0, tot = 0;
+        for (const i of bl.px) {
+          const cx2 = ((i % WORK) >> 2), cy2 = (((i / WORK) | 0) >> 2);
+          tot++;
+          if (mask[cy2 * (WORK >> 2) + cx2]) hit++;
+        }
+        return tot === 0 || hit / tot < 0.45;
+      });
 
       // 6. A blob must hold still across two looks before it counts, so a
       //    dart still quivering in the board is not measured mid-wobble.
@@ -908,6 +1008,33 @@ export default function DetectPage() {
       return { ...d, label: up, value, confidence: "corrected" };
     }));
   }, []);
+
+  const loadVideo = useCallback((file) => {
+    if (!file) return;
+    const v = videoRef.current;
+    if (!v) return;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    v.srcObject = null;
+    v.src = URL.createObjectURL(file);
+    v.loop = false;
+    v.muted = true;
+    v.playbackRate = 1;
+    v.onloadeddata = () => {
+      sourceRef.current = "camera";      // same path as a live camera feed
+      setSource("camera");
+      setIsVideo(true);
+      v.play().catch(() => {});
+      paint();
+      setStatus("Video loaded. Pause it on a frame with an EMPTY board, tap Set baseline, then play on and Start scoring.");
+    };
+    baseRef.current = null; emptyRef.current = null;
+    setHasBaseline(false); setRunning(false);
+    seenRef.current = []; candRef.current = [];
+    setVisit([]); setPending(null); setLastBlobs([]);
+  }, [paint]);
 
   const loadPhoto = useCallback((file, asBaseline) => {
     if (!file) return;
@@ -1072,7 +1199,39 @@ export default function DetectPage() {
             </label>
           )}
 
+          {isVideo && (
+            <div className="mt-3 rounded-xl border border-odcCream/15 bg-odcPanel2 p-3">
+              <p className="mono text-[11px] uppercase tracking-wider text-odcCream/50">Replaying a video</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    const v = videoRef.current; if (!v) return;
+                    if (v.paused) { v.play(); setVidPlaying(true); } else { v.pause(); setVidPlaying(false); }
+                  }}
+                  className="flex-1 rounded-lg bg-odcCream/15 px-3 py-2 text-xs text-odcCream">
+                  {vidPlaying ? "Pause video" : "Play video"}
+                </button>
+                {[0.25, 0.5, 1].map((r) => (
+                  <button key={r}
+                    onClick={() => { if (videoRef.current) videoRef.current.playbackRate = r; }}
+                    className="mono rounded-lg border border-odcCream/20 px-3 py-2 text-xs text-odcCream/70">
+                    {r}x
+                  </button>
+                ))}
+              </div>
+              <p className="mono mt-2 text-[10px] leading-relaxed text-odcCream/45">
+                Slower is better — the detector needs a couple of looks at each dart
+                before it counts it.
+              </p>
+            </div>
+          )}
+
           <div className="mt-2 flex flex-wrap gap-2">
+            <label className="mono cursor-pointer rounded-lg border border-odcCream/15 px-3 py-2 text-[11px] text-odcCream/60">
+              test: a video of a real visit
+              <input type="file" accept="video/*" className="hidden"
+                onChange={(e) => loadVideo(e.target.files?.[0])} />
+            </label>
             <label className="mono cursor-pointer rounded-lg border border-odcCream/15 px-3 py-2 text-[11px] text-odcCream/60">
               test: empty-board photo
               <input type="file" accept="image/*" className="hidden"
@@ -1179,6 +1338,10 @@ export default function DetectPage() {
               <dd className="text-right tabular-nums">{debug.inBoard?.toFixed(2)}%</dd>
               <dt className="text-odcCream/45">Changed vs last dart</dt>
               <dd className="text-right tabular-nums">{debug.changedPct.toFixed(2)}%</dd>
+              <dt className="text-odcCream/45">Lumps before joining</dt>
+              <dd className="text-right tabular-nums">{debug.piecesBefore}</dd>
+              <dt className="text-odcCream/45">Lumps after joining</dt>
+              <dd className="text-right tabular-nums">{debug.piecesAfter}</dd>
               <dt className="text-odcCream/45">New things found</dt>
               <dd className="text-right tabular-nums">{debug.blobs}</dd>
               <dt className="text-odcCream/45">Waiting to settle</dt>
