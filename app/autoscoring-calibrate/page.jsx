@@ -185,6 +185,26 @@ function fitEllipseTo(pts) {
 /** Full board find on one frame of pixels. Returns ellipse + bull, in px. */
 function findBoard(data, w, h) {
   const m = redGreenMask(data, w, h);
+  // Colour that runs off the edge of the picture is not the board: it is the
+  // surround (Winmau ones are bright red), or a coloured cast over the whole
+  // scene from the lighting. The scoring rings never touch the frame edge on a
+  // usable shot, so drop any patch of colour that does.
+  {
+    const q = new Int32Array(w * h);
+    let head = 0, tail = 0;
+    const push = (i) => { if (m[i] === 1) { m[i] = 2; q[tail++] = i; } };
+    for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+    while (head < tail) {
+      const i = q[head++], x = i % w, y = (i / w) | 0;
+      if (x > 0) push(i - 1);
+      if (x < w - 1) push(i + 1);
+      if (y > 0) push(i - w);
+      if (y < h - 1) push(i + w);
+    }
+    for (let i = 0; i < m.length; i++) if (m[i] === 2) m[i] = 0;
+  }
+
   let sx = 0, sy = 0, n = 0;
   for (let p = 0; p < m.length; p++) if (m[p]) { sx += p % w; sy += (p / w) | 0; n++; }
   if (n < 300) return { ok: false, why: "Not enough red and green found. Is the board in view and lit?" };
