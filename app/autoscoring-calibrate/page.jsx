@@ -823,14 +823,17 @@ export default function CalibratePage() {
           {(board || manual.length === 4) && (
             <label className="mt-3 block">
               <span className="mono text-[11px] uppercase tracking-wider text-odcCream/50">
-                Rotation · {rot}°  — turn until the drawn numbers match the real ones
+                Rotation · {rot.toFixed(1)}°  — turn until the drawn numbers match the real ones
               </span>
-              <input type="range" min={0} max={359} step={1} value={rot}
+              <input type="range" min={0} max={359.5} step={0.5} value={rot}
                 onChange={(e) => setRot(Number(e.target.value))}
                 className="mt-1 w-full accent-odcGold" />
+              {/* A bed is 18 deg wide, so a whole degree out already shoves the
+                  mark a third of the way to the wire at the double ring. The
+                  0.5 deg steps are what let you square it up properly. */}
               <span className="mt-1 flex gap-2">
-                {[-18, -1, +1, +18].map((d) => (
-                  <button key={d} onClick={() => setRot((r) => (r + d + 360) % 360)}
+                {[-18, -0.5, +0.5, +18].map((d) => (
+                  <button key={d} onClick={() => setRot((r) => Math.round(((r + d + 360) % 360) * 2) / 2)}
                     className="mono flex-1 rounded-lg border border-odcCream/15 py-1.5 text-xs text-odcCream/70">
                     {d > 0 ? "+" : ""}{d}°
                   </button>
