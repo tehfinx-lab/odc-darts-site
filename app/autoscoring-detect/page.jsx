@@ -446,6 +446,37 @@ function distToSeg(p, a, b) {
   return Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy));
 }
 
+/** Is this lump merely another piece of a dart already counted this visit?
+ *
+ *  A dart that was counted as one lump can later break into two: the light
+ *  shifts a shade, a wire crossing the shaft stops standing out, and the far
+ *  half of the SAME dart arrives as a brand-new lump. The footprint test does
+ *  not catch it, because the new piece sits beside the recorded footprint
+ *  rather than on top of it. That is how one dart scored "S20 S20".
+ *
+ *  Two genuinely different darts cross each other at an angle, so demanding
+ *  BOTH that the lump runs parallel to the counted dart AND that it sits on
+ *  that dart's own line keeps real dart three while killing the phantom. */
+function isPieceOfCounted(bl, shaft) {
+  const [a, b] = shaft;
+  const sx = b[0] - a[0], sy = b[1] - a[1];
+  const sl = Math.hypot(sx, sy) || 1;
+  if (Math.abs((sx / sl) * bl.ux + (sy / sl) * bl.uy) < 0.93) return false; // >~21 deg apart
+  let gap = Infinity;
+  for (const p of [bl.a, bl.b]) for (const q of [a, b]) {
+    gap = Math.min(gap, Math.hypot(p[0] - q[0], p[1] - q[1]));
+  }
+  if (gap > 34) return false;
+  // How far off the counted dart's LINE does this lump sit? Measured against
+  // the infinite line, not the segment: the broken-off piece usually lies
+  // beyond the end of the counted shaft, which a segment distance would score
+  // as "far away" even though it is dead in line with it.
+  const ux = sx / sl, uy = sy / sl;
+  const perp = (p) => Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux);
+  const off = Math.max(perp(bl.a), perp(bl.b));
+  return off < 11;
+}
+
 /* ================= which end is the point? =================
    Two independent rules: the end nearer the camera's axis, and the thinner end
    (a dart is fat at the flight and thin at the point).
@@ -514,6 +545,7 @@ export default function DetectPage() {
   const candRef = useRef([]);       // candidates awaiting stability
   const seenRef = useRef([]);       // darts already counted this visit
   const shaftsRef = useRef([]);     // for refining the camera axis point
+  const visitShaftsRef = useRef([]); // shafts counted THIS visit, reset each visit
   const dirRef = useRef(null);      // learned flight -> point direction
   const countedRef = useRef(null);  // coarse footprint of every dart counted
 
@@ -638,7 +670,7 @@ export default function DetectPage() {
       // the old one is void.
       baseRef.current = null; emptyRef.current = null;
       setHasBaseline(false); setRunning(false);
-      seenRef.current = []; candRef.current = [];
+      seenRef.current = []; candRef.current = []; visitShaftsRef.current = [];
       setVisit([]); setPending(null); setLastBlobs([]);
       streamRef.current = s;
       trackRef.current = s.getVideoTracks()[0];
@@ -714,7 +746,7 @@ export default function DetectPage() {
     setZoomWarn(null);
     baseRef.current = null; emptyRef.current = null;
     setHasBaseline(false); setRunning(false);
-    seenRef.current = []; candRef.current = [];
+    seenRef.current = []; candRef.current = []; visitShaftsRef.current = [];
     setVisit([]); setPending(null); setLastBlobs([]);
     setStatus(`Board found again from ${r.colourPixels.toLocaleString()} coloured pixels. Check the gold rings sit on the real ones, then clear the board and Set baseline.`);
   }, [grab, cal, zoom, applyPoints]);
@@ -771,7 +803,7 @@ export default function DetectPage() {
     baseRef.current = { gray, prof: profiles(gray) };
     emptyRef.current = { gray };
     setHasBaseline(true);
-    candRef.current = []; seenRef.current = []; countedRef.current = null;
+    candRef.current = []; seenRef.current = []; visitShaftsRef.current = []; countedRef.current = null;
     setVisit([]); setPending(null); setLastBlobs([]);
     setStatus("Baseline set. Throw.");
   }, [grab]);
@@ -789,6 +821,7 @@ export default function DetectPage() {
     };
     seenRef.current.push(pick.tip);
     shaftsRef.current.push([blob.a, blob.b]);
+    visitShaftsRef.current.push([blob.a, blob.b]);
     // stamp this dart's footprint so it is not counted a second time as it settles
     if (!countedRef.current) countedRef.current = new Uint8Array((WORK >> 2) * (WORK >> 2));
     if (blob.px) for (const i of blob.px) {
@@ -843,12 +876,16 @@ export default function DetectPage() {
       //    gets most of it, the second mops up the residue, which matters on
       //    the bigger nudges where one pass leaves a pixel behind and a pixel
       //    is enough to light up every wire on the board.
+      //    Three passes, each searching a smaller range than the last. The wide
+      //    first pass is what lets the board survive a real nudge of the phone
+      //    — reaching down to tap a score or type to your opponent shifts it
+      //    tens of pixels, and the old +/-12 px search simply gave up.
       const refProf = baseRef.current.prof;
       let dx = 0, dy = 0;
-      for (let pass = 0; pass < 2; pass++) {
+      for (const rng of [48, 12, 4]) {
         const pr = profiles(gray);
-        const ex = shift1d(refProf.cols, pr.cols);
-        const ey = shift1d(refProf.rows, pr.rows);
+        const ex = shift1d(refProf.cols, pr.cols, rng);
+        const ey = shift1d(refProf.rows, pr.rows, rng);
         if (Math.abs(ex) < 0.05 && Math.abs(ey) < 0.05) break;
         dx += ex; dy += ey;
         gray = shiftGray(gray, ex, ey);
@@ -867,7 +904,7 @@ export default function DetectPage() {
 
       // 2b. The camera has been properly knocked, not merely flexed. Nothing
       //     measured from here is trustworthy, so stop rather than score junk.
-      if (drift > 25) {
+      if (drift > 52) {
         candRef.current = [];
         setStatus(`Camera has moved ${drift.toFixed(0)} px — too far to correct. Tap "Find the board again, here", then Set baseline.`);
         return;
@@ -887,7 +924,7 @@ export default function DetectPage() {
         setHistory((h) => (visit.length
           ? [{ darts: visit, total: visit.reduce((a, d) => a + d.value, 0), at: Date.now() }, ...h].slice(0, 12)
           : h));
-        seenRef.current = []; candRef.current = []; countedRef.current = null;
+        seenRef.current = []; candRef.current = []; visitShaftsRef.current = []; countedRef.current = null;
         setVisit([]); setPending(null);
         emptyRef.current = { gray };
         baseRef.current = { gray, prof: profiles(gray) };
@@ -920,7 +957,11 @@ export default function DetectPage() {
           if (mask[cy2 * (WORK >> 2) + cx2]) hit++;
         }
         return tot === 0 || hit / tot < 0.45;
-      });
+      })
+      // ...and drop anything that is plainly a second piece of a dart already
+      // counted. See isPieceOfCounted: this is what stops "S20 S20" from one
+      // dart when the shaft breaks in half after it has been scored.
+      .filter((bl) => !visitShaftsRef.current.some((sh) => isPieceOfCounted(bl, sh)));
 
       // 6. A blob must hold still across two looks before it counts, so a
       //    dart still quivering in the board is not measured mid-wobble.
@@ -1032,7 +1073,7 @@ export default function DetectPage() {
     };
     baseRef.current = null; emptyRef.current = null;
     setHasBaseline(false); setRunning(false);
-    seenRef.current = []; candRef.current = [];
+    seenRef.current = []; candRef.current = []; visitShaftsRef.current = [];
     setVisit([]); setPending(null); setLastBlobs([]);
   }, [paint]);
 
@@ -1305,7 +1346,7 @@ export default function DetectPage() {
             })}
           </ul>
           {visit.length > 0 && (
-            <button onClick={() => { setVisit([]); seenRef.current = []; candRef.current = []; setPending(null); setStatus("Visit cleared."); }}
+            <button onClick={() => { setVisit([]); seenRef.current = []; candRef.current = []; visitShaftsRef.current = []; setPending(null); setStatus("Visit cleared."); }}
               className="mono mt-3 text-xs text-odcCream/40 underline">clear this visit</button>
           )}
         </section>
