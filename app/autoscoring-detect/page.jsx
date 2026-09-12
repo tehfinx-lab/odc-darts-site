@@ -1175,13 +1175,24 @@ export default function DetectPage() {
   }, [running, step]);
 
   /* ---------- write the black box out ----------
-     One file with every number the page had and a handful of pictures. Shared
-     through the phone's own share sheet where that exists, because a plain
-     download often goes nowhere on a phone; a download link is the fallback. */
+     Getting a file off a phone is harder than it sounds, so this tries four
+     ways in turn and says which one worked. The order matters:
+
+       1. the share sheet, as a PLAIN TEXT file. Sharing an application/json
+          file is refused outright by Android with "Permission denied" — the
+          share sheet only accepts a fixed list of types and JSON is not on it.
+          The contents are identical; only the label changes.
+       2. an ordinary download.
+       3. the clipboard, so it can be pasted straight into a message.
+       4. on screen in a box to select by hand.
+
+     An in-app browser — the one that opens inside Spotify, Facebook, WhatsApp
+     and the like — blocks the first two outright, which is what "Permission
+     denied" usually means. Three and four still work there. */
   const [saveMsg, setSaveMsg] = useState(null);
-  const saveDiagnostics = useCallback(async () => {
-    try {
-      keepShot("at-save");
+  const [saveText, setSaveText] = useState(null);
+  const buildReport = useCallback((withPictures) => {
+    keepShot("at-save");
       const report = {
         what: "ODC autoscoring diagnostics",
         formatVersion: 1,
@@ -1215,27 +1226,74 @@ export default function DetectPage() {
         earlierVisits: history,
         lastLook: debug,
         events: logRef.current,
-        pictures: shotsRef.current,
+        pictures: withPictures ? shotsRef.current
+                               : shotsRef.current.map((s) => ({ tag: s.tag, at: s.at, frame: s.frame, jpeg: "(left out)" })),
       };
-      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      const name = `odc-autoscoring-${stamp}.json`;
-      const blob = new Blob([JSON.stringify(report)], { type: "application/json" });
-      const kb = Math.round(blob.size / 1024);
-      const file = new File([blob], name, { type: "application/json" });
+    return report;
+  }, [cal, H, thr, axis, visit, history, debug, zoom, camId, keepShot]);
+
+  const saveDiagnostics = useCallback(async (withPictures = true) => {
+    setSaveText(null);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const name = `odc-autoscoring-${stamp}.txt`;
+    let text;
+    try {
+      text = JSON.stringify(buildReport(withPictures));
+    } catch (e) {
+      setSaveMsg(`Could not build the report: ${e.message}`);
+      return;
+    }
+    const kb = Math.round(new Blob([text]).size / 1024);
+    const tried = [];
+
+    // 1. the share sheet, as plain text
+    try {
+      const file = new File([text], name, { type: "text/plain" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: "ODC autoscoring diagnostics" });
         setSaveMsg(`Shared ${name} (${kb} kB).`);
         return;
       }
+      tried.push("share sheet does not take files here");
+    } catch (e) {
+      if (e && e.name === "AbortError") { setSaveMsg("Sharing cancelled."); return; }
+      tried.push(`share sheet: ${e?.name || e}`);
+    }
+
+    // 2. an ordinary download
+    try {
+      const blob = new Blob([text], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url; a.download = name; document.body.appendChild(a); a.click();
       a.remove(); setTimeout(() => URL.revokeObjectURL(url), 8000);
-      setSaveMsg(`Saved ${name} (${kb} kB) to your downloads.`);
+      setSaveMsg(`Saved ${name} (${kb} kB) to your downloads. If nothing arrived, use "Copy it instead" below.`);
+      return;
     } catch (e) {
-      setSaveMsg(`Could not save the file: ${e.message}`);
+      tried.push(`download: ${e?.name || e}`);
     }
-  }, [cal, H, thr, axis, visit, history, debug, zoom, camId, keepShot]);
+
+    // 3 and 4 are offered rather than forced, because a silent clipboard write
+    // looks like nothing happened at all.
+    setSaveText(text);
+    setSaveMsg(`Could not save a file (${tried.join("; ")}). The report is ${kb} kB — copy it from the box below.`);
+  }, [buildReport]);
+
+  const copyDiagnostics = useCallback(async (withPictures = false) => {
+    let text;
+    try { text = JSON.stringify(buildReport(withPictures)); }
+    catch (e) { setSaveMsg(`Could not build the report: ${e.message}`); return; }
+    const kb = Math.round(new Blob([text]).size / 1024);
+    try {
+      await navigator.clipboard.writeText(text);
+      setSaveText(null);
+      setSaveMsg(`Copied ${kb} kB to the clipboard${withPictures ? "" : " (no pictures)"}. Paste it into the chat.`);
+    } catch (e) {
+      setSaveText(text);
+      setSaveMsg(`The clipboard is blocked here (${e?.name || e}). Select the text in the box below and copy it by hand.`);
+    }
+  }, [buildReport]);
+
 
   /* ---------- the human decides ---------- */
   const resolvePending = useCallback((which) => {
@@ -1507,13 +1565,27 @@ export default function DetectPage() {
           {/* THE BLACK BOX. Send this after anything reads wrong and the exact
               numbers behind every decision go with it — no more guessing from
               screenshots. */}
-          <button onClick={saveDiagnostics}
+          <button onClick={() => saveDiagnostics(true)}
             className="mono mt-2 w-full rounded-xl border border-odcCream/25 px-4 py-3 text-sm text-odcCream/85 active:scale-[0.98]">
             Save a diagnostics file
           </button>
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => copyDiagnostics(false)}
+              className="mono flex-1 rounded-xl border border-odcCream/15 px-3 py-2.5 text-xs text-odcCream/70 active:scale-[0.98]">
+              Copy it instead (no pictures)
+            </button>
+            <button onClick={() => saveDiagnostics(false)}
+              className="mono flex-1 rounded-xl border border-odcCream/15 px-3 py-2.5 text-xs text-odcCream/70 active:scale-[0.98]">
+              Save the small one
+            </button>
+          </div>
           <p className="mono mt-1 text-[10px] leading-snug text-odcCream/45">
-            {saveMsg || "Writes down every dart it found, the numbers behind each decision, and pictures of the board at each one. Send it over after a bad read."}
+            {saveMsg || "Writes down every dart it found, the numbers behind each decision, and pictures of the board at each one. Send it over after a bad read. If saving is blocked — which it is inside app browsers — copy it instead."}
           </p>
+          {saveText && (
+            <textarea readOnly value={saveText} onFocus={(e) => e.target.select()}
+              className="mono mt-2 h-40 w-full rounded-lg border border-odcCream/20 bg-black/40 p-2 text-[9px] leading-tight text-odcCream/70" />
+          )}
 
           {cams.length > 1 && source === "camera" && (
             <label className="mt-3 block">
