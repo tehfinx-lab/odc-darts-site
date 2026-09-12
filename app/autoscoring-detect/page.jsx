@@ -595,6 +595,16 @@ export default function DetectPage() {
   const shaftsRef = useRef([]);     // for refining the camera axis point
   const visitShaftsRef = useRef([]); // shafts counted THIS visit, reset each visit
   const dirRef = useRef(null);      // learned flight -> point direction
+  // THE BLACK BOX RECORDER.
+  // Everything the page decides, and why, goes in here, with a picture of the
+  // board at each decision. One button then writes the lot out as a file that
+  // can be replayed and picked apart away from the board. Guessing from
+  // screenshots is what has been slowing this down.
+  const lastRecoverRef = useRef(0);
+  const calSizeRef = useRef(null);   // board radius we calibrated against, in working pixels
+  const logRef = useRef([]);
+  const shotsRef = useRef([]);      // { tag, at, jpeg } — kept small on purpose
+  const frameNoRef = useRef(0);
   const countedRef = useRef(null);  // coarse footprint of every dart counted
 
   // Where the picture is coming from, kept in a ref as well as in state.
@@ -638,6 +648,14 @@ export default function DetectPage() {
       });
       const Hn = homography(p.pts, p.manual ? dst : [[0, -B.doubleOut], [B.doubleOut, 0], [0, B.doubleOut], [-B.doubleOut, 0]]);
       setCal(p); setH(Hn);
+      // Remember how big the board was when it was calibrated. The automatic
+      // recovery after a knock uses it as a sanity check: a board that has
+      // suddenly changed size is not the same board seen from a nudged phone.
+      try {
+        const [t, r2, bt, l] = p.pts;
+        calSizeRef.current = Math.max(Math.hypot(r2[0] - l[0], r2[1] - l[1]),
+                                      Math.hypot(bt[0] - t[0], bt[1] - t[1])) / 2;
+      } catch (e) {}
       void rot;
       const Hi = invert3(Hn);
       let ax = null;
@@ -672,6 +690,28 @@ export default function DetectPage() {
     const side = Math.min(w, h);
     ctx.drawImage(src, (w - side) / 2, (h - side) / 2, side, side, 0, 0, WORK, WORK);
     return ctx.getImageData(0, 0, WORK, WORK);
+  }, []);
+
+  /* ---------- the black box recorder ----------
+     Two jobs: write down every decision with the numbers behind it, and keep a
+     handful of pictures of the board at the moments that matter. Both go into
+     one file on demand. */
+  const logEvent = useCallback((kind, data) => {
+    const L = logRef.current;
+    L.push({ kind, at: Date.now(), frame: frameNoRef.current, ...data });
+    if (L.length > 5000) L.splice(0, L.length - 5000);   // keep the file sane
+  }, []);
+
+  /** Keep a picture of the board as it is right now. The working canvas
+   *  already holds the frame that grab() just read, so this is nearly free.
+   *  Quality 0.5 at 480px is about 20 kB, and only ten are ever kept. */
+  const keepShot = useCallback((tag) => {
+    try {
+      const c = workRef.current; if (!c) return;
+      shotsRef.current.push({ tag, at: Date.now(), frame: frameNoRef.current,
+                              jpeg: c.toDataURL("image/jpeg", 0.5) });
+      if (shotsRef.current.length > 10) shotsRef.current.shift();
+    } catch (e) { /* canvas tainted or out of memory: the numbers still matter */ }
   }, []);
 
   const paint = useCallback(() => {
@@ -787,6 +827,7 @@ export default function DetectPage() {
     const pts = autoPoints(r.ellipse, r.bull, rot);
     if (!pts) { setStatus("Found the board but could not place the four points."); return; }
     applyPoints(pts, rot, false);
+    calSizeRef.current = Math.max(r.ellipse.rx, r.ellipse.ry);
     const payload = { pts, rot, savedAt: Date.now(), manual: false,
                       zoom: zoom ? zoom.value : (cal?.zoom ?? null), source: "camera" };
     try { window.localStorage.setItem(CAL_KEY, JSON.stringify(payload)); } catch (e) {}
@@ -798,6 +839,43 @@ export default function DetectPage() {
     setVisit([]); setPending(null); setLastBlobs([]);
     setStatus(`Board found again from ${r.colourPixels.toLocaleString()} coloured pixels. Check the gold rings sit on the real ones, then clear the board and Set baseline.`);
   }, [grab, cal, zoom, applyPoints]);
+
+  /** THE PHONE GOT KNOCKED AND THE BOARD IS EMPTY — just fix it.
+   *  Finds the board where it now is, keeps the rotation that was set by hand
+   *  during calibration, and takes a fresh baseline from this same frame.
+   *  Returns false if it cannot do it safely, in which case the caller falls
+   *  back to asking. Only ever called with no darts counted: see the note at
+   *  the call site for why that matters. */
+  const autoRecover = useCallback((img, drift) => {
+    if (!img) return false;
+    const r = findBoard(img.data, WORK, WORK);
+    if (!r.ok) return false;
+    // Sanity: the board should be much the same size as the one we calibrated
+    // against. If it is not, something other than a nudge has happened —
+    // a different board, a hand over the lens — and guessing would be worse
+    // than stopping.
+    const was = calSizeRef.current;
+    const now = Math.max(r.ellipse.rx, r.ellipse.ry);
+    if (was && (now < was * 0.75 || now > was * 1.33)) return false;
+    const rot = cal?.rot || 0;
+    const pts = autoPoints(r.ellipse, r.bull, rot);
+    if (!pts) return false;
+    applyPoints(pts, rot, false);
+    calSizeRef.current = now;
+    const payload = { pts, rot, savedAt: Date.now(), manual: false,
+                      zoom: zoom ? zoom.value : (cal?.zoom ?? null), source: "camera" };
+    try { window.localStorage.setItem(CAL_KEY, JSON.stringify(payload)); } catch (e) {}
+    setCal(payload);
+    const gray = toGray(img.data);
+    baseRef.current = { gray, prof: profiles(gray) };
+    emptyRef.current = { gray };
+    candRef.current = []; seenRef.current = []; visitShaftsRef.current = [];
+    countedRef.current = null;
+    setVisit([]); setPending(null); setLastBlobs([]);
+    keepShot(`recovered-after-${Math.round(drift)}px`);
+    setStatus(`Camera moved ${drift.toFixed(0)} px — found the board again and re-set the baseline on its own. Carry on throwing.`);
+    return true;
+  }, [cal, zoom, applyPoints, keepShot]);
 
   /* ---------- overlay ---------- */
   const drawOverlay = useCallback(() => {
@@ -853,8 +931,10 @@ export default function DetectPage() {
     setHasBaseline(true);
     candRef.current = []; seenRef.current = []; visitShaftsRef.current = []; countedRef.current = null;
     setVisit([]); setPending(null); setLastBlobs([]);
+    keepShot("baseline");
+    logEvent("baseline", { sensitivity: thr });
     setStatus("Baseline set. Throw.");
-  }, [grab]);
+  }, [grab, keepShot, logEvent, thr]);
 
   /* ---------- accept a dart ---------- */
   const commitDart = useCallback((blob, pick, rebaseGray, trusted) => {
@@ -867,6 +947,21 @@ export default function DetectPage() {
       geo: pick.geo, thin: pick.thin, widthRatio: pick.widthRatio,
       len: blob.len, area: blob.area,
     };
+    // Everything that went into this decision, written down before anything
+    // else can change. If the score is wrong, the answer is in here.
+    logEvent("dart", {
+      n: seenRef.current.length + 1, label: s.label, value: s.value, ring: s.ring,
+      mm: [Math.round(mx * 10) / 10, Math.round(my * 10) / 10],
+      tip: pick.tip, other: pick.other,
+      tipScore: pick.tipScore?.label, otherScore: pick.otherScore?.label,
+      confidence: pick.confidence, usedLearned: pick.usedLearned,
+      learnedCos: pick.learnedCos, geo: pick.geo, thin: pick.thin,
+      widthRatio: pick.widthRatio, sameEitherWay: pick.sameEitherWay,
+      blob: { a: blob.a, b: blob.b, len: blob.len, area: blob.area,
+              wa: blob.wa, wb: blob.wb, cx: blob.cx, cy: blob.cy },
+      trusted: !!trusted, learnedDirection: dirRef.current, axis,
+    });
+    keepShot(`dart${seenRef.current.length + 1}-${s.label}`);
     seenRef.current.push(pick.tip);
     shaftsRef.current.push([blob.a, blob.b]);
     visitShaftsRef.current.push([blob.a, blob.b]);
@@ -909,7 +1004,7 @@ export default function DetectPage() {
       }
       return nv;
     });
-  }, [H]);
+  }, [H, logEvent, keepShot, axis]);
 
   /* ---------- the loop ---------- */
   const step = useCallback(() => {
@@ -950,11 +1045,43 @@ export default function DetectPage() {
                  blobs: blobs.length, piecesBefore, piecesAfter, ms: tMs,
                  candidates: candRef.current.length, counted: seenRef.current.length });
 
-      // 2b. The camera has been properly knocked, not merely flexed. Nothing
-      //     measured from here is trustworthy, so stop rather than score junk.
+      frameNoRef.current++;
+      // A running record, thinned out so the file stays small. Every tenth look
+      // in normal running, and every look once something is actually happening.
+      if (frameNoRef.current % 10 === 0 || blobs.length) {
+        logEvent("look", {
+          dx: Math.round(dx * 100) / 100, dy: Math.round(dy * 100) / 100,
+          drift: Math.round(drift * 100) / 100,
+          changedPct: Math.round(changedPct * 100) / 100,
+          piecesBefore, piecesAfter, counted: seenRef.current.length,
+          blobs: blobs.map((b) => ({ a: b.a, b: b.b, len: Math.round(b.len),
+                                     area: b.area, wa: b.wa, wb: b.wb })),
+        });
+      }
+
+      // 2b. THE CAMERA HAS BEEN PROPERLY KNOCKED, not merely flexed.
+      //     If the board is empty we can simply find it again where it now is,
+      //     re-baseline, and carry on — no tapping, no lost game. That is the
+      //     common case: the phone gets nudged between visits.
+      //     With darts already counted we do NOT touch anything, because
+      //     re-baselining now would fold those darts into the empty-board
+      //     picture and the visit could never be banked. Then it asks.
       if (drift > 52) {
         candRef.current = [];
-        setStatus(`Camera has moved ${drift.toFixed(0)} px — too far to correct. Tap "Find the board again, here", then Set baseline.`);
+        const clean = seenRef.current.length === 0;
+        const since = Date.now() - (lastRecoverRef.current || 0);
+        if (clean && since > 4000) {
+          lastRecoverRef.current = Date.now();
+          const ok = autoRecover(img, drift);
+          logEvent("nudge", { drift, autoRecovered: ok });
+          if (ok) return;
+        } else {
+          logEvent("nudge", { drift, autoRecovered: false,
+                              why: clean ? "just tried" : "darts already counted" });
+        }
+        setStatus(seenRef.current.length
+          ? `Camera has moved ${drift.toFixed(0)} px. Pull the darts out and it will fix itself, or tap "Find the board again, here".`
+          : `Camera has moved ${drift.toFixed(0)} px — too far to correct. Tap "Find the board again, here", then Set baseline.`);
         return;
       }
 
@@ -1039,7 +1166,7 @@ export default function DetectPage() {
       }
       candRef.current = next;
     } finally { busyRef.current = false; }
-  }, [grab, H, thr, axis, pending, visit, commitDart]);
+  }, [grab, H, thr, axis, pending, visit, commitDart, logEvent, keepShot, autoRecover]);
 
   useEffect(() => {
     if (!running) return;
@@ -1047,11 +1174,80 @@ export default function DetectPage() {
     return () => clearInterval(loopRef.current);
   }, [running, step]);
 
+  /* ---------- write the black box out ----------
+     One file with every number the page had and a handful of pictures. Shared
+     through the phone's own share sheet where that exists, because a plain
+     download often goes nowhere on a phone; a download link is the fallback. */
+  const [saveMsg, setSaveMsg] = useState(null);
+  const saveDiagnostics = useCallback(async () => {
+    try {
+      keepShot("at-save");
+      const report = {
+        what: "ODC autoscoring diagnostics",
+        formatVersion: 1,
+        when: new Date().toISOString(),
+        page: "autoscoring-detect",
+        device: {
+          userAgent: navigator.userAgent,
+          screen: `${window.screen?.width}x${window.screen?.height}`,
+          dpr: window.devicePixelRatio,
+        },
+        camera: {
+          source: sourceRef.current,
+          lens: camId || null,
+          zoom: zoom ? { value: zoom.value, min: zoom.min, max: zoom.max } : null,
+          videoSize: videoRef.current
+            ? `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}` : null,
+          workingCanvas: WORK,
+        },
+        calibration: cal
+          ? { points: cal.pts, rotation: cal.rot, zoomWhenCalibrated: cal.zoom,
+              savedAt: cal.savedAt, placedByHand: !!cal.manual }
+          : null,
+        homography: H,
+        settings: {
+          sensitivity: thr,
+          cameraAxisPoint: axis,
+          learnedDartDirection: dirRef.current,
+          boardRadiusAtCalibration: calSizeRef.current,
+        },
+        thisVisit: visit,
+        earlierVisits: history,
+        lastLook: debug,
+        events: logRef.current,
+        pictures: shotsRef.current,
+      };
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const name = `odc-autoscoring-${stamp}.json`;
+      const blob = new Blob([JSON.stringify(report)], { type: "application/json" });
+      const kb = Math.round(blob.size / 1024);
+      const file = new File([blob], name, { type: "application/json" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "ODC autoscoring diagnostics" });
+        setSaveMsg(`Shared ${name} (${kb} kB).`);
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click();
+      a.remove(); setTimeout(() => URL.revokeObjectURL(url), 8000);
+      setSaveMsg(`Saved ${name} (${kb} kB) to your downloads.`);
+    } catch (e) {
+      setSaveMsg(`Could not save the file: ${e.message}`);
+    }
+  }, [cal, H, thr, axis, visit, history, debug, zoom, camId, keepShot]);
+
   /* ---------- the human decides ---------- */
   const resolvePending = useCallback((which) => {
     if (!pending) return;
     const tip = which === "tip" ? pending.tip : pending.other;
     const other = which === "tip" ? pending.other : pending.tip;
+    // Which way the player actually answered is the single most valuable line
+    // in the whole record: it is the only place the truth enters the page.
+    logEvent("answer", { picked: which, agreedWithGuess: which === "tip",
+                         offeredGreen: pending.tipScore?.label,
+                         offeredRed: pending.otherScore?.label,
+                         merged: !!pending.merged, confidence: pending.confidence });
     // The `true` is what makes it learn from this. Your answer is the only
     // trustworthy evidence of which way round a dart sits.
     commitDart(pending.blob, { ...pending, tip, other, flight: other, confidence: "confirmed" }, pending.gray, true);
@@ -1077,7 +1273,7 @@ export default function DetectPage() {
       }
     }
     setPending(null);
-  }, [pending, commitDart]);
+  }, [pending, commitDart, logEvent]);
 
   const editDart = useCallback((i, label) => {
     setVisit((v) => v.map((d, j) => {
@@ -1307,6 +1503,17 @@ export default function DetectPage() {
               Find the board again, here
             </button>
           )}
+
+          {/* THE BLACK BOX. Send this after anything reads wrong and the exact
+              numbers behind every decision go with it — no more guessing from
+              screenshots. */}
+          <button onClick={saveDiagnostics}
+            className="mono mt-2 w-full rounded-xl border border-odcCream/25 px-4 py-3 text-sm text-odcCream/85 active:scale-[0.98]">
+            Save a diagnostics file
+          </button>
+          <p className="mono mt-1 text-[10px] leading-snug text-odcCream/45">
+            {saveMsg || "Writes down every dart it found, the numbers behind each decision, and pictures of the board at each one. Send it over after a bad read."}
+          </p>
 
           {cams.length > 1 && source === "camera" && (
             <label className="mt-3 block">
