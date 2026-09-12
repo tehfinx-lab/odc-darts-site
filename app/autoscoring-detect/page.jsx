@@ -399,24 +399,52 @@ function detectBlobs(cur, ref, inside, thr) {
     for (let i = 0; i < desc.length; i++) {
       for (let j = i + 1; j < desc.length; j++) {
         const A = desc[i], Bd = desc[j];
-        // same direction? (axes are undirected, so compare |cos|)
+        // WHICH PIECE DEFINES THE LINE?
+        // A dart flight is a broad fin. Seen face-on its own long axis runs
+        // ACROSS the shaft, not along it, so comparing the two pieces' axes to
+        // each other is meaningless and the flight never joined up with its own
+        // shaft. Use the more elongated piece to define the line instead, and
+        // ask whether the other piece sits on it.
+        const Lg = A.len >= Bd.len ? A : Bd;
+        const Sm = A.len >= Bd.len ? Bd : A;
         const cos = Math.abs(A.ux * Bd.ux + A.uy * Bd.uy);
-        if (cos < 0.93) continue;                      // more than ~21 deg apart
-        // close, end to end?
+        const onLine = Math.abs((Sm.cx - Lg.cx) * Lg.uy - (Sm.cy - Lg.cy) * Lg.ux);
+        // closest approach, end to end
         let gap = Infinity, ga = null, gb = null;
         for (const p of [A.a, A.b]) for (const q of [Bd.a, Bd.b]) {
           const dd = Math.hypot(p[0] - q[0], p[1] - q[1]);
           if (dd < gap) { gap = dd; ga = p; gb = q; }
         }
-        if (gap > 30) continue;
+
+        // TWO WAYS TWO LUMPS CAN BE ONE DART.
+        //
+        // 1. THE SHAFT BROKE IN TWO. The pieces run the same way and sit end to
+        //    end. A dart is long, so when they are dead in line the gap between
+        //    them may be most of the dart: a faint stretch of grey shaft that
+        //    never crossed the threshold, with the black flight beyond it.
+        const sameWay = cos >= 0.93 && gap <= (onLine < 6 ? 95 : 30);
+        //
+        // 2. A FLIGHT BESIDE ITS OWN SHAFT. This is the one that was scoring a
+        //    dart twice, once at each end, in two different beds. A flight is a
+        //    broad fin: its own long axis runs ACROSS the dart rather than
+        //    along it, and its centre sits off to one side of the shaft, so
+        //    every test based on its direction failed. A stubby lump touching
+        //    another lump is its flight, and nothing else plausible.
+        //    If two real darts ever did land this close, the joined lump comes
+        //    out longer than a dart and the player gets asked — which is the
+        //    right outcome anyway.
+        const flightBeside = Sm.len < 45 && gap <= 20;
+
+        if (!sameWay && !flightBeside) continue;
+
         // The join must run ALONG the shafts, not sideways across two darts
         // lying next to each other. Skipped for pieces that are practically
-        // touching: over four or five pixels the direction of the join is just
-        // noise, and it was this test wrongly rejecting the obvious merges.
-        if (gap > 8) {
+        // touching (over four or five pixels the direction of the join is just
+        // noise) and for a flight, which by its nature sits beside the shaft.
+        if (gap > 8 && !flightBeside) {
           const jx = gb[0] - ga[0], jy = gb[1] - ga[1];
           const jl = Math.hypot(jx, jy) || 1;
-          if (Math.abs((jx / jl) * A.ux + (jy / jl) * A.uy) < 0.7) continue;
+          if (Math.abs((jx / jl) * Lg.ux + (jy / jl) * Lg.uy) < 0.7) continue;
         }
         comps[i] = comps[i].concat(comps[j]);
         comps.splice(j, 1);
@@ -461,12 +489,14 @@ function isPieceOfCounted(bl, shaft) {
   const [a, b] = shaft;
   const sx = b[0] - a[0], sy = b[1] - a[1];
   const sl = Math.hypot(sx, sy) || 1;
-  if (Math.abs((sx / sl) * bl.ux + (sy / sl) * bl.uy) < 0.93) return false; // >~21 deg apart
+  // A stubby lump — a flight on its own — has no meaningful axis of its own, so
+  // it is judged purely on whether it sits on the counted dart's line.
+  const parallel = Math.abs((sx / sl) * bl.ux + (sy / sl) * bl.uy) >= 0.93;
+  if (!parallel && bl.len >= 40) return false;          // a crossing dart, keep it
   let gap = Infinity;
   for (const p of [bl.a, bl.b]) for (const q of [a, b]) {
     gap = Math.min(gap, Math.hypot(p[0] - q[0], p[1] - q[1]));
   }
-  if (gap > 34) return false;
   // How far off the counted dart's LINE does this lump sit? Measured against
   // the infinite line, not the segment: the broken-off piece usually lies
   // beyond the end of the counted shaft, which a segment distance would score
@@ -474,7 +504,12 @@ function isPieceOfCounted(bl, shaft) {
   const ux = sx / sl, uy = sy / sl;
   const perp = (p) => Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux);
   const off = Math.max(perp(bl.a), perp(bl.b));
-  return off < 11;
+  // A stubby lump touching a counted dart is that dart's flight.
+  if (bl.len < 45 && gap <= 20) return true;
+  if (off >= 11) return false;
+  // Same reasoning as the merge above: a dart is long, so a piece that is dead
+  // in line with a counted one may be a long way down the same shaft.
+  return gap <= (off < 6 ? 95 : 34);
 }
 
 /* ================= which end is the point? =================
