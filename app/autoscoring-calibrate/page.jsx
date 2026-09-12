@@ -255,7 +255,13 @@ function findBoard(data, w, h) {
     }
   }
   const bull = rn >= 6 ? [rx / rn, ry / rn] : gn >= 10 ? [gx / gn, gy / gn] : [E.cx, E.cy];
-  return { ok: true, ellipse: E, bull, edgePoints: pts.length, colourPixels: n };
+  // How much of the picture the board actually fills. This decides whether the
+  // dart SHAFTS will survive later: the detector works on a 480-pixel square,
+  // so a board filling 60% of the frame leaves a shaft about two pixels wide,
+  // which the blur all but wipes out — and then only the fat black flight is
+  // found, a bed or two away from where the point actually is.
+  const fill = (2 * Math.max(E.rx, E.ry)) / w;
+  return { ok: true, ellipse: E, bull, edgePoints: pts.length, colourPixels: n, fill };
 }
 
 function ellipsePt(E, t) {
@@ -604,7 +610,12 @@ export default function CalibratePage() {
     setBoard({ ellipse: r.ellipse, bull: r.bull });
     setManual([]);
     setMode("ready");
+    const pct = Math.round((r.fill || 0) * 100);
     setMsg(`Board found from ${r.colourPixels.toLocaleString()} coloured pixels. ` +
+           `The board fills ${pct}% of the picture. ` +
+           (r.fill < 0.78
+             ? `THAT IS TOO SMALL. Zoom in until the numbers almost touch the edges, then find the board again. At this size the dart shafts are only a couple of pixels wide and get lost, so it finds the black flight instead of the point and scores the wrong bed.`
+             : `Good size. `) +
            `Now turn the rotation dial until the numbers line up with the real board.`);
   }, [grabWork]);
 
