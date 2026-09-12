@@ -511,8 +511,21 @@ function chooseTip(blob, axis, scoreOf, learned) {
   const otherScore = scoreOf ? scoreOf(other) : null;
   const sameEitherWay = !!(tipScore && otherScore && tipScore.label === otherScore.label);
 
+  // Is there a real fat-end/thin-end difference to read, or are both ends much
+  // the same width? If they are the same, the shape tells us nothing and must
+  // not be treated as evidence either way.
+  const widthKnown = ratio < 0.85;
+
   let confidence;
   if (sameEitherWay) confidence = "high";           // nothing to argue about
+  // THE SHAPE DISAGREES WITH THE LEARNED DIRECTION — ASK.
+  // This is what put a marker on the flight instead of the point. A strong
+  // learned direction used to be declared "high" on its own and committed
+  // silently, even when the dart's own shape said the opposite end was the
+  // thin one. The learned direction is only ever an average of past throws;
+  // this dart's own fat end is evidence about THIS dart. When the two
+  // disagree, neither is trusted and the question goes to the player.
+  else if (usedLearned && widthKnown && pickEnd !== thin) confidence = "low";
   else if (usedLearned && Math.abs(learnedCos) > 0.55) confidence = "high";
   else if (usedLearned) confidence = "medium";
   else if (agree) confidence = ratio < 0.6 ? "high" : "medium";
@@ -1095,7 +1108,42 @@ export default function DetectPage() {
   return (
     <main className="min-h-screen bg-odcBlack text-odcCream">
       <meta name="robots" content="noindex, nofollow" />
-      <div className="mx-auto w-full max-w-2xl px-4 py-6 pb-24">
+
+      {/* THE QUESTION BAR.
+          Pinned to the top of the screen, over everything, whatever you have
+          scrolled to. It used to sit below the picture, which meant scrolling
+          the phone to answer it — and nudging a phone mid-visit is exactly what
+          throws the board out of line. You never have to move it now.
+          The two scores are on the buttons, so you answer by score without
+          having to look at the little circles at all. */}
+      {pending && (
+        <div className="fixed inset-x-0 top-0 z-50 border-b border-odcGold/50 bg-odcBlack/95 px-3 pb-3 pt-2 shadow-raised backdrop-blur">
+          <div className="mx-auto w-full max-w-2xl">
+            <p className="mono text-center text-[10px] uppercase tracking-wider text-odcRed">
+              Scoring paused — which end is the point?
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button onClick={() => resolvePending("tip")}
+                className="flex-1 rounded-xl bg-odcGreen px-4 py-4 text-odcBlack">
+                <span className="block text-2xl font-bold">{pending.tipScore?.label || "green"}</span>
+                <span className="mono block text-[10px] opacity-70">green ring</span>
+              </button>
+              <button onClick={() => resolvePending("other")}
+                className="flex-1 rounded-xl bg-odcRed px-4 py-4 text-white">
+                <span className="block text-2xl font-bold">{pending.otherScore?.label || "red"}</span>
+                <span className="mono block text-[10px] opacity-70">red ring</span>
+              </button>
+            </div>
+            <p className="mono mt-1.5 text-center text-[10px] leading-snug text-odcCream/50">
+              {pending.merged
+                ? "Long enough to be two darts touching — pick the end the point is at."
+                : "Both ends would score differently, so it is asking rather than guessing."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className={`mx-auto w-full max-w-2xl px-4 py-6 pb-24 ${pending ? "pt-40" : ""}`}>
         <header className="mb-5">
           <p className="mono text-[11px] uppercase tracking-[0.2em] text-odcGold">Autoscoring · Stage 4</p>
           <h1 className="mt-1 text-3xl leading-none">Dart detection</h1>
@@ -1285,33 +1333,6 @@ export default function DetectPage() {
             </label>
           </div>
         </section>
-
-        {pending && (
-          <section className="mt-4 rounded-2xl border border-odcGold/50 bg-odcGold/10 p-4">
-            <h2 className="text-lg text-odcGold">Not sure — which end is the point?</h2>
-            <p className="mono mt-1 text-[11px] uppercase tracking-wider text-odcRed">
-              Scoring is paused — answer this before you throw again
-            </p>
-            <p className="mt-1.5 text-sm leading-relaxed text-odcCream/80">
-              {pending.merged
-                ? "This blob is long enough to be two darts touching. Pick the end the point is at."
-                : "The two ends of this dart would score differently, so it is asking rather than guessing."}
-              {" "}Pick by the score — that is quicker than squinting at the circles.
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button onClick={() => resolvePending("tip")}
-                className="flex-1 rounded-xl bg-odcGreen px-4 py-3 text-odcBlack">
-                <span className="block text-xl font-bold">{pending.tipScore?.label || "green"}</span>
-                <span className="mono block text-[10px] opacity-70">green ring</span>
-              </button>
-              <button onClick={() => resolvePending("other")}
-                className="flex-1 rounded-xl bg-odcRed px-4 py-3 text-white">
-                <span className="block text-xl font-bold">{pending.otherScore?.label || "red"}</span>
-                <span className="mono block text-[10px] opacity-70">red ring</span>
-              </button>
-            </div>
-          </section>
-        )}
 
         <section className="mt-4 rounded-2xl border border-odcCream/10 bg-odcNavy p-4">
           <div className="flex items-baseline justify-between">
