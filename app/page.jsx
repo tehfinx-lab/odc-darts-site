@@ -58,7 +58,9 @@ const pages = [
 // ⬇️ PASTE YOUR GOOGLE APPS SCRIPT WEB-APP URL HERE (the one ending in /exec)
 /* Update these two each season rollover */
 const CURRENT_SEASON = "Season 4";  // the season being played / coming up
-const LAST_SEASON = "Season 3";     // the season Wrapped + Archive refer to
+const LAST_SEASON = "Season 3";     // previous season (already frozen in the Archive)
+const WRAPPED_SEASON = CURRENT_SEASON; // the season Wrapped shows (live sheet data)
+const SEASON_COMPLETE = false;      // flip to true when the season is over: "Currently #3" -> "Finished #3"
 
 const PREDICTIONS_SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
 
@@ -853,7 +855,7 @@ function HomePage({ setActive, data, status, onSelectMatch }) {
             <span className="flex items-center gap-3">
               <span className="text-odcGold">★</span>
               <span>
-                <span className="display block text-xl tracking-[0.03em] md:text-2xl">{LAST_SEASON} Wrapped is here</span>
+                <span className="display block text-xl tracking-[0.03em] md:text-2xl">{WRAPPED_SEASON} Wrapped is here</span>
                 <span className="mono mt-0.5 block text-[10px] uppercase tracking-[0.14em] text-odcCream/45">
                   Your whole season in one shareable card
                 </span>
@@ -1182,7 +1184,8 @@ function computeWrapped(p, data) {
   else if (winRate >= 50) archetype = "The Contender";
 
   return {
-    season: LAST_SEASON,
+    season: WRAPPED_SEASON,
+    finished: SEASON_COMPLETE,
     name: p.name,
     division: p.division,
     archetype,
@@ -1219,7 +1222,7 @@ function WrappedPage({ data }) {
       {!picked && (
         <>
           <SectionTitle
-            kicker={LAST_SEASON}
+            kicker={WRAPPED_SEASON}
             title="Your Wrapped"
             text="Your whole season in one card — find your name, see your numbers, share it everywhere."
           />
@@ -1249,14 +1252,14 @@ function WrappedPage({ data }) {
           <ClipReveal>
             <div className="overflow-hidden rounded-xl border border-odcCream/15 bg-odcNavy">
               <div className="mono flex justify-between border-b border-odcCream/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-odcCream/50">
-                <span>ODC · {LAST_SEASON}</span>
+                <span>ODC · {WRAPPED_SEASON}</span>
                 <span className="text-odcRed">Wrapped</span>
               </div>
               <div className="p-6 md:p-8">
                 <p className="display break-words text-[clamp(44px,11vw,84px)] font-extrabold leading-[0.9]">{w.name}</p>
                 <p className="display mt-2 text-xl text-odcGold">★ {w.archetype}</p>
                 <p className="mono mt-1.5 text-[10.5px] uppercase tracking-[0.14em] text-odcCream/45">
-                  {w.division} · Finished #{w.position} of {w.totalPlayers}
+                  {w.division} · {w.finished ? "Finished" : "Currently"} #{w.position} of {w.totalPlayers}
                 </p>
 
                 <div className="num mt-7 grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -1326,7 +1329,7 @@ function WrappedPage({ data }) {
 
 function ArchivePage({ data }) {
   const snapshot = () => {
-    const name = window.prompt("Name this season (this freezes the CURRENT tables):", LAST_SEASON);
+    const name = window.prompt("Name this season (this freezes the CURRENT tables):", CURRENT_SEASON);
     if (!name) return;
     const tables = data.tables || {};
     const entry = {
