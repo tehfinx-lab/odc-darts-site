@@ -271,7 +271,7 @@ export async function buildWrappedCanvas(w) {
   ctx.fillText(`\u2605 ${w.archetype.toUpperCase()}`, 82, 496);
   ctx.fillStyle = "rgba(233,239,231,0.5)";
   ctx.font = `500 28px ${MONO}`;
-  ctx.fillText(`${w.division}  ·  FINISHED #${w.position}`, 84, 550);
+  ctx.fillText(`${w.division}  ·  ${w.finished ? "FINISHED" : "CURRENTLY"} #${w.position}`, 84, 550);
 
   /* stat grid 2 x 3 */
   const stats = [
