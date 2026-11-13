@@ -130,7 +130,8 @@ export default function Predictions({ data, scriptUrl }) {
     if (Array.isArray(f)) return f;
     return Object.values(f).flat();
   }, [data]);
-  const results = data?.results || [];
+  // allResults = every result this season (data.results is only the latest 200)
+  const results = data?.allResults || data?.results || [];
   const players = data?.players || [];
 
   // Build a lookup of posted results by home|away|week for locking + scoring
@@ -140,6 +141,10 @@ export default function Predictions({ data, scriptUrl }) {
       const key = `${canon(r.home)}|${canon(r.away)}|${r.week}`;
       const parts = String(r.score).split("-").map((x) => Number(x.trim()));
       m[key] = { homeScore: parts[0], awayScore: parts[1] };
+      // results are sometimes entered with home/away the other way round to the
+      // fixture: store the flipped version too so those predictions still score
+      const flipped = `${canon(r.away)}|${canon(r.home)}|${r.week}`;
+      if (!m[flipped]) m[flipped] = { homeScore: parts[1], awayScore: parts[0] };
     });
     return m;
   }, [results]);
@@ -300,18 +305,19 @@ export default function Predictions({ data, scriptUrl }) {
         ? predictions
         : predictions.filter((p) => wkOf(p.week) === wkOf(activeLbWeek));
 
+    // keyed on the cleaned name so "ErieauAL" and "erieauAL" are one player
     const totals = {};
     scope.forEach((p) => {
       const wkNum = wkOf(p.week);
       const actual = resultMap[`${canon(p.home)}|${canon(p.away)}|${wkNum}`];
       const pts = scorePick(p, actual);
+      const k = canon(p.player) || p.player;
       // Ensure every predictor appears, even on 0 points
-      totals[p.player] = (totals[p.player] || 0) + pts;
+      if (!totals[k]) totals[k] = { player: p.player, pts: 0 };
+      totals[k].pts += pts;
     });
 
-    return Object.entries(totals)
-      .map(([player, pts]) => ({ player, pts }))
-      .sort((a, b) => b.pts - a.pts);
+    return Object.values(totals).sort((a, b) => b.pts - a.pts);
   }, [predictions, activeLbWeek, resultMap]);
 
   // =================== RENDER ===================
