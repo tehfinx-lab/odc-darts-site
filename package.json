@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
+    "@vercel/blob": "^2.9.0",
     "framer-motion": "latest",
     "lucide-react": "latest",
     "next": "latest",
