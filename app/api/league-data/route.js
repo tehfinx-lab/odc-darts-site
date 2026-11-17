@@ -117,6 +117,14 @@ const cleanCell = (value) =>
 
 const text = (value) => cleanCell(value);
 
+// "Division 8`", "division 8 ", "Div 8", "Divison 8" -> "Division 8", so a
+// typo in the sheet doesn't split a division into two tables.
+const divisionName = (value) => {
+  const raw = text(value);
+  const m = raw.match(/^\s*div\w*\.?\s*(\d+)/i);
+  return m ? `Division ${Number(m[1])}` : raw;
+};
+
 const num = (value) => {
   // Keep only digits, dot, minus — kills any stray character (apostrophe, space, etc.)
   const cleaned = cleanCell(value)
@@ -298,7 +306,7 @@ function buildMatchesData(rows, rosterRows = []) {
 
   for (const row of rows.slice(1)) {
     const week = num(row[MATCH_COL.week]);
-    const division = text(row[MATCH_COL.division]) || "Unassigned";
+    const division = divisionName(row[MATCH_COL.division]) || "Unassigned";
     const p1 = text(row[MATCH_COL.p1]);
     const p2 = text(row[MATCH_COL.p2]);
 
@@ -397,7 +405,7 @@ function buildMatchesData(rows, rosterRows = []) {
   // Matches data automatically once they play.
   for (const row of (rosterRows || []).slice(1)) {
     const name = text(row[0]);
-    const division = text(row[1]) || "Unassigned";
+    const division = divisionName(row[1]) || "Unassigned";
     if (!name) continue;
     const key = `${division}__${name}`;
     if (playerMap[key]) continue;
@@ -485,7 +493,7 @@ function buildFixturesData(rows) {
 
   for (const row of rows.slice(1)) {
     const week = num(row[FIXTURE_COL.week]);
-    const division = text(row[FIXTURE_COL.division]);
+    const division = divisionName(row[FIXTURE_COL.division]);
     const home = text(row[FIXTURE_COL.home]);
     const away = text(row[FIXTURE_COL.away]);
     const date = text(row[FIXTURE_COL.date]);
@@ -535,7 +543,7 @@ function buildMasterStats(rows) {
       best3DA: num(row[MASTER_COL.best3DA]),
       best9DA: num(row[MASTER_COL.best9DA]),
       totalPoints: num(row[MASTER_COL.totalPoints]),
-      division: text(row[MASTER_COL.division]),
+      division: divisionName(row[MASTER_COL.division]),
     };
   }
 
