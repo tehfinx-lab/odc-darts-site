@@ -5,8 +5,8 @@
   "start_url": "/splash?from=pwa",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0A1710",
-  "theme_color": "#0A1710",
+  "background_color": "#030C08",
+  "theme_color": "#030C08",
   "categories": [
     "sports"
   ],

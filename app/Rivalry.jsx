@@ -18,7 +18,7 @@ function Card({ children, className = "" }) {
 function Kicker({ children }) {
   return (
     <p className="mono flex items-center gap-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-odcCream/60">
-      <span className="text-odcRed">■</span> {children}
+      <span className="text-odcAcc">■</span> {children}
       <span className="h-px flex-1 bg-odcCream/[0.13]" aria-hidden="true" />
     </p>
   );
@@ -46,7 +46,7 @@ function StatusPill({ status }) {
     status === "Complete"
       ? "bg-odcGreen/15 text-odcGreenBright"
       : status === "In progress"
-      ? "bg-odcRed/15 text-odcRed"
+      ? "bg-odcAcc/15 text-odcAcc"
       : "bg-odcCream/10 text-odcCream/55";
   return (
     <span className={`mono rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${tone}`}>
@@ -119,9 +119,9 @@ function Standings({ data, openNight }) {
           <tbody>
             {data.standings.map((r) => (
               <tr key={r.team} className="border-t border-odcCream/10">
-                <td className="p-4 font-semibold text-odcRed">{r.rank}</td>
+                <td className="p-4 font-semibold text-odcAcc">{r.rank}</td>
                 <td className="p-4 font-semibold">
-                  {r.rank === 1 && r.points > 0 && <Crown size={15} className="mr-2 inline text-odcRed" />}
+                  {r.rank === 1 && r.points > 0 && <Crown size={15} className="mr-2 inline text-odcAcc" />}
                   {r.team}
                 </td>
                 <td className="p-4">{r.played}</td>
@@ -148,7 +148,7 @@ function Standings({ data, openNight }) {
             <button
               key={n.night}
               onClick={() => openNight(n.night)}
-              className="rounded-xl border border-odcCream/10 bg-odcNavy p-4 text-left transition hover:border-odcRed/60"
+              className="rounded-xl border border-odcCream/10 bg-odcNavy p-4 text-left transition hover:border-odcAcc/60"
             >
               <div className="flex items-center justify-between">
                 <span className="mono text-[11px] font-semibold uppercase tracking-[0.14em] text-odcCream/55">
@@ -222,7 +222,7 @@ function NightView({ data, night, setNight }) {
           </div>
         </div>
         {n.result && (
-          <p className="border-b border-odcCream/10 bg-odcRed/10 px-5 py-2.5 text-center text-sm font-semibold text-odcRed">
+          <p className="border-b border-odcCream/10 bg-odcAcc/10 px-5 py-2.5 text-center text-sm font-semibold text-odcAcc">
             {n.result === "Draw" ? "Night drawn" : `${n.result} win the night`}
           </p>
         )}
@@ -237,9 +237,9 @@ function NightView({ data, night, setNight }) {
                 <div className="min-w-[72px] rounded-lg bg-odcBlack/60 px-3 py-1.5 text-center font-display text-xl font-extrabold tabular-nums">
                   {m.played ? (
                     <>
-                      <span className={m.winner === "left" ? "text-odcRed" : ""}>{m.leftLegs}</span>
+                      <span className={m.winner === "left" ? "text-odcAcc" : ""}>{m.leftLegs}</span>
                       <span className="text-odcCream/30"> – </span>
-                      <span className={m.winner === "right" ? "text-odcRed" : ""}>{m.rightLegs}</span>
+                      <span className={m.winner === "right" ? "text-odcAcc" : ""}>{m.rightLegs}</span>
                     </>
                   ) : (
                     <span className="text-odcCream/35">v</span>
@@ -256,7 +256,7 @@ function NightView({ data, night, setNight }) {
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <p className="mono mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-odcCream/55">
-              <Flame size={14} className="text-odcRed" /> 180s on the night
+              <Flame size={14} className="text-odcAcc" /> 180s on the night
             </p>
             {tons.length ? tons.map((t) => (
               <p key={t.name} className="flex justify-between py-1"><span>{t.name}</span><b>{t.count}</b></p>
@@ -264,7 +264,7 @@ function NightView({ data, night, setNight }) {
           </Card>
           <Card>
             <p className="mono mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-odcCream/55">
-              <Target size={14} className="text-odcRed" /> Ton-plus finishes
+              <Target size={14} className="text-odcAcc" /> Ton-plus finishes
             </p>
             {finishes.length ? finishes.map((f, i) => (
               <p key={i} className="flex justify-between py-1"><span>{f.player}</span><b>{f.finish}</b></p>
@@ -340,7 +340,7 @@ function PlayerStats({ data }) {
           <tbody>
             {rows.map((p, i) => (
               <tr key={p.name} className="border-t border-odcCream/10">
-                <td className="p-3 font-semibold text-odcRed">{i + 1}</td>
+                <td className="p-3 font-semibold text-odcAcc">{i + 1}</td>
                 <td className="p-3 font-semibold">{p.name}</td>
                 <td className="p-3 text-odcCream/60">{p.team}</td>
                 <td className="p-3 text-center">{p.singlesPlayed || "–"}</td>
@@ -362,7 +362,7 @@ function PlayerStats({ data }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <p className="mono mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-odcCream/55">
-            <Flame size={14} className="text-odcRed" /> 180 leaders
+            <Flame size={14} className="text-odcAcc" /> 180 leaders
           </p>
           {data.players.filter((p) => p.s180).sort((a, b) => b.s180 - a.s180).slice(0, 8).map((p) => (
             <p key={p.name} className="flex justify-between border-t border-odcCream/5 py-1.5 first:border-0">
@@ -373,7 +373,7 @@ function PlayerStats({ data }) {
         </Card>
         <Card>
           <p className="mono mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-odcCream/55">
-            <Target size={14} className="text-odcRed" /> Ton-plus finishes
+            <Target size={14} className="text-odcAcc" /> Ton-plus finishes
           </p>
           {data.tonPlus.slice(0, 10).map((f, i) => (
             <p key={i} className="flex justify-between border-t border-odcCream/5 py-1.5 first:border-0">
@@ -412,7 +412,7 @@ function Teams({ data }) {
                       <span className="mono w-5 text-xs text-odcCream/40">{p.slot}</span>
                       <span className="font-semibold">{p.name}</span>
                       {/captain/i.test(p.role) && (
-                        <span className="mono rounded bg-odcRed/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-odcRed">C</span>
+                        <span className="mono rounded bg-odcAcc/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-odcAcc">C</span>
                       )}
                     </div>
                     <span className="mono text-[11px] text-odcCream/55">
@@ -462,7 +462,7 @@ export default function Rivalry() {
         <div className="flex-1">
           <Kicker>ODC Pub Rivalry</Kicker>
           <h2 className="mt-3 font-display text-4xl font-extrabold uppercase leading-none md:text-6xl">
-            <Swords className="mr-3 inline -translate-y-1 text-odcRed" size={40} />
+            <Swords className="mr-3 inline -translate-y-1 text-odcAcc" size={40} />
             Pub Rivalry
           </h2>
           <p className="mt-3 max-w-xl text-odcCream/60">

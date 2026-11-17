@@ -3,21 +3,24 @@
 @tailwind utilities;
 
 /* ============================================================
-   ODC MATCHNIGHT — TV darts coverage translated to web.
-   Palette = the board: baize black-green, bone, wire hairlines,
-   dartboard red. Gold reserved for silverware.
+   ODC FLOODLIT CREAM — the same look as the bot's images.
+   Near-black green, white type, cream for highlights, red only
+   for losses, green for wins. Faded ODC badge in the background.
    ============================================================ */
 
 :root {
-  --pitch: #0a1710;
-  --panel: #0f1f16;
-  --panel-2: #13251b;
-  --line: rgba(233, 239, 231, 0.13);
-  --bone: #e9efe7;
-  --red: #e63329;
-  --disp: "Big Shoulders Display", "Arial Narrow", sans-serif;
-  --body: "Archivo", system-ui, sans-serif;
-  --mono: "Spline Sans Mono", ui-monospace, monospace;
+  --pitch: #030c08;
+  --panel: #0a1c14;
+  --panel-2: #0f241a;
+  --line: rgba(255, 255, 255, 0.1);
+  --bone: #ffffff;
+  --acc: #ebd7aa;
+  --red: #ff3b30;
+  --green: #12b76a;
+  --sponsor: #ffd60a;
+  --disp: "Sofia Sans Extra Condensed", "Arial Narrow", sans-serif;
+  --body: "Sofia Sans", system-ui, sans-serif;
+  --mono: "Sofia Sans", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -32,24 +35,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: var(--red); color: #fff; }
-:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+::selection { background: var(--acc); color: var(--pitch); }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 
 /* Poster / scoreboard type */
 h1, h2, h3, .display {
   font-family: var(--disp);
   text-transform: uppercase;
-  letter-spacing: 0.01em;
-  font-weight: 700;
+  letter-spacing: 0;
+  font-weight: 800;
 }
-.mono { font-family: var(--mono); }
+/* titles get the black italic used on every bot image */
+h1, h2 { font-weight: 900; font-style: italic; letter-spacing: -0.005em; }
+.mono { font-family: var(--mono); font-weight: 600; }
 table, .stat, .score, .num { font-variant-numeric: tabular-nums; }
 .score {
   font-family: var(--disp);
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.02em;
 }
-.hollow { color: transparent; -webkit-text-stroke: 2px var(--bone); }
+.hollow { color: transparent; -webkit-text-stroke: 2px var(--acc); }
 
 button, a, input, select { -webkit-tap-highlight-color: transparent; }
 
@@ -76,7 +82,7 @@ button, a, input, select { -webkit-tap-highlight-color: transparent; }
 /* Legacy utility classes kept as quiet no-ops */
 .animate-float { animation: none; }
 .shimmer { background: rgba(233, 239, 231, 0.04); }
-.text-gold { color: #d9b45b; }
+.text-gold { color: var(--acc); }
 .lux-divider { height: 1px; background: var(--line); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -91,15 +97,32 @@ button, a, input, select { -webkit-tap-highlight-color: transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: var(--pitch); }
 ::-webkit-scrollbar-thumb {
-  background: #22362a;
+  background: #1d3329;
   border-radius: 6px;
   border: 2px solid var(--pitch);
 }
-::-webkit-scrollbar-thumb:hover { background: #2d4636; }
+::-webkit-scrollbar-thumb:hover { background: #2a473a; }
 
 /* ---------- GIANT WORDMARK MARQUEE ---------- */
 .marq { animation: tick 46s linear infinite; }
 .marq-wrap { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .marq { animation: none; }
+}
+
+/* ---------- FLOODLIT CREAM ---------- */
+/* edge stripe: cream over green, like the bot images */
+.edge-stripe::before {
+  content: ""; position: fixed; left: 0; top: 0; bottom: 0; width: 6px; z-index: 60;
+  background: linear-gradient(var(--acc) 0 50%, var(--green) 50% 100%);
+  pointer-events: none;
+}
+@media (max-width: 767px) { .edge-stripe::before { width: 4px; } }
+
+/* the faded ODC badge used behind every bot image */
+.odc-watermark {
+  position: absolute; pointer-events: none; user-select: none;
+  background: url(/odc-logo.png) center / contain no-repeat;
+  filter: grayscale(1) brightness(1.6);
+  opacity: 0.07;
 }

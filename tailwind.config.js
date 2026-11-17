@@ -3,23 +3,29 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Big Shoulders Display"', '"Arial Narrow"', "sans-serif"],
-        body: ['"Archivo"', "system-ui", "sans-serif"],
-        mono: ['"Spline Sans Mono"', "ui-monospace", "monospace"],
+        display: ['"Sofia Sans Extra Condensed"', '"Arial Narrow"', "sans-serif"],
+        body: ['"Sofia Sans"', "system-ui", "sans-serif"],
+        mono: ['"Sofia Sans"', "system-ui", "sans-serif"],
       },
       colors: {
-        odcBlack: "#0A1710",  // pitch
-        odcNavy: "#0F1F16",   // panel
-        odcPanel2: "#13251B", // zebra
-        odcCream: "#E9EFE7",  // bone
-        odcRed: "#E63329",
-        odcRedDeep: "#C2281F",
-        odcGreen: "#23A566",
-        odcGreenBright: "#2BBF77",
-        odcGreenDeep: "#1B7F4E",
-        odcGreenDark: "#0F1F16",
-        odcGold: "#D9B45B",
-        odcGoldDeep: "#A8873C",
+        // Floodlit Cream - same palette as the bot's images
+        odcBlack: "#030C08",   // background
+        odcNavy: "#0A1C14",    // panels
+        odcPanel2: "#0F241A",  // zebra rows
+        odcCream: "#FFFFFF",   // text
+        odcAcc: "#EBD7AA",     // cream accent (buttons, highlights, leaders)
+        odcAccDeep: "#CDB27A",
+        odcOnAcc: "#030C08",   // text on cream
+        odcLoss: "#FF3B30",    // losses, relegation, errors, live
+        odcSponsor: "#FFD60A", // BarSport yellow
+        odcRed: "#FF3B30",
+        odcRedDeep: "#D92D23",
+        odcGreen: "#12B76A",   // wins, promotion
+        odcGreenBright: "#2FD38A",
+        odcGreenDeep: "#0E8A50",
+        odcGreenDark: "#0A1C14",
+        odcGold: "#EBD7AA",
+        odcGoldDeep: "#CDB27A",
       },
       boxShadow: {
         glow: "0 1px 2px rgba(0,0,0,0.35)",

@@ -41,22 +41,22 @@ export async function buildResultCardCanvas(match) {
   canvas.height = H;
   const ctx = canvas.getContext("2d");
 
-  const RED = "#e51d2a";
-  const CREAM = "#f3ecd9";
-  const NAVY = "#0f2535";
+  const RED = "#EBD7AA";   // cream accent (was red)
+  const CREAM = "#FFFFFF";
+  const NAVY = "#0A1C14";
 
   // ---- background ----
   const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#0a1622");
-  bg.addColorStop(0.5, "#070d14");
-  bg.addColorStop(1, "#05080c");
+  bg.addColorStop(0, "#071510");
+  bg.addColorStop(0.5, "#030C08");
+  bg.addColorStop(1, "#030C08");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
   // red glow top
   const glow = ctx.createRadialGradient(W / 2, 120, 0, W / 2, 120, 600);
-  glow.addColorStop(0, "rgba(229,29,42,0.25)");
-  glow.addColorStop(1, "rgba(229,29,42,0)");
+  glow.addColorStop(0, "rgba(235,215,170,0.14)");
+  glow.addColorStop(1, "rgba(235,215,170,0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, 700);
 
@@ -109,7 +109,7 @@ export async function buildResultCardCanvas(match) {
   ctx.fillStyle = RED;
   roundRect(ctx, W / 2 - sw / 2, midY - 70, sw, 100, 28);
   ctx.fill();
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = "#030C08";
   ctx.fillText(score, W / 2, midY + 2);
 
   // "VS" tag under
@@ -231,17 +231,17 @@ export async function buildWrappedCanvas(w) {
   const ctx = canvas.getContext("2d");
 
   try { await document.fonts.ready; } catch (e) {}
-  const DISP = '"Big Shoulders Display","Arial Narrow",sans-serif';
-  const MONO = '"Spline Sans Mono",monospace';
-  const PITCH = "#0A1710", BONE = "#E9EFE7", RED = "#E63329", GOLD = "#D9B45B";
-  const LINE = "rgba(233,239,231,0.14)";
+  const DISP = '"Sofia Sans Extra Condensed","Arial Narrow",sans-serif';
+  const MONO = '"Sofia Sans",sans-serif';
+  const PITCH = "#030C08", BONE = "#FFFFFF", RED = "#EBD7AA", GOLD = "#EBD7AA";
+  const LINE = "rgba(255,255,255,0.14)";
 
   ctx.fillStyle = PITCH; ctx.fillRect(0, 0, W, H);
 
   /* board rim arcs bleeding off top-right */
   ctx.strokeStyle = LINE; ctx.lineWidth = 2;
   [520, 560].forEach((r) => { ctx.beginPath(); ctx.arc(W - 60, 120, r, 0, Math.PI * 2); ctx.stroke(); });
-  ctx.strokeStyle = "rgba(230,51,41,0.85)"; ctx.lineWidth = 40;
+  ctx.strokeStyle = "rgba(235,215,170,0.85)"; ctx.lineWidth = 40;
   ctx.beginPath(); ctx.arc(W - 60, 120, 540, Math.PI * 0.62, Math.PI * 0.78); ctx.stroke();
 
   /* logo + header */
@@ -251,7 +251,7 @@ export async function buildWrappedCanvas(w) {
     ctx.drawImage(logo, 64, 94, 112, 112); ctx.restore();
   }
   ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(233,239,231,0.6)";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.font = `600 30px ${MONO}`;
   ctx.fillText(`O D C  ·  ${String(w.season || "SEASON").toUpperCase().split("").join(" ")}`, 210, 140);
   ctx.fillStyle = RED;
@@ -269,7 +269,7 @@ export async function buildWrappedCanvas(w) {
   ctx.fillStyle = GOLD;
   ctx.font = `700 52px ${DISP}`;
   ctx.fillText(`\u2605 ${w.archetype.toUpperCase()}`, 82, 496);
-  ctx.fillStyle = "rgba(233,239,231,0.5)";
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
   ctx.font = `500 28px ${MONO}`;
   ctx.fillText(`${w.division}  ·  ${w.finished ? "FINISHED" : "CURRENTLY"} #${w.position}`, 84, 550);
 
@@ -283,10 +283,10 @@ export async function buildWrappedCanvas(w) {
   stats.forEach(([label, val], i) => {
     const x = gx + (i % 2) * (cw + 24);
     const y = gy + Math.floor(i / 2) * (ch + 24);
-    ctx.fillStyle = "#0F1F16";
+    ctx.fillStyle = "#0A1C14";
     roundRect(ctx, x, y, cw, ch, 18); ctx.fill();
     ctx.strokeStyle = LINE; ctx.lineWidth = 1.5; roundRect(ctx, x, y, cw, ch, 18); ctx.stroke();
-    ctx.fillStyle = "rgba(233,239,231,0.45)";
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
     ctx.font = `600 24px ${MONO}`;
     ctx.fillText(label, x + 30, y + 60);
     ctx.fillStyle = BONE;
@@ -297,10 +297,10 @@ export async function buildWrappedCanvas(w) {
   /* biggest win band */
   let by = gy + 3 * (ch + 24) + 20;
   ctx.fillStyle = RED; roundRect(ctx, 80, by, W - 160, 130, 18); ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.fillStyle = "rgba(3,12,8,0.7)";
   ctx.font = `600 24px ${MONO}`;
   ctx.fillText("BIGGEST WIN", 112, by + 52);
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = "#030C08";
   ctx.font = `800 56px ${DISP}`;
   ctx.fillText(w.biggestWin || "\u2013", 110, by + 108);
 
@@ -308,7 +308,7 @@ export async function buildWrappedCanvas(w) {
   by += 154;
   ctx.strokeStyle = LINE; roundRect(ctx, 80, by, W - 160, 130, 18); ctx.stroke();
   ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(233,239,231,0.45)";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
   ctx.font = `600 24px ${MONO}`;
   ctx.fillText("BEST PERFORMANCE", 112, by + 52);
   ctx.fillStyle = BONE;
@@ -316,10 +316,10 @@ export async function buildWrappedCanvas(w) {
   ctx.fillText(w.bestPerf || "\u2013", 110, by + 106);
 
   /* footer */
-  ctx.fillStyle = "rgba(233,239,231,0.4)";
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.font = `600 26px ${MONO}`;
   ctx.textAlign = "center";
-  ctx.fillText("GAME ON  ///  onlinedartscircuit.vercel.app", W / 2, H - 70);
+  ctx.fillText("GAME ON  ///  onlinedartscircuit.co.uk", W / 2, H - 70);
 
   return canvas;
 }

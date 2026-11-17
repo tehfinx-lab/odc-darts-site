@@ -163,7 +163,7 @@ export default function PlayerProfile({ player, masterStats, matches, profiles, 
     const avg = Number(master.best3DA ?? player.avg ?? 0);
 
     if (tons >= 1) b.push({ icon: Flame, label: `${tons}× 180`, color: "text-orange-400" });
-    if (hc >= 100) b.push({ icon: Target, label: `${hc} Checkout`, color: "text-odcRed" });
+    if (hc >= 100) b.push({ icon: Target, label: `${hc} Checkout`, color: "text-odcAcc" });
     if (avg >= 60) b.push({ icon: Zap, label: `${avg} Avg`, color: "text-yellow-400" });
     if (wins >= 5) b.push({ icon: Crown, label: `${wins} Wins`, color: "text-amber-300" });
     if (streak.type === "W" && streak.count >= 3) b.push({ icon: TrendingUp, label: `${streak.count} Win Streak`, color: "text-green-400" });
@@ -199,14 +199,14 @@ export default function PlayerProfile({ player, masterStats, matches, profiles, 
                 {initials(player.name)}
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcRed">{master?.division || player.division}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-odcAcc">{master?.division || player.division}</p>
                 <h3 className="mt-1 text-3xl font-semibold">{player.name}</h3>
                 <div className="mt-2 flex items-center gap-2">
                   {recentForm.map((r, i) => (
                     <span
                       key={i}
                       className={`flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold ${
-                        r === "W" ? "bg-green-500/20 text-green-400" : r === "L" ? "bg-odcRed/20 text-odcRed" : "bg-white/10 text-odcCream/60"
+                        r === "W" ? "bg-green-500/20 text-green-400" : r === "L" ? "bg-odcLoss/20 text-odcLoss" : "bg-white/10 text-odcCream/60"
                       }`}
                     >
                       {r}
@@ -222,7 +222,7 @@ export default function PlayerProfile({ player, masterStats, matches, profiles, 
             </div>
             <div className="flex items-center gap-2">
               {onShare && (
-                <button onClick={() => onShare(player)} className="rounded-lg bg-odcRed/90 p-3 text-white transition hover:bg-odcRed" title="Share profile">
+                <button onClick={() => onShare(player)} className="rounded-lg bg-odcAcc/90 p-3 text-odcOnAcc transition hover:bg-odcAcc" title="Share profile">
                   <Share2 size={18} />
                 </button>
               )}
@@ -255,7 +255,7 @@ export default function PlayerProfile({ player, masterStats, matches, profiles, 
                   Player Profile
                 </p>
                 {profile.nickname ? (
-                  <p className="text-sm font-semibold text-odcRed">&ldquo;{profile.nickname}&rdquo;</p>
+                  <p className="text-sm font-semibold text-odcAcc">&ldquo;{profile.nickname}&rdquo;</p>
                 ) : null}
               </div>
 
@@ -301,7 +301,7 @@ export default function PlayerProfile({ player, masterStats, matches, profiles, 
                       href={profile.dartcounter}
                       target="_blank"
                       rel="noreferrer"
-                      className="mono text-xs font-semibold uppercase tracking-[0.12em] text-odcRed transition hover:text-odcCream"
+                      className="mono text-xs font-semibold uppercase tracking-[0.12em] text-odcAcc transition hover:text-odcCream"
                     >
                       DartCounter &rarr;
                     </a>
@@ -316,7 +316,7 @@ export default function PlayerProfile({ player, masterStats, matches, profiles, 
               <div className="mb-3 flex items-center justify-between">
                 <h4 className="text-sm font-semibold uppercase tracking-[0.1em] text-odcCream/70">Average Form</h4>
                 {trend !== 0 && (
-                  <span className={`inline-flex items-center gap-1 text-xs font-semibold ${trend > 0 ? "text-green-400" : "text-odcRed"}`}>
+                  <span className={`inline-flex items-center gap-1 text-xs font-semibold ${trend > 0 ? "text-green-400" : "text-odcLoss"}`}>
                     {trend > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     {trend > 0 ? "+" : ""}{trend.toFixed(1)} trend
                   </span>
@@ -345,14 +345,14 @@ export default function PlayerProfile({ player, masterStats, matches, profiles, 
                   const won = sc && sc.for > sc.against;
                   const opp = isHome ? m.away : m.home;
                   return (
-                    <div key={m.id || i} className={`rounded-lg border p-4 ${won ? "border-green-500/30 bg-green-500/5" : "border-odcRed/30 bg-odcRed/5"}`}>
+                    <div key={m.id || i} className={`rounded-lg border p-4 ${won ? "border-green-500/30 bg-green-500/5" : "border-odcLoss/30 bg-odcLoss/5"}`}>
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-odcCream/45">{m.division || "League"}</p>
                           <p className="mt-1 font-semibold">vs {opp}</p>
                         </div>
                         <div className="text-right">
-                          <span className={`rounded-lg px-3 py-1 text-lg font-semibold ${won ? "bg-green-500/20 text-green-400" : "bg-odcRed/20 text-odcRed"}`}>
+                          <span className={`rounded-lg px-3 py-1 text-lg font-semibold ${won ? "bg-green-500/20 text-green-400" : "bg-odcLoss/20 text-odcLoss"}`}>
                             {m.score}
                           </span>
                         </div>
