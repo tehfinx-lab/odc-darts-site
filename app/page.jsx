@@ -32,7 +32,8 @@ import { seasonArchive } from "../lib/seasonArchive";
 import { CountUp, AnimatedStatValue, Reveal, StaggerRows, Row } from "./motion";
 import { downloadResultCard, shareResultCard, shareWrappedCard } from "./shareCard";
 import Predictions from "./Predictions";
-import { Crosshair } from "lucide-react";
+import Rivalry from "./Rivalry";
+import { Crosshair, Swords } from "lucide-react";
 
 function playerSlug(name) {
   return String(name).toLowerCase().trim().replace(/\s+/g, "-");
@@ -46,6 +47,7 @@ const pages = [
   { id: "results", label: "Results", icon: ClipboardList },
   { id: "tables", label: "Tables", icon: Table2 },
   { id: "duo", label: "Duo League", icon: Trophy },
+  { id: "rivalry", label: "Rivalry", icon: Swords },
   { id: "players", label: "Players", icon: Users },
   { id: "leaderboards", label: "Leaders", icon: BarChart3 },
   { id: "predictions", label: "Predict", icon: Crosshair },
@@ -1327,7 +1329,181 @@ function WrappedPage({ data }) {
   );
 }
 
+/* ---------- SEASON ARCHIVE ---------- */
+const seasonNum = (name) => Number(String(name || "").match(/\d+/)?.[0] ?? 0);
+const divNum = (name) => Number(String(name || "").match(/\d+/)?.[0] ?? 999);
+
+// Season stats stored with a snapshot (newer snapshots only).
+function buildSeasonStats(data) {
+  const players = (data.players || []).filter((p) => p.played > 0);
+  const results = data.allResults || data.results || [];
+  const maxPlayed = Math.max(0, ...players.map((p) => p.played || 0));
+  const minGames = Math.max(1, Math.ceil(maxPlayed / 2));
+  const pick = (list, key, dir = -1, n = 3) =>
+    [...list]
+      .filter((p) => Number(p[key]) > 0)
+      .sort((a, b) => dir * (Number(a[key]) - Number(b[key])))
+      .slice(0, n)
+      .map((p) => ({ name: p.name, division: p.division, value: Number(p[key]) }));
+  let bestMatch = null;
+  let legs = 0;
+  let tons = 0;
+  for (const r of results) {
+    for (const [name, s] of [[r.home, r.p1Stats], [r.away, r.p2Stats]]) {
+      const avg = Number(s?.avg) || 0;
+      legs += Number(s?.legsFor) || 0;
+      tons += Number(s?.tons) || 0;
+      if (avg > (bestMatch?.value || 0)) bestMatch = { name, division: r.division, value: avg };
+    }
+  }
+  return {
+    matches: results.length,
+    legs,
+    tons,
+    players: players.length,
+    bestMatchAvg: bestMatch,
+    seasonAvg: pick(players.filter((p) => p.played >= minGames), "avg"),
+    checkout: pick(players, "highCheckout"),
+    tons180: pick(players, "tons"),
+    bestLeg: pick(players, "bestLeg", 1),
+  };
+}
+
+function ArchiveSelect({ value, onChange, children, label }) {
+  return (
+    <label className="relative block">
+      <span className="mono mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-odcCream/45">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full appearance-none rounded-lg border border-odcCream/15 bg-odcNavy px-5 py-4 pr-12 font-semibold text-odcCream outline-none md:w-64"
+      >
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute bottom-4 right-4" />
+    </label>
+  );
+}
+
+function ArchiveTable({ division, rows, champion }) {
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <div className="flex items-center justify-between gap-2 border-b border-odcCream/10 px-4 py-3">
+        <p className="display text-lg tracking-[0.03em]">{division}</p>
+        {champion && (
+          <p className="mono text-[10px] uppercase tracking-[0.1em] text-odcGold">★ Champion — {champion}</p>
+        )}
+      </div>
+      <div className="num overflow-x-auto">
+        <table className="w-full min-w-[420px] border-collapse">
+          <thead>
+            <tr className="mono border-b border-odcCream/[0.13] text-left text-[9.5px] uppercase tracking-[0.14em] text-odcCream/40">
+              <th className="px-3 py-2.5 font-semibold">Pos</th>
+              <th className="px-2 py-2.5 font-semibold">Player</th>
+              <th className="px-2 py-2.5 text-right font-semibold">P</th>
+              <th className="px-2 py-2.5 text-right font-semibold">W</th>
+              <th className="px-2 py-2.5 text-right font-semibold">D</th>
+              <th className="px-2 py-2.5 text-right font-semibold">L</th>
+              <th className="hidden px-2 py-2.5 text-right font-semibold sm:table-cell">+/−</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(rows || []).map((row, i) => (
+              <tr
+                key={row.name || i}
+                className={`border-b border-odcCream/[0.06] last:border-0 odd:bg-odcBlack/40 ${
+                  i === 0 ? "bg-odcGold/[0.07] odd:bg-odcGold/[0.07]" : ""
+                }`}
+              >
+                <td className="mono w-11 px-3 py-2.5 text-xs font-semibold text-odcCream/50">
+                  {String(row.pos ?? i + 1).padStart(2, "0")}
+                </td>
+                <td className={`px-2 py-2.5 text-[13px] font-semibold ${i === 0 ? "text-odcGold" : ""}`}>
+                  {i === 0 ? "★ " : ""}{row.name}
+                </td>
+                <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.played ?? "–"}</td>
+                <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.wins ?? "–"}</td>
+                <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.draws ?? "–"}</td>
+                <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.losses ?? "–"}</td>
+                <td className="mono hidden px-2 py-2.5 text-right text-xs text-odcCream/55 sm:table-cell">{row.legs ?? "–"}</td>
+                <td className="mono px-3 py-2.5 text-right text-sm font-bold">{row.points ?? "–"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+function ArchiveStats({ stats }) {
+  if (!stats) return null;
+  const fmt = (v, key) => (key === "bestLeg" ? `${v} darts` : key === "seasonAvg" || key === "bestMatchAvg" ? Number(v).toFixed(2) : v);
+  const boards = [
+    ["seasonAvg", "Best season average"],
+    ["checkout", "Highest checkout"],
+    ["tons180", "Most 180s"],
+    ["bestLeg", "Best leg"],
+  ].filter(([k]) => stats[k]?.length);
+  return (
+    <div className="mb-6 space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          ["Matches", stats.matches],
+          ["Legs", stats.legs],
+          ["180s", stats.tons],
+          ["Best match avg", stats.bestMatchAvg ? `${Number(stats.bestMatchAvg.value).toFixed(2)} · ${stats.bestMatchAvg.name}` : "–"],
+        ].map(([k, v]) => (
+          <Card key={k} className="!p-4">
+            <p className="mono text-[10px] uppercase tracking-[0.14em] text-odcCream/45">{k}</p>
+            <p className="mt-1 truncate text-lg font-semibold">{typeof v === "number" ? v.toLocaleString("en-GB") : v}</p>
+          </Card>
+        ))}
+      </div>
+      {boards.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          {boards.map(([key, label]) => (
+            <Card key={key} className="!p-4">
+              <p className="mono mb-2 text-[10px] uppercase tracking-[0.14em] text-odcRed">{label}</p>
+              {stats[key].map((p, i) => (
+                <p key={p.name + i} className="flex items-baseline justify-between gap-3 border-t border-odcCream/[0.06] py-1.5 text-sm first:border-0">
+                  <span className={`truncate ${i === 0 ? "font-semibold text-odcGold" : "text-odcCream/75"}`}>{p.name}</span>
+                  <span className="mono shrink-0 font-bold">{fmt(p.value, key)}</span>
+                </p>
+              ))}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ArchivePage({ data }) {
+  const seasons = useMemo(
+    () => [...seasonArchive].sort((a, b) => seasonNum(b.name) - seasonNum(a.name)),
+    []
+  );
+  const [season, setSeason] = useState(seasons[0]?.name || "all");
+  const [division, setDivision] = useState("all");
+
+  const shown = season === "all" ? seasons : seasons.filter((s) => s.name === season);
+  const divisionOptions = useMemo(() => {
+    const set = new Set();
+    shown.forEach((s) => Object.keys(s.tables || {}).forEach((d) => set.add(d)));
+    return [...set].sort((a, b) => divNum(a) - divNum(b));
+  }, [shown]);
+  const rollDivisions = useMemo(() => {
+    const set = new Set();
+    seasons.forEach((s) => Object.keys(s.champions || {}).forEach((d) => set.add(d)));
+    return [...set].sort((a, b) => divNum(a) - divNum(b));
+  }, [seasons]);
+
+  useEffect(() => {
+    if (division !== "all" && !divisionOptions.includes(division)) setDivision("all");
+  }, [divisionOptions, division]);
+
   const snapshot = () => {
     const name = window.prompt("Name this season (this freezes the CURRENT tables):", CURRENT_SEASON);
     if (!name) return;
@@ -1336,11 +1512,15 @@ function ArchivePage({ data }) {
       name,
       savedOn: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
       champions: Object.fromEntries(Object.entries(tables).map(([d, rows]) => [d, rows?.[0]?.name || ""])),
+      stats: buildSeasonStats(data),
       tables,
     };
+    // re-saving a season replaces it instead of adding it twice
+    const rest = seasonArchive.filter((s) => String(s.name).trim().toLowerCase() !== name.trim().toLowerCase());
+    const all = [entry, ...rest].sort((a, b) => seasonNum(b.name) - seasonNum(a.name));
     const file =
       "/**\n * SEASON ARCHIVE — generated by the site.\n * Replace lib/seasonArchive.js on GitHub with this file to freeze the season.\n */\nexport const seasonArchive = " +
-      JSON.stringify([entry, ...seasonArchive], null, 2) +
+      JSON.stringify(all, null, 2) +
       ";\n";
     const blob = new Blob([file], { type: "text/javascript" });
     const a = document.createElement("a");
@@ -1352,26 +1532,106 @@ function ArchivePage({ data }) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
-      <SectionTitle
-        kicker="History"
-        title="Season Archive"
-        text="Finished seasons, frozen forever — final tables and champions."
-      />
-
-      <Card className="mb-10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="font-semibold">End of season? Freeze it here.</p>
-            <p className="mt-1.5 text-sm leading-6 text-odcCream/55">
-              Only do this when the season is finished. The button downloads a file called{" "}
-              <span className="mono text-odcCream/80">seasonArchive.js</span> — the final tables, frozen. Then:{" "}
-              <b className="text-odcCream/80">1.</b> go to your GitHub repo and click into the{" "}
-              <span className="mono text-odcCream/80">lib</span> folder,{" "}
-              <b className="text-odcCream/80">2.</b> Add file &rarr; Upload files,{" "}
-              <b className="text-odcCream/80">3.</b> drag the downloaded file in and commit. The season then appears on this
-              page forever. Until you do that, the file just sits in your Downloads doing nothing.
-            </p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <SectionTitle kicker="History" title="Season Archive" text="Every finished season, frozen forever: final tables, champions and records." />
+        {seasons.length > 0 && (
+          <div className="mb-7 flex flex-col gap-3 md:flex-row">
+            <ArchiveSelect label="Season" value={season} onChange={setSeason}>
+              <option value="all">All seasons</option>
+              {seasons.map((s) => (
+                <option key={s.name} value={s.name}>{s.name}</option>
+              ))}
+            </ArchiveSelect>
+            <ArchiveSelect label="Division" value={division} onChange={setDivision}>
+              <option value="all">All divisions</option>
+              {divisionOptions.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </ArchiveSelect>
           </div>
+        )}
+      </div>
+
+      {seasons.length === 0 ? (
+        <Card>
+          <p className="font-semibold">No archived seasons yet.</p>
+          <p className="mt-1.5 text-sm text-odcCream/55">{LAST_SEASON} has just finished — it'll be the first one in the vault.</p>
+        </Card>
+      ) : (
+        <>
+          {season === "all" && (
+            <Card className="mb-10 !p-0 overflow-hidden">
+              <div className="border-b border-odcCream/10 px-4 py-3">
+                <p className="display text-lg tracking-[0.03em]">Roll of Honour</p>
+              </div>
+              <div className="num overflow-x-auto">
+                <table className="w-full min-w-[420px] border-collapse">
+                  <thead>
+                    <tr className="mono border-b border-odcCream/[0.13] text-left text-[9.5px] uppercase tracking-[0.14em] text-odcCream/40">
+                      <th className="px-4 py-2.5 font-semibold">Division</th>
+                      {seasons.map((s) => (
+                        <th key={s.name} className="px-3 py-2.5 font-semibold">
+                          <button onClick={() => setSeason(s.name)} className="uppercase hover:text-odcCream">{s.name}</button>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rollDivisions
+                      .filter((d) => division === "all" || d === division)
+                      .map((d) => (
+                        <tr key={d} className="border-b border-odcCream/[0.06] last:border-0 odd:bg-odcBlack/40">
+                          <td className="mono px-4 py-2.5 text-xs font-semibold text-odcCream/60">{d}</td>
+                          {seasons.map((s) => (
+                            <td key={s.name} className="px-3 py-2.5 text-[13px] font-semibold text-odcGold">
+                              {s.champions?.[d] ? `★ ${s.champions[d]}` : <span className="text-odcCream/25">{"–"}</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {shown.map((s) => {
+            const tables = Object.entries(s.tables || {})
+              .filter(([d]) => division === "all" || d === division)
+              .sort(([a], [b]) => divNum(a) - divNum(b));
+            return (
+              <div key={s.name} className="mb-12">
+                <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3 border-b border-odcCream/[0.13] pb-4">
+                  <h3 className="text-3xl md:text-4xl">{s.name}</h3>
+                  <p className="mono text-[10.5px] uppercase tracking-[0.14em] text-odcCream/40">Frozen {s.savedOn}</p>
+                </div>
+                {division === "all" && <ArchiveStats stats={s.stats} />}
+                {tables.length === 0 ? (
+                  <Card><p className="text-odcCream/55">{division} didn't exist in {s.name}.</p></Card>
+                ) : (
+                  <div className="grid gap-5 md:grid-cols-2">
+                    {tables.map(([d, rows]) => (
+                      <ArchiveTable key={d} division={d} rows={rows} champion={s.champions?.[d]} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      <details className="mt-6 rounded-xl border border-odcCream/10 bg-odcNavy/60 p-5">
+        <summary className="mono cursor-pointer text-[11px] font-semibold uppercase tracking-[0.14em] text-odcCream/50">
+          Admin: freeze the season that's just finished
+        </summary>
+        <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm leading-6 text-odcCream/55">
+            Only do this when the season is finished, before the sheet is cleared. It downloads{" "}
+            <span className="mono text-odcCream/80">seasonArchive.js</span> with every season so far plus this one
+            (tables, champions and season stats). Upload it to the <span className="mono text-odcCream/80">lib</span>{" "}
+            folder on GitHub, replacing the old file. Saving the same season name again replaces it rather than adding it twice.
+          </p>
           <button
             onClick={snapshot}
             className="mono shrink-0 rounded-md bg-odcRed px-5 py-3.5 text-xs font-bold uppercase tracking-[0.08em] text-white transition hover:bg-odcRedDeep"
@@ -1379,76 +1639,7 @@ function ArchivePage({ data }) {
             Download season snapshot
           </button>
         </div>
-      </Card>
-
-      {seasonArchive.length === 0 ? (
-        <Card>
-          <p className="font-semibold">No archived seasons yet.</p>
-          <p className="mt-1.5 text-sm text-odcCream/55">{LAST_SEASON} has just finished — it'll be the first one in the vault.</p>
-        </Card>
-      ) : (
-        seasonArchive.map((season) => (
-          <div key={season.name} className="mb-12">
-            <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3 border-b border-odcCream/[0.13] pb-4">
-              <h3 className="text-3xl md:text-4xl">{season.name}</h3>
-              <p className="mono text-[10.5px] uppercase tracking-[0.14em] text-odcCream/40">Frozen {season.savedOn}</p>
-            </div>
-            <div className="grid gap-5 md:grid-cols-2">
-              {Object.entries(season.tables || {}).map(([division, rows]) => (
-                <Card key={division} className="!p-0 overflow-hidden">
-                  <div className="flex items-center justify-between gap-2 border-b border-odcCream/10 px-4 py-3">
-                    <p className="display text-lg tracking-[0.03em]">{division}</p>
-                    {season.champions?.[division] && (
-                      <p className="mono text-[10px] uppercase tracking-[0.1em] text-odcGold">
-                        ★ Champion — {season.champions[division]}
-                      </p>
-                    )}
-                  </div>
-                  <div className="num overflow-x-auto">
-                    <table className="w-full min-w-[420px] border-collapse">
-                      <thead>
-                        <tr className="mono border-b border-odcCream/[0.13] text-left text-[9.5px] uppercase tracking-[0.14em] text-odcCream/40">
-                          <th className="px-3 py-2.5 font-semibold">Pos</th>
-                          <th className="px-2 py-2.5 font-semibold">Player</th>
-                          <th className="px-2 py-2.5 text-right font-semibold">P</th>
-                          <th className="px-2 py-2.5 text-right font-semibold">W</th>
-                          <th className="px-2 py-2.5 text-right font-semibold">D</th>
-                          <th className="px-2 py-2.5 text-right font-semibold">L</th>
-                          <th className="hidden px-2 py-2.5 text-right font-semibold sm:table-cell">+/−</th>
-                          <th className="px-3 py-2.5 text-right font-semibold">Pts</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(rows || []).map((row, i) => (
-                          <tr
-                            key={row.name || i}
-                            className={`border-b border-odcCream/[0.06] last:border-0 odd:bg-odcBlack/40 ${
-                              i === 0 ? "bg-odcGold/[0.07] odd:bg-odcGold/[0.07]" : ""
-                            }`}
-                          >
-                            <td className="mono w-11 px-3 py-2.5 text-xs font-semibold text-odcCream/50">
-                              {String(row.pos ?? i + 1).padStart(2, "0")}
-                            </td>
-                            <td className={`px-2 py-2.5 text-[13px] font-semibold ${i === 0 ? "text-odcGold" : ""}`}>
-                              {i === 0 ? "★ " : ""}{row.name}
-                            </td>
-                            <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.played ?? "\u2013"}</td>
-                            <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.wins ?? "\u2013"}</td>
-                            <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.draws ?? "\u2013"}</td>
-                            <td className="mono px-2 py-2.5 text-right text-xs text-odcCream/55">{row.losses ?? "\u2013"}</td>
-                            <td className="mono hidden px-2 py-2.5 text-right text-xs text-odcCream/55 sm:table-cell">{row.legs ?? "\u2013"}</td>
-                            <td className="mono px-3 py-2.5 text-right text-sm font-bold">{row.points ?? "\u2013"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ))
-      )}
+      </details>
     </div>
   );
 }
@@ -2149,6 +2340,7 @@ export default function App() {
         {active === "results"      && <ResultsPage data={data} onSelectMatch={setSelectedMatch} />}
         {active === "tables"       && <TablesPage data={data} />}
         {active === "duo"          && <DuoLeaguePage data={data} />}
+        {active === "rivalry"      && <Rivalry />}
         {active === "players"      && <PlayersPage data={data} onSelectPlayer={setSelectedPlayer} />}
         {active === "leaderboards" && <LeaderboardsPage data={data} />}
         {active === "predictions"  && <Predictions data={data} scriptUrl={PREDICTIONS_SCRIPT_URL} />}
