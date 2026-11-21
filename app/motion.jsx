@@ -14,23 +14,45 @@ import { motion, useInView, animate } from "framer-motion";
  */
 
 // ---- Count-up number ----
+// Always shows the real number (also in the server HTML, so Google and slow
+// phones never see 0). The count-up is only a bonus when it scrolls into view.
 export function CountUp({ value, duration = 1.1, decimals = 0, suffix = "", prefix = "" }) {
+  const target = Number(value) || 0;
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-40px" });
-  const [display, setDisplay] = useState(0);
+  const [display, setDisplay] = useState(target);
+  const hasAnimated = useRef(false);
+  const last = useRef(target);
 
   useEffect(() => {
-    if (!inView) return;
-    const target = Number(value) || 0;
-    const controls = animate(0, target, {
+    if (!inView) {
+      setDisplay(target);
+      last.current = target;
+      return;
+    }
+    const from = hasAnimated.current ? last.current : 0;
+    hasAnimated.current = true;
+    last.current = target;
+    if (from === target) {
+      setDisplay(target);
+      return;
+    }
+    const controls = animate(from, target, {
       duration,
       ease: [0.2, 0.8, 0.2, 1],
       onUpdate: (v) => setDisplay(v),
+      onComplete: () => setDisplay(target),
     });
-    return () => controls.stop();
-  }, [inView, value, duration]);
+    // Safety net: whatever happens to the animation, land on the real number.
+    const t = setTimeout(() => setDisplay(target), duration * 1000 + 300);
+    return () => {
+      controls.stop();
+      clearTimeout(t);
+      setDisplay(target);
+    };
+  }, [inView, target, duration]);
 
-  const formatted = decimals > 0 ? display.toFixed(decimals) : Math.round(display).toLocaleString();
+  const formatted = decimals > 0 ? Number(display).toFixed(decimals) : Math.round(display).toLocaleString();
   return <span ref={ref}>{prefix}{formatted}{suffix}</span>;
 }
 
