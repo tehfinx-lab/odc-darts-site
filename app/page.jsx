@@ -2,26 +2,33 @@ import { unstable_cache } from "next/cache";
 import App from "./HomeApp";
 import { GET as leagueData } from "./api/league-data/route";
 
-// Render the home page with the real league data in the HTML, so Google (and
-// anyone on a slow phone) sees the actual tables, players and results instead
-// of the demo placeholders. Rebuilt at most every 2 minutes; the browser still
-// fetches fresh data straight after it loads.
-export const revalidate = 120;
+// Render on each request (same context as /api/league-data, which works),
+// so Google always gets real tables/players in the HTML. The sheet data
+// itself is cached for 2 minutes so visits stay fast.
+export const dynamic = "force-dynamic";
 
-const getInitialData = unstable_cache(
+const getCachedLeagueData = unstable_cache(
   async () => {
-    try {
-      const res = await leagueData();
-      if (!res.ok) return null;
-      const json = await res.json();
-      return json && json.tables && json.players && !json.error ? json : null;
-    } catch {
-      return null;
+    const res = await leagueData();
+    const json = await res.json();
+    if (!res.ok || !json || !json.tables || !json.players || json.error) {
+      // Throw so a failed fetch is never cached.
+      throw new Error((json && json.error) || `league-data returned ${res.status}`);
     }
+    return json;
   },
-  ["odc-home-league-data"],
+  ["odc-home-league-data-v2"],
   { revalidate: 120 }
 );
+
+async function getInitialData() {
+  try {
+    return await getCachedLeagueData();
+  } catch (error) {
+    console.error("[home SSR] league data failed:", error);
+    return null;
+  }
+}
 
 export default async function Page() {
   const initialData = await getInitialData();
