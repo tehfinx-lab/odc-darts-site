@@ -67,8 +67,8 @@ function canon(name = "") {
 // change season to season.
 // ---------------------------------------------------------------
 const DIVISION_BEST_OF = {
-  1: 10, 2: 10, 3: 10, 4: 10,
-  5: 8, 6: 8, 7: 8, 8: 8, 9: 8, 10: 8, // TODO: confirm best-of for divs 5-10
+  1: 10, 2: 10, 3: 10,                         // Divisions 1-3: best of 10 (first to 6)
+  4: 8, 5: 8, 6: 8, 7: 8, 8: 8, 9: 8, 10: 8,   // Divisions 4-10: best of 8 (first to 5)
 };
 const DEFAULT_BEST_OF = 8;
 
