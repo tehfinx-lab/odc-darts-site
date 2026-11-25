@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { STATE_COOKIE, siteOrigin } from "../../../../lib/session";
+import { STATE_COOKIE, NEXT_COOKIE, siteOrigin } from "../../../../lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,5 +21,10 @@ export async function GET(request) {
   });
   const res = NextResponse.redirect(`https://discord.com/oauth2/authorize?${params}`);
   res.cookies.set(STATE_COOKIE, state, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 600 });
+  // where to land after signing in (only pages we know about)
+  const next = new URL(request.url).searchParams.get("next");
+  if (next && ["hub", "predictions"].includes(next)) {
+    res.cookies.set(NEXT_COOKIE, next, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 600 });
+  }
   return res;
 }

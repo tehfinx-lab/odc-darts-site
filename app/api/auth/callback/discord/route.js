@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
-  SESSION_COOKIE, STATE_COOKIE, createSessionToken, sessionCookieOptions, siteOrigin,
+  SESSION_COOKIE, STATE_COOKIE, NEXT_COOKIE, createSessionToken, sessionCookieOptions, siteOrigin, discordAvatarUrl,
 } from "../../../../../lib/session";
-import { findPlayerByDiscordId } from "../../../../../lib/sheetsWrite";
+import { findPlayerByDiscordId, saveAvatar } from "../../../../../lib/sheetsWrite";
 
 export const dynamic = "force-dynamic";
 
@@ -55,15 +55,26 @@ export async function GET(request) {
       console.error("Players lookup failed", e);
     }
 
+    // keep their Discord picture for the predictions leaderboard
+    if (player?.name) {
+      try {
+        await saveAvatar(player.name, me.id, discordAvatarUrl(me.id, me.avatar));
+      } catch (e) {
+        console.error("saveAvatar failed", e);
+      }
+    }
+
     const session = createSessionToken({
       id: me.id,
       name: me.global_name || me.username,
       avatar: me.avatar || "",
       player: player?.name || "",
     });
-    const res = NextResponse.redirect(`${origin}/#hub`);
+    const next = request.cookies.get(NEXT_COOKIE)?.value;
+    const res = NextResponse.redirect(`${origin}/#${next === "predictions" ? "predictions" : "hub"}`);
     res.cookies.set(SESSION_COOKIE, session, sessionCookieOptions);
     res.cookies.delete(STATE_COOKIE);
+    res.cookies.delete(NEXT_COOKIE);
     return res;
   } catch (e) {
     console.error("Sign-in failed", e);
